@@ -1,0 +1,18 @@
+# dependências e saída do build
+node_modules/
+dist/
+__pycache__/
+.pytest_cache/
+
+# DADOS REAIS: nunca versionar (ver docs/decisoes/0010-dados-reais-fora-do-git.md)
+*.xlsx
+*.xlsm
+*.xls
+*.csv
+*.har
+*.json.bak
+configuracao_mapa_portfolio*.json
+diagnostico_*.json
+# dados fictícios dos testes são gerados por tests/gerar_fixtures.py
+fixtures/*
+!fixtures/.gitkeep

@@ -1,0 +1,16 @@
+{
+  "name": "mapa-portfolio",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Mapa do Portfólio: visualizador encadeado Iniciativa → Release → Épico → Times, em um único arquivo HTML sem servidor.",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "check": "node scripts/check-syntax.mjs",
+    "fixtures": "python3 tests/gerar_fixtures.py",
+    "test": "npm run build && python3 -m pytest tests -q"
+  },
+  "devDependencies": {
+    "xlsx": "0.18.5"
+  }
+}

@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mapa do Portfólio</title>
+<style>/*__CSS__*/</style>
+</head>
+<body>
+<div class="top">
+  <div class="top-row">
+    <div class="brand"><h1>Mapa do Portfólio</h1><span class="src" id="srcLabel">dados de exemplo</span></div>
+    <label class="btn primary" for="file">Carregar planilha</label>
+    <input id="file" type="file" accept=".xlsx,.xlsm,.xls,.csv,.txt" multiple class="visually-hidden" title="Planilha do Portal (tabela ou CSV nas abas) ou arquivos .csv, um por aba">
+    <button class="btn" id="btnDemo">Dados de exemplo</button>
+    <button class="btn" id="btnTemplate" title="Baixa a planilha de exemplo no formato esperado">Baixar modelo</button>
+    <button class="btn" id="btnAz" title="Carrega ou atualiza os dados direto do Azure DevOps">Azure DevOps</button>
+    <button class="btn" id="btnCfg" title="Alertas por time e colunas de Discovery, WIP e Vazão">Configurações</button>
+    <button class="btn" id="btnHygiene">Higiene de dados</button>
+  </div>
+  <div class="filters">
+    <div class="f"><label for="fExec">Roadmap executivo</label><select id="fExec"></select></div>
+    <div class="f" id="fOwnerBox"><label id="fOwnerLab" title="Filtra apenas o nível de Iniciativas; releases, épicos e times não são filtrados por responsável">Responsável da iniciativa</label>
+      <div class="ms" id="ms">
+        <button type="button" class="ms-btn" id="fOwner" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="fOwnerLab fOwner"><span id="msLabel">Todos</span><span class="caret">▾</span></button>
+        <div class="ms-pop" id="msPop" hidden>
+          <input type="search" id="msSearch" placeholder="Buscar por qualquer parte do nome" autocomplete="off" aria-label="Buscar responsável">
+          <div class="ms-actions"><button type="button" id="msAll">Marcar os listados</button><button type="button" id="msNone">Limpar</button><span class="cnt" id="msCount"></span></div>
+          <div class="ms-list" id="msList" role="listbox" aria-multiselectable="true"></div>
+        </div>
+      </div></div>
+    <div class="f"><label for="fInt">Roadmap interno</label><select id="fInt"></select></div>
+    <div class="f"><label for="fTeam">Time</label><select id="fTeam"></select></div>
+    <div class="f"><label for="fIni">Iniciativa (ID ou nome)</label><input id="fIni" type="search" placeholder="Ex.: 1003 ou Pix"></div>
+    <div class="f"><label for="goto">Ir para qualquer ID</label><input id="goto" type="search" placeholder="Release, épico ou item"></div>
+    <button class="btn" id="btnExpand" disabled title="Selecione uma iniciativa">Abrir cadeia completa</button>
+    <button class="btn" id="btnClear">Limpar seleção</button>
+    <button class="btn" id="btnClearF" disabled title="Remove todos os filtros ativos">Limpar filtros<span class="n" id="nFilters"></span></button>
+    <label class="chk" title="Mostra também as etapas do fluxo sem nenhum item"><input type="checkbox" id="fEmpty" checked> Mostrar etapas vazias</label>
+    <label class="chk" title="Mostra iniciativas sem release e releases sem épico (exceto as já concluídas). Desligue para ver só a cadeia completa."><input type="checkbox" id="fBare" checked> Mostrar itens sem desdobramento</label>
+    <div class="anchor-bar">
+      <label class="chk" title="Desmarque para arrastar as ilhas pelo whiteboard; marque para travá-las no lugar"><input type="checkbox" id="fAnchor" checked> Ilhas ancoradas</label>
+      <button class="btn" id="btnLayout" disabled title="Desfaz os movimentos e volta ao layout automático">Reorganizar automaticamente</button>
+    </div>
+    <div class="sep"></div>
+    <div class="legend" aria-label="Legenda dos barbantes">
+      <span><i style="background:var(--ok)"></i>no fluxo</span>
+      <span><i style="background:var(--warn)"></i>atenção</span>
+      <span><i style="background:var(--alert)"></i>alerta</span>
+      <span><i style="background:var(--outlier)"></i>outlier</span>
+    </div>
+  </div>
+</div>
+<div class="notice" id="notice">Você está vendo dados fictícios. Carregue a planilha do Portal para ver o seu portfólio; nada sai do seu computador.</div>
+<nav class="crumbs" id="crumbs" aria-label="Caminho selecionado"></nav>
+<div class="viewport" id="viewport"><div class="sizer" id="sizer"><div id="board"></div></div></div>
+<div class="zoom" role="group" aria-label="Zoom do quadro">
+  <button id="zOut" aria-label="Diminuir zoom">−</button><button class="zl" id="zLabel" title="Voltar a 100%">100%</button><button id="zIn" aria-label="Aumentar zoom">+</button><button class="fit" id="zFit">Ajustar à tela</button>
+  <span class="sepv" id="tnavSep" hidden></span><div class="tnav" id="tnav" hidden aria-label="Ir para o time"></div>
+</div>
+<div class="minimap" id="minimap" aria-label="Minimapa do quadro"><div class="mm-t"><span>Visão geral</span><button id="mmClose" title="Ocultar minimapa" aria-label="Ocultar minimapa">×</button></div><canvas id="mm" width="220" height="140"></canvas></div>
+<button class="btn mm-open" id="mmOpen" hidden>Mostrar mapa</button>
+
+<button class="an-tab" id="anTab" disabled aria-expanded="false" aria-controls="anPanel" title="Selecione um Time e um Roadmap (interno ou executivo) nos filtros para habilitar"><span>Visão analítica</span></button>
+<aside class="an-panel" id="anPanel" aria-hidden="true" aria-label="Visão analítica do roadmap">
+  <div class="an-head">
+    <div class="an-title" id="anTitle"></div>
+    <div class="an-actions"><button class="btn" id="anCopy" title="Copia a tabela para colar no PowerPoint, Excel ou e-mail">Copiar tabela</button><button class="x" id="anClose" aria-label="Recolher visão analítica">«</button></div>
+  </div>
+  <div class="an-body" id="anBody"></div>
+</aside>
+<aside class="drawer" id="drawer" aria-hidden="true">
+  <header><h3 id="dTitle">Detalhes</h3><button class="x" id="dClose" aria-label="Fechar painel">×</button></header>
+  <div class="body" id="dBody"></div>
+</aside>
+<div class="modal-bg" id="cfgBg" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="cfgTitle">
+    <header><h3 id="cfgTitle">Configurações</h3><button class="x" id="cfgClose" aria-label="Fechar">×</button></header>
+    <div class="mbody" id="cfgBody"></div>
+    <footer>
+      <button class="btn" id="cfgReset" title="Volta alertas, fluxo, tags e cores ao padrão; mantém conexões, fontes e dados">Restaurar padrão</button>
+      <button class="btn danger" id="cfgWipe" title="Apaga tudo o que o portal guardou neste navegador e reinicia como no primeiro acesso">Limpar tudo e reiniciar</button>
+      <button class="btn" id="cfgExport" title="Baixa a configuração em um arquivo .json">Exportar</button>
+      <label class="btn" for="cfgImport" title="Carrega uma configuração exportada antes">Importar</label>
+      <input type="file" id="cfgImport" accept=".json,application/json" class="visually-hidden">
+      <span class="sep"></span>
+      <button class="btn" id="cfgCancel">Cancelar</button>
+      <button class="btn primary" id="cfgSave">Salvar</button>
+    </footer>
+  </div>
+</div>
+<div class="modal-bg" id="azBg" hidden><div class="modal" role="dialog" aria-modal="true" aria-label="Carga do Azure DevOps"><div class="mbody az-body" id="azBody"></div></div></div>
+<div class="fmsg" id="fmsg" role="alert" hidden></div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>/*__XLSX__*/</script>
+<script>/*__APP__*/</script>
+</body>
+</html>
