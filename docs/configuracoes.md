@@ -23,6 +23,9 @@ Testes: `tests/test_configuracoes.py`.
 | `typeColors[nível][tipo]` | `{}` | cor da faixa do card por tipo |
 | `fields[nível]` | `[]` | campos adicionais exibidos nos cards |
 | `anTag`, `anClassCol`, `anFreeze` | ROADMAP, Classificação_Despesas_Comitê, 0 | visão analítica |
+| `f4p.months` | 6 | período (meses) da amostra do P95/P50 do Report F4P |
+| `f4p.types` | user story, technical story | tipos considerados na amostra do Report F4P |
+| `f4p.teams[time]` | `{}` | por time: `min`, `max` da variabilidade esperada (padrão efetivo 1.5/3.5) |
 | `azure.orgs` | `[]` | organizações (sem token) |
 | `azure.sources` | `[]` | fontes: `id, role, org, project, team, level, alias, stages` |
 | `azure.maps[fonte]` | `{}` | mapeamento de colunas antigas (`colunaId` ou `colunaId|Done` → coluna atual) |
@@ -34,6 +37,7 @@ Testes: `tests/test_configuracoes.py`.
 - Por time: atenção < CT máximo < outlier; atenção ou outlier exigem CT máximo.
 - Regra geral: atenção < atraso < outlier.
 - Fluxo de cada time: pelo menos **duas** colunas em "Entra no CT"; as abas com problema ficam em vermelho.
+- Report F4P: `min` e `max` da variabilidade de um time só valem preenchidos os dois juntos, e `min` < `max`.
 - Com erro, nada é salvo e os valores digitados são preservados no formulário.
 
 ## Times listados na configuração

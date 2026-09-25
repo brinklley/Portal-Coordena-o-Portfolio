@@ -9,6 +9,7 @@ const cfgDefaults = () => ({teams:{}, warnDays:30, alertDays:60, outlierDays:90,
   ctTypes:["user story","technical story","technical solution"], tags:TAG_DEFAULTS(),
   typeColors:{ini:{}, rel:{}, epi:{}, op:{}}, fields:{ini:[], rel:[], epi:[], op:[]}, ctCols:null, flow:{},
   anTag:"ROADMAP", anClassCol:"Classificação_Despesas_Comitê", anFreeze:0,
+  f4p:{months:6, types:["user story","technical story"], teams:{}},
   azure:{orgs:[], sources:[], maps:{}, fields:{epic:"ID_EPICO_UNICRED", roadmap:"AnoSemestreRoadmap"}, excludeRemoved:true}});
 /* aceita configurações antigas (ctMax + warnPct) e converte para limites por time */
 function normCfg(j){
@@ -18,6 +19,10 @@ function normCfg(j){
   c.typeColors = {ini:{}, rel:{}, epi:{}, op:{}, ...(j.typeColors || {})};
   c.fields = {ini:[], rel:[], epi:[], op:[], ...(j.fields || {})};
   c.flow = {...(j.flow || {})};
+  const f4pD = cfgDefaults().f4p, jf = j.f4p || {};
+  c.f4p = {months: jf.months > 0 ? jf.months : f4pD.months,
+    types: Array.isArray(jf.types) && jf.types.length ? jf.types : f4pD.types,
+    teams: {...(jf.teams || {})}};
   const az = j.azure || {};   // tokens nunca fazem parte da configuração
   c.azure = {orgs:(az.orgs || []).map(o => ({org:o.org})), sources:az.sources || [], maps:az.maps || {},
     fields:{epic:"ID_EPICO_UNICRED", roadmap:"AnoSemestreRoadmap", ...(az.fields || {})}, excludeRemoved: az.excludeRemoved !== false};
@@ -32,6 +37,11 @@ function limitsOf(team){
   const planned = t.max > 0;
   return {planned, warn: planned ? t.warn : CFG.warnDays, max: planned ? t.max : CFG.alertDays,
     out: planned ? t.out : CFG.outlierDays, stuck: t.stuck > 0 ? t.stuck : CFG.stuckDays};
+}
+/* faixa de variabilidade esperada de um time (Report F4P): a planejada ou o padrão 1.5–3.5 */
+function f4pRangeOf(team){
+  const t = (CFG.f4p.teams || {})[norm(team)] || {};
+  return {min: t.min > 0 ? t.min : 1.5, max: t.max > 0 ? t.max : 3.5, planned: t.min > 0 && t.max > 0};
 }
 function saveCfg(){ try { localStorage.setItem(CFG_KEY, JSON.stringify(CFG)); return true; } catch(e){ return false; } }
 /* Padrão: Vazão = de "Aguardando Deploy"/"Pronto para Deploy" até o fim; WIP = de "READY" até antes da Vazão. */

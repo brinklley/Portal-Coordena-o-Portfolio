@@ -1,4 +1,6 @@
-# Report F4P (próxima tarefa)
+# Report F4P
+
+**Status**: Quadrantes 1 (CycleTime) e 2 (Variabilidade) implementados — ver `docs/regras-de-negocio.md` §12 e `docs/decisoes/0011-report-f4p-quadrantes-1-e-2.md`. Os demais quadrantes abaixo continuam "em definição" (próxima tarefa: definir a regra de cada um, um de cada vez).
 
 Tela "Report F4P" (BUSINESS OUTCOMES – PRODUCTIVITY), inspirada no slide usado pela gestão, com o mesmo comportamento da Visão analítica: **painel lateral recolhível, habilitado só quando o filtro tem um Time e um Roadmap (interno ou executivo)**. O filtro só habilita o acesso; o relatório mostra **sempre todos os times ativos na configuração** (colunas CORE, MOBILE, IB, BO… são os times).
 

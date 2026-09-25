@@ -78,7 +78,7 @@ function renderAnalytics(){
 }
 const fmtDM = d => d ? d.toLocaleDateString("pt-BR", {day:"2-digit", month:"short"}).replace(".", "").replace(" de ", "/").toUpperCase() : "--";
 function placeAnalytics(){ const h = document.querySelector(".top").offsetHeight; $("anPanel").style.top = h + "px"; $("anPanel").style.height = `calc(100% - ${h}px)`; }
-function openAnalytics(){ if (!anEnabled()) return; AN.open = true; placeAnalytics(); $("anPanel").classList.add("open"); $("anPanel").setAttribute("aria-hidden","false"); $("anTab").setAttribute("aria-expanded","true"); renderAnalytics(); $("anClose").focus(); }
+function openAnalytics(){ if (!anEnabled()) return; if (F4P.open) closeF4P(); AN.open = true; placeAnalytics(); $("anPanel").classList.add("open"); $("anPanel").setAttribute("aria-hidden","false"); $("anTab").setAttribute("aria-expanded","true"); renderAnalytics(); $("anClose").focus(); }
 function closeAnalytics(){ AN.open = false; $("anPanel").classList.remove("open"); $("anPanel").setAttribute("aria-hidden","true"); $("anTab").setAttribute("aria-expanded","false"); }
 $("anTab").onclick = openAnalytics;
 $("anClose").onclick = () => { closeAnalytics(); $("anTab").focus(); };

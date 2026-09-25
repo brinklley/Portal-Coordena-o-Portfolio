@@ -167,3 +167,30 @@ Habilitada com **Time** e **Roadmap** (interno ou executivo) no filtro. Uma linh
 ## 11. Higiene de dados
 
 Lista: importação (CSV detectado, registros reparados/descartados), carga do Azure (Removed excluídos, vínculos divergentes), itens órfãos, épicos inválidos e releases sem iniciativa.
+
+## 12. Report F4P
+
+Especificação completa: `docs/backlog/report-f4p.md`. Decisões de implementação: `docs/decisoes/0011-report-f4p-quadrantes-1-e-2.md`.
+
+Habilitado com **Time** e **Roadmap** (interno ou executivo) no filtro, igual à Visão analítica — mas o filtro só libera o acesso ao painel: o relatório sempre mostra **todos os times carregados no momento** (`S.model.teams`, o mesmo conjunto das colunas do quadro), independente de qual time está selecionado.
+
+### 12.1 Amostra do CycleTime (quadrantes CycleTime e Variabilidade)
+
+Itens **concluídos** (com `o.deploy` preenchido, isto é, já saíram do CT) dos **tipos configurados** (`CFG.f4p.types`, padrão User Story e Technical Story), de **todos** os itens do time (não filtrada pelo roadmap), cuja saída do CT caiu nos últimos **N meses** (`CFG.f4p.months`, padrão 6).
+
+### 12.2 CycleTime (reserva vs. atual)
+
+- **Reserva**: CT máximo do time (`limitsOf(time).max`); sem CT planejado, usa o limite geral e sinaliza no texto de apoio.
+- **Atual**: **P95** do CT da amostra, por **interpolação linear** (igual ao `PERCENTIL.INC` do Excel — função `percentil`).
+- Indicador: P95 > reserva → ▼ vermelho; P95 ≤ reserva → ▲ verde. Sem amostra, mostra "--".
+
+### 12.3 Variabilidade (min vs. atual vs. max)
+
+- **Variabilidade** = P95 ÷ **P50** da mesma amostra, 1 casa decimal (`dec1`).
+- **Min/Max esperados**: por time (`CFG.f4p.teams[time]`), padrão **1.5** / **3.5**.
+- Indicador: acima do máximo → ▼ vermelho; dentro da faixa → ▲ verde; abaixo do mínimo → ▼ laranja.
+- P50 = 0 ou sem amostra → "--"; o tamanho da amostra (n) e o P50 ficam disponíveis no texto de apoio (title) da célula.
+
+### 12.4 Demais quadrantes
+
+Eficiência de fluxo, Roadmap–Épicos, Vazão, Urgente, Technical Story e User Story ainda não têm regra de cálculo definida; aparecem no painel como "em definição", mantendo a mesma grade e as mesmas colunas de time dos quadrantes calculados.

@@ -43,6 +43,13 @@ function nid(v){
   const s = String(v).trim();
   return /^\d+(\.0+)?$/.test(s) ? String(parseInt(s,10)) : s;
 }
+/* percentil por interpolação linear, igual ao PERCENTIL.INC do Excel; array já ordenado ascendente */
+function percentil(a, p){
+  const n = a.length; if (!n) return null; if (n === 1) return a[0];
+  const rank = p * (n - 1), lo = Math.floor(rank), hi = Math.ceil(rank);
+  return lo === hi ? a[lo] : a[lo] + (rank - lo) * (a[hi] - a[lo]);
+}
+const dec1 = x => (x == null || isNaN(x)) ? "--" : (Math.round(x * 10) / 10).toFixed(1).replace(".", ",");
 function colIdx(headers, name){ const n = norm(name); return headers.findIndex(h => norm(h) === n); }
 function flowCols(headers, start, end){
   const ns = norm(start), ne = norm(end);

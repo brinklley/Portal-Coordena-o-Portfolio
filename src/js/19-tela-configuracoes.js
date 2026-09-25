@@ -36,6 +36,18 @@ function cfgForm(err){
       <label>Coluna da iniciativa com Capex/Opex<input type="text" id="cfgAnCol" value="${esc(d.anClassCol || "")}" style="width:240px"></label>
       <label title="Use quando o semestre operacional termina antes do último dia do calendário (ex.: congelamento de fim de ano)">Dias antes do fim do semestre<input type="number" min="0" id="cfgAnFreeze" value="${d.anFreeze || 0}" style="width:120px"></label>
     </div>
+    <h4>Report F4P</h4>
+    <p class="help">Painel Report F4P (aba à esquerda, junto com a Visão analítica): mostra sempre todos os times carregados. O quadrante <b>CycleTime</b> usa o CT máximo por time (tabela “Alertas por time” acima); os campos abaixo valem para a amostra do P95/P50 e para a faixa esperada de <b>Variabilidade</b> (P95 ÷ P50) de cada time. Sem valor por time, usa-se o padrão 1.5–3.5.</p>
+    <div class="grid3">
+      <label>Período do P95/P50 (meses)<input type="number" min="1" id="cfgF4pMonths" value="${d.f4p.months}" style="width:100px"></label>
+    </div>
+    <div class="typelist">${typesFound().map(([ty, n]) => `<label><input type="checkbox" data-f4ptype="${esc(norm(ty))}" ${(d.f4p.types || []).includes(norm(ty)) ? "checked" : ""}> ${esc(ty)} <span class="muted">${n}</span></label>`).join("") || `<span class="muted">Carregue uma planilha para ver os tipos.</span>`}</div>
+    <table class="ctab" ${teams.length ? "" : "hidden"}><thead><tr><th>Time</th><th>Variabilidade mínima</th><th>Variabilidade máxima</th></tr></thead><tbody>
+    ${teams.map(tm => { const k = norm(tm), v = d.f4p.teams[k] || {};
+      return `<tr><td>${esc(tm)}</td>
+        <td><input type="number" min="0.1" step="0.1" data-f4pteam="${esc(k)}" data-f4pf="min" value="${v.min ?? ""}" placeholder="1,5" aria-label="Variabilidade mínima de ${esc(tm)}"></td>
+        <td><input type="number" min="0.1" step="0.1" data-f4pteam="${esc(k)}" data-f4pf="max" value="${v.max ?? ""}" placeholder="3,5" aria-label="Variabilidade máxima de ${esc(tm)}"></td></tr>`; }).join("") || `<tr><td colspan="3" class="muted">Carregue uma planilha para ver os times.</td></tr>`}
+    </tbody></table>
     <h4>Tipos considerados no CT do épico</h4>
     <p class="help">O CycleTime mostrado nos cards de épico usa só os itens dos tipos marcados. Os alertas de cada item continuam valendo para todos os tipos.</p>
     <div class="typelist">${typesFound().map(([ty, n]) => `<label><input type="checkbox" data-cttype="${esc(norm(ty))}" ${(d.ctTypes || []).includes(norm(ty)) ? "checked" : ""}> ${esc(ty)} <span class="muted">${n}</span></label>`).join("") || `<span class="muted">Carregue uma planilha para ver os tipos.</span>`}</div>
@@ -86,6 +98,22 @@ function readForm(){
   d.anTag = $("cfgAnTag").value.trim() || "ROADMAP"; d.anClassCol = $("cfgAnCol").value.trim(); d.anFreeze = Math.max(0, parseInt($("cfgAnFreeze").value, 10) || 0);
   d.ctTypes = [...$("cfgBody").querySelectorAll("input[data-cttype]")].filter(i => i.checked).map(i => i.dataset.cttype)
     .concat((d.ctTypes || []).filter(x => !$("cfgBody").querySelector(`input[data-cttype="${cssEsc(x)}"]`)));
+  d.f4p.months = (() => { const v = parseInt($("cfgF4pMonths").value, 10); return v > 0 ? v : 6; })();
+  d.f4p.types = [...$("cfgBody").querySelectorAll("input[data-f4ptype]")].filter(i => i.checked).map(i => i.dataset.f4ptype)
+    .concat((d.f4p.types || []).filter(x => !$("cfgBody").querySelector(`input[data-f4ptype="${cssEsc(x)}"]`)));
+  const f4pRows = {};
+  $("cfgBody").querySelectorAll("input[data-f4pteam]").forEach(inp => {
+    const k = inp.dataset.f4pteam, v = parseFloat(inp.value.replace(",", "."));
+    (f4pRows[k] ||= {})[inp.dataset.f4pf] = v > 0 ? v : undefined;
+  });
+  d.f4p.teams = {};
+  Object.entries(f4pRows).forEach(([k, r]) => {
+    if (r.min === undefined && r.max === undefined) return;
+    const bad = f => $("cfgBody").querySelector(`input[data-f4pteam="${cssEsc(k)}"][data-f4pf="${f}"]`).classList.add("bad");
+    if (r.min === undefined || r.max === undefined){ err = err || "Para a variabilidade de um time, preencha o mínimo e o máximo juntos."; bad(r.min === undefined ? "min" : "max"); return; }
+    if (r.min >= r.max){ err = err || "A variabilidade mínima precisa ser menor que a máxima."; bad("min"); return; }
+    d.f4p.teams[k] = {min: r.min, max: r.max};
+  });
   $("cfgBody").querySelectorAll("input[data-tc-lvl]").forEach(i => {
     const l = i.dataset.tcLvl, k = i.dataset.tcType; d.typeColors[l] = d.typeColors[l] || {};
     if (i.value.toLowerCase() === LVL_HEX[l].toLowerCase()) delete d.typeColors[l][k]; else d.typeColors[l][k] = i.value;

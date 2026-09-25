@@ -30,7 +30,7 @@ Painel lateral (aba "Visão analítica") habilitado com Time + Roadmap. Tabela n
 
 ## Report F4P
 
-Em construção. Especificação: `docs/backlog/report-f4p.md`.
+Painel lateral (aba "Report F4P", ao lado da Visão analítica) habilitado com Time + Roadmap; o filtro só habilita o acesso, o relatório sempre mostra todos os times carregados. Grade de 8 quadrantes em 2 colunas, no formato do slide de referência. **CycleTime** e **Variabilidade** têm regra calculada (P95/P50 do CT, interpolação linear); os demais 6 aparecem como "em definição". Regras em `docs/regras-de-negocio.md` §12; especificação completa e decisões em `docs/backlog/report-f4p.md` e `docs/decisoes/0011-report-f4p-quadrantes-1-e-2.md`.
 
 ## Higiene de dados
 

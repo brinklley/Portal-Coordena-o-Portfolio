@@ -95,6 +95,7 @@ function render(){
   renderTeamNav();
   markActiveFilters();
   renderAnalytics();
+  renderF4P();
   if (S.lastFilterEl){
     const el = S.lastFilterEl; S.lastFilterEl = null;
     if (!iniList.length && S.emptyDiag) requestAnimationFrame(() => showFmsg(el, diagHtml(S.emptyDiag)));

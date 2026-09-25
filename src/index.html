@@ -61,13 +61,23 @@
 <div class="minimap" id="minimap" aria-label="Minimapa do quadro"><div class="mm-t"><span>Visão geral</span><button id="mmClose" title="Ocultar minimapa" aria-label="Ocultar minimapa">×</button></div><canvas id="mm" width="220" height="140"></canvas></div>
 <button class="btn mm-open" id="mmOpen" hidden>Mostrar mapa</button>
 
-<button class="an-tab" id="anTab" disabled aria-expanded="false" aria-controls="anPanel" title="Selecione um Time e um Roadmap (interno ou executivo) nos filtros para habilitar"><span>Visão analítica</span></button>
+<div class="side-tabs">
+  <button class="side-tab" id="anTab" disabled aria-expanded="false" aria-controls="anPanel" title="Selecione um Time e um Roadmap (interno ou executivo) nos filtros para habilitar"><span>Visão analítica</span></button>
+  <button class="side-tab" id="f4pTab" disabled aria-expanded="false" aria-controls="f4pPanel" title="Selecione um Time e um Roadmap (interno ou executivo) nos filtros para habilitar"><span>Report F4P</span></button>
+</div>
 <aside class="an-panel" id="anPanel" aria-hidden="true" aria-label="Visão analítica do roadmap">
   <div class="an-head">
     <div class="an-title" id="anTitle"></div>
     <div class="an-actions"><button class="btn" id="anCopy" title="Copia a tabela para colar no PowerPoint, Excel ou e-mail">Copiar tabela</button><button class="x" id="anClose" aria-label="Recolher visão analítica">«</button></div>
   </div>
   <div class="an-body" id="anBody"></div>
+</aside>
+<aside class="an-panel f4p-panel" id="f4pPanel" aria-hidden="true" aria-label="Report F4P">
+  <div class="an-head">
+    <div class="an-title" id="f4pTitle"></div>
+    <div class="an-actions"><button class="x" id="f4pClose" aria-label="Recolher Report F4P">«</button></div>
+  </div>
+  <div class="an-body" id="f4pBody"></div>
 </aside>
 <aside class="drawer" id="drawer" aria-hidden="true">
   <header><h3 id="dTitle">Detalhes</h3><button class="x" id="dClose" aria-label="Fechar painel">×</button></header>

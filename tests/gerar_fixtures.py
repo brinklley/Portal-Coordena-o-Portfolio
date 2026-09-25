@@ -116,6 +116,22 @@ def csv_nas_abas():
         ["500,100,Item Próximo,User Story,2026-04-06,2026-04-07,2026-04-20,2026-04-21", "501,101,Item dois,User Story,2026-04-06,,,", "502,Item truncado sem colunas"])
     wb.save(OUT / "csv_nas_abas.xlsx")
 
+def f4p():
+    """Time único (CORE) com 10 itens de CT conhecido, para conferir o P95/P50 do Report F4P
+    (docs/backlog/report-f4p.md) contra um cálculo independente. Datas relativas a agora,
+    para a amostra sempre cair dentro dos últimos 6 meses (padrão de CFG.f4p.months)."""
+    entry = dt.datetime.now() - dt.timedelta(days=150)
+    wb = openpyxl.Workbook(); wb.remove(wb.active)
+    I = wb.create_sheet("Iniciativa"); I.append(["ID","Title","AnoSemestreRoadmap","Materialização da Oportunidade ou Solicitação","Concluído"])
+    I.append([1, "Ini F4P", "2026 2º Semestre", entry, None])
+    R = wb.create_sheet("Release"); R.append(["ID","Title","Parent","Inventário de Opções de Valor","Entregue"]); R.append([10, "Rel F4P", 1, entry, None])
+    E = wb.create_sheet("Épico"); E.append(["ID","Title","Parent","Target Date","Backlog","Fechado"]); E.append([100, "Ep F4P", 10, entry, entry, None])
+    T = wb.create_sheet("TIME CORE"); T.append(["ID","ID_EPICO_UNICRED","Title","Work Item Type","Backlog","READY / PRONTO PARA DEV","Pronto para Deploy","Fechado"])
+    for i, ct in enumerate([10, 20, 25, 30, 35, 40, 45, 50, 60, 100]):        # CTs conhecidos (n=10)
+        deploy = entry + dt.timedelta(days=ct)
+        T.append([2000 + i, 100, f"Item {i}", "User Story", entry, entry, deploy, deploy + dt.timedelta(days=1)])
+    wb.save(OUT / "f4p.xlsx")
+
 if __name__ == "__main__":
-    for f in (times, responsaveis, fluxo_largo, desdobramento, csv_nas_abas): f()
+    for f in (times, responsaveis, fluxo_largo, desdobramento, csv_nas_abas, f4p): f()
     print("fixtures geradas em", OUT)
