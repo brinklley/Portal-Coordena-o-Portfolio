@@ -23,7 +23,7 @@ def test_aba_desabilitada_sem_time_e_roadmap(page):
     assert page.is_disabled("#f4pTab")
     page.evaluate("()=>{ S.f.team='CORE'; render(); }")
     assert page.is_disabled("#f4pTab")                       # só o time não basta
-    page.evaluate("()=>{ S.f.exec='2026 2º Semestre'; render(); }")
+    page.evaluate("()=>{ S.f.exec=semestre(TODAY); render(); }")   # semestre atual
     assert not page.is_disabled("#f4pTab")
     page.click("#f4pTab")
     assert page.evaluate("F4P.open") is True
@@ -32,7 +32,7 @@ def test_aba_desabilitada_sem_time_e_roadmap(page):
 
 def test_todos_os_times_aparecem_mesmo_com_time_filtrado(page):
     carregar(page, "times.xlsx")                             # 7 times
-    page.evaluate("()=>{ S.f.team='CORE'; S.f.exec='2026 2º Semestre'; render(); }")
+    page.evaluate("()=>{ S.f.team='CORE'; S.f.exec=semestre(TODAY); render(); }")
     page.click("#f4pTab")
     n_teams = page.evaluate("S.model.teams.length")
     cols = page.evaluate("document.querySelector('#f4pBody .f4p-tbl thead').querySelectorAll('th').length")
@@ -40,15 +40,57 @@ def test_todos_os_times_aparecem_mesmo_com_time_filtrado(page):
 
 def test_quadrante_em_definicao_mostra_travessao_e_nota(page):
     carregar(page, "f4p.xlsx")
-    page.evaluate("()=>{ S.f.team='CORE'; S.f.exec='2026 2º Semestre'; render(); }")
+    page.evaluate("()=>{ S.f.team='CORE'; S.f.exec=semestre(TODAY); render(); }")
     page.click("#f4pTab")
     assert "Regra de cálculo ainda em definição." in page.inner_text("#f4pBody")
 
 def test_ct_acima_do_maximo_fica_vermelho(page):
     carregar(page, "f4p.xlsx")
-    page.evaluate("()=>{ CFG.teams={core:{max:20}}; S.f.team='CORE'; S.f.exec='2026 2º Semestre'; recomputeHealth(); render(); }")
+    page.evaluate("()=>{ CFG.teams={core:{max:20}}; S.f.team='CORE'; S.f.exec=semestre(TODAY); recomputeHealth(); render(); }")
     page.click("#f4pTab")
     assert page.evaluate("document.querySelector('#f4pBody .f4p-bad') !== null")
+
+def test_amostra_do_semestre_atual_usa_janela_corrida(page):
+    """Sem semestre selecionado, ou com o semestre em curso, a amostra é a janela corrida (últimos N meses)."""
+    carregar(page, "f4p.xlsx")
+    sem_semestre = page.evaluate("f4pMetrics('CORE')")
+    com_semestre_atual = page.evaluate("()=>{ S.f.team='CORE'; S.f.exec=semestre(TODAY); return f4pMetrics('CORE'); }")
+    for m in (sem_semestre, com_semestre_atual):
+        assert m["n"] == len(CTS)
+        assert abs(m["p95"] - P95_ESPERADO) < 1e-6
+        assert abs(m["p50"] - P50_ESPERADO) < 1e-6
+        assert abs(m["varr"] - P95_ESPERADO / P50_ESPERADO) < 1e-6
+
+def test_amostra_ancora_no_semestre_passado_ja_encerrado(page):
+    """Semestre já encerrado selecionado no filtro: a amostra passa a ser só o período daquele semestre.
+    Usa um time só desta amostra (F4P_TESTE), acrescentado ao Map de itens sem tocar nos demais, para não
+    interferir nas referências que os épicos da fixture já têm para os próprios itens."""
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      const curStart = f4pSemStart(semestre(TODAY));
+      const prevMid = new Date(curStart.getFullYear(), curStart.getMonth() - 3, 15);   // meio do semestre anterior
+      const prevSem = semestre(prevMid);
+      S.model.ops.set("f4pTestePassado", {team:"F4P_TESTE", type:"User Story", deploy:prevMid, ct:40});
+      S.model.ops.set("f4pTesteAtual", {team:"F4P_TESTE", type:"User Story", deploy:curStart, ct:999});   // no semestre atual: deve ficar de fora
+      S.f.team = "F4P_TESTE"; S.f.int = prevSem;
+      return {enabled: f4pEnabled(), metrics: f4pMetrics("F4P_TESTE"), prevSem};
+    }""")
+    assert r["enabled"] is True
+    assert r["metrics"] == {"n": 1, "p95": 40, "p50": 40, "varr": 1.0}
+
+def test_semestre_futuro_desabilita_e_fecha_o_painel(page):
+    carregar(page, "f4p.xlsx")
+    page.evaluate("()=>{ S.f.team='CORE'; S.f.exec=semestre(TODAY); render(); }")
+    page.click("#f4pTab")
+    assert page.evaluate("F4P.open") is True
+    page.evaluate("""()=>{
+      const curStart = f4pSemStart(semestre(TODAY));
+      const future = new Date(curStart.getFullYear(), curStart.getMonth() + 12, 1);   // um ano à frente: sempre futuro
+      S.f.exec = semestre(future); render();
+    }""")
+    assert page.is_disabled("#f4pTab")
+    assert page.evaluate("f4pEnabled()") is False
+    assert page.evaluate("F4P.open") is False              # estava aberto: recolhe sozinho
 
 def test_valida_variabilidade_minima_maior_que_maxima(page):
     carregar(page, "times.xlsx")

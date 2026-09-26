@@ -172,11 +172,17 @@ Lista: importação (CSV detectado, registros reparados/descartados), carga do A
 
 Especificação completa: `docs/backlog/report-f4p.md`. Decisões de implementação: `docs/decisoes/0011-report-f4p-quadrantes-1-e-2.md`.
 
-Habilitado com **Time** e **Roadmap** (interno ou executivo) no filtro, igual à Visão analítica — mas o filtro só libera o acesso ao painel: o relatório sempre mostra **todos os times carregados no momento** (`S.model.teams`, o mesmo conjunto das colunas do quadro), independente de qual time está selecionado.
+Habilitado com **Time** e **Roadmap** (interno ou executivo) no filtro, igual à Visão analítica — mas o filtro só libera o acesso ao painel: o relatório sempre mostra **todos os times carregados no momento** (`S.model.teams`, o mesmo conjunto das colunas do quadro), independente de qual time está selecionado. Semestre **futuro** (ainda não começou): a aba fica desabilitada (não há dados possíveis) e, se o painel já estiver aberto, recolhe sozinho.
 
 ### 12.1 Amostra do CycleTime (quadrantes CycleTime e Variabilidade)
 
-Itens **concluídos** (com `o.deploy` preenchido, isto é, já saíram do CT) dos **tipos configurados** (`CFG.f4p.types`, padrão User Story e Technical Story), de **todos** os itens do time (não filtrada pelo roadmap), cuja saída do CT caiu nos últimos **N meses** (`CFG.f4p.months`, padrão 6).
+Itens **concluídos** (com `o.deploy` preenchido, isto é, já saíram do CT) dos **tipos configurados** (`CFG.f4p.types`, padrão User Story e Technical Story), de **todos** os itens do time (não filtrada por qual épico/iniciativa está no roadmap selecionado). O **período** da amostra depende do semestre escolhido no filtro (Roadmap interno tem prioridade sobre o executivo; `f4pSemesterState` em `src/js/23-report-f4p.js`):
+
+| Semestre selecionado | Período da amostra |
+|---|---|
+| Em curso (contém hoje), ou nenhum semestre reconhecido no filtro | Últimos **N meses** a partir de hoje (`CFG.f4p.months`, padrão 6) — janela corrida |
+| Já encerrado (terminou antes de hoje) | Só as datas de saída **dentro daquele semestre** (1/jan–30/jun ou 1/jul–31/dez) |
+| Ainda não começou | Painel desabilitado (ver acima) |
 
 ### 12.2 CycleTime (reserva vs. atual)
 

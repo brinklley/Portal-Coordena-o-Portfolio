@@ -24,20 +24,40 @@ const F4P_GROUPS = [
 /* time é lido dos dados carregados (todos, não só o filtrado): a mesma lista que aparece nas colunas do quadro */
 function f4pTeams(){ return S.model ? [...S.model.teams] : []; }
 function f4pTypes(){ return new Set((CFG.f4p.types || []).map(norm)); }
-/* amostra: itens concluídos (com data de saída do CT) dos tipos configurados, saída nos últimos N meses, de todos os itens do time */
-function f4pSample(team){
+const f4pSemStart = s => { const m = /(\d{4})\s*(\d)/.exec(s || ""); return m ? new Date(+m[1], m[2] === "1" ? 0 : 6, 1) : null; };
+/* semestre selecionado no filtro (interno tem prioridade sobre o executivo, igual ao cabeçalho do painel) e o que ele significa
+   para a amostra: "current" (em curso) usa os últimos N meses a partir de hoje; "past" (já fechado) usa as datas do próprio
+   semestre; "future" (ainda não começou) não tem dados possíveis, então o relatório fica desabilitado. */
+function f4pSemester(){ return S.f.int || S.f.exec || ""; }
+function f4pSemesterState(){
+  const sem = f4pSemester(), start = f4pSemStart(sem), end = semEnd(sem);
+  if (!start || !end) return {kind:"current", start:null, end:null};
+  if (start > TODAY) return {kind:"future", start, end};
+  if (end < TODAY) return {kind:"past", start, end};
+  return {kind:"current", start, end};
+}
+/* amostra: itens concluídos (com data de saída do CT) dos tipos configurados, de todos os itens do time.
+   Semestre em curso ou sem semestre reconhecido: últimos N meses a partir de hoje. Semestre já fechado: só o período dele. */
+function f4pSample(team, st){
+  st = st || f4pSemesterState();
   const types = f4pTypes(), months = CFG.f4p.months || 6;
-  const cutoff = new Date(TODAY.getFullYear(), TODAY.getMonth() - months, TODAY.getDate());
-  return [...S.model.ops.values()].filter(o => o.team === team && o.type && types.has(norm(o.type)) && o.deploy && o.ct != null && o.deploy >= cutoff);
+  const from = st.kind === "past" ? st.start : new Date(TODAY.getFullYear(), TODAY.getMonth() - months, TODAY.getDate());
+  const to = st.kind === "past" ? st.end : TODAY;
+  return [...S.model.ops.values()].filter(o => o.team === team && o.type && types.has(norm(o.type)) && o.deploy && o.ct != null && o.deploy >= from && o.deploy <= to);
+}
+function f4pPeriodLabel(st){
+  st = st || f4pSemesterState();
+  return st.kind === "past" ? `${fmtL(st.start)} a ${fmtL(st.end)}` : `últimos ${CFG.f4p.months || 6} meses`;
 }
 function f4pMetrics(team){
-  const cts = f4pSample(team).map(o => o.ct).sort((a, b) => a - b), n = cts.length;
+  const st = f4pSemesterState();
+  const cts = f4pSample(team, st).map(o => o.ct).sort((a, b) => a - b), n = cts.length;
   const p95 = n ? percentil(cts, .95) : null, p50 = n ? percentil(cts, .5) : null;
   return {n, p95, p50, varr: (p50 > 0) ? p95 / p50 : null};
 }
 function f4pCtCell(team){
   const L = limitsOf(team), m = f4pMetrics(team);
-  const tip = `Amostra: ${m.n} ${m.n === 1 ? "item" : "itens"} concluídos nos últimos ${CFG.f4p.months || 6} meses${m.n ? ` · P50 ${dec1(m.p50)} dias` : ""}${L.planned ? "" : " · time sem CT máximo planejado (usando o limite geral)"}`;
+  const tip = `Amostra: ${m.n} ${m.n === 1 ? "item" : "itens"} concluídos (${f4pPeriodLabel()})${m.n ? ` · P50 ${dec1(m.p50)} dias` : ""}${L.planned ? "" : " · time sem CT máximo planejado (usando o limite geral)"}`;
   if (m.p95 == null) return `<span title="${esc(tip)}"><span class="f4p-lo">${L.max}</span><span class="f4p-sep">|</span><span class="f4p-dash">--</span></span>`;
   const bad = L.max && m.p95 > L.max, arrow = bad ? "▼" : "▲", cls = bad ? "f4p-bad" : "f4p-good";
   return `<span title="${esc(tip)}"><span class="f4p-lo">${L.max}</span><span class="f4p-sep">|</span><b class="${cls}">${Math.round(m.p95)} ${arrow}</b></span>`;
@@ -64,25 +84,27 @@ function f4pGroup(g, teams){
   return `<div class="f4p-group"><img class="f4p-badge" src="${F4P_ASSETS[g.badge]}" alt="${esc(g.alt)}">
     ${g.quads.map(id => f4pCard(id, teams)).join("")}</div>`;
 }
-function f4pEnabled(){ return anEnabled(); }
+function f4pEnabled(){ return anEnabled() && f4pSemesterState().kind !== "future"; }
 function renderF4P(){
   const tab = $("f4pTab"), en = f4pEnabled();
   tab.disabled = !en;
-  tab.title = en ? "Abrir o Report F4P (Business Outcomes – Productivity)" : "Selecione um Time e um Roadmap (interno ou executivo) nos filtros para habilitar";
+  tab.title = en ? "Abrir o Report F4P (Business Outcomes – Productivity)"
+    : !anEnabled() ? "Selecione um Time e um Roadmap (interno ou executivo) nos filtros para habilitar"
+    : "O Report F4P não está disponível para um semestre que ainda não começou (ainda não há dados para calcular).";
   if (en && !tab.dataset.was){ tab.classList.remove("ready"); void tab.offsetWidth; tab.classList.add("ready"); }
   tab.dataset.was = en ? "1" : "";
   if (!en && F4P.open) closeF4P();
   if (!F4P.open) return;
-  const teams = f4pTeams();
+  const teams = f4pTeams(), st = f4pSemesterState();
   $("f4pTitle").innerHTML = `<div class="f4p-title-row"><img class="f4p-logo" src="${F4P_ASSETS.f4pLogo}" alt="F4P">
-    <div><h2>Report F4P <span class="f4p-sem">Business Outcomes – Productivity</span></h2><h3>${esc(semLong(S.f.int || S.f.exec))}</h3></div></div>`;
+    <div><h2>Report F4P <span class="f4p-sem">Business Outcomes – Productivity</span></h2><h3>${esc(semLong(f4pSemester()))}</h3></div></div>`;
   if (!teams.length){ $("f4pBody").innerHTML = `<div class="an-empty">Nenhum time carregado para calcular o relatório.</div>`; return; }
   const left = F4P_GROUPS.filter(g => g.side === "l"), right = F4P_GROUPS.filter(g => g.side === "r");
   $("f4pBody").innerHTML = `<div class="f4p-grid">
       <div class="f4p-col">${left.map(g => f4pGroup(g, teams)).join("")}</div>
       <div class="f4p-col">${right.map(g => f4pGroup(g, teams)).join("")}</div>
     </div>
-    <div class="an-note">Mostra sempre todos os times carregados (${esc(teams.join(", "))}), mesmo com um time diferente selecionado no filtro — o filtro só habilita o acesso a este painel. CycleTime e Variabilidade usam itens dos tipos ${esc((CFG.f4p.types || []).join(", ") || "nenhum tipo marcado")} concluídos nos últimos ${CFG.f4p.months || 6} meses. Os demais quadrantes aguardam a definição da regra de cálculo.</div>`;
+    <div class="an-note">Mostra sempre todos os times carregados (${esc(teams.join(", "))}), mesmo com um time diferente selecionado no filtro — o filtro só habilita o acesso a este painel. CycleTime e Variabilidade usam itens dos tipos ${esc((CFG.f4p.types || []).join(", ") || "nenhum tipo marcado")} concluídos no período: <b>${esc(f4pPeriodLabel(st))}</b>${st.kind === "past" ? " (semestre selecionado, já encerrado)" : " (semestre selecionado ainda em curso, ou não reconhecido — usa a janela corrida)"}. Os demais quadrantes aguardam a definição da regra de cálculo.</div>`;
 }
 function placeF4P(){ const h = document.querySelector(".top").offsetHeight; $("f4pPanel").style.top = h + "px"; $("f4pPanel").style.height = `calc(100% - ${h}px)`; }
 function openF4P(){ if (!f4pEnabled()) return; if (AN.open) closeAnalytics(); F4P.open = true; placeF4P(); $("f4pPanel").classList.add("open"); $("f4pPanel").setAttribute("aria-hidden","false"); $("f4pTab").setAttribute("aria-expanded","true"); renderF4P(); $("f4pClose").focus(); }
