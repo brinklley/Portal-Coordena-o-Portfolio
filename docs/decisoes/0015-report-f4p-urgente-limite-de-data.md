@@ -24,3 +24,5 @@ A primeira tentativa de correção limitou os itens fechados do semestre em curs
 - Times antigos com uso histórico ocasional da tag Expedite não acumulam mais itens de anos atrás no Realizado do semestre em curso.
 - Qualquer quadrante futuro que precise de uma amostra por período (Eficiência de fluxo, Vazão, etc.) deve chamar `f4pWindow`, não recriar a lógica — isso é agora explícito em `docs/regras-de-negocio.md` §12.1, exatamente para evitar que este tipo de divergência se repita.
 - Teste de regressão em `tests/test_report_f4p.py` (`test_urgente_semestre_atual_ignora_fechados_fora_da_janela_de_meses`): item fechado fora da janela de N meses não conta; dentro da janela ou ainda aberto, conta.
+
+> **Atualização (a janela mudou de novo)**: o uso de `f4pWindow` para o Urgente descrito aqui foi substituído por uma janela própria do quadrante (período exato do semestre, em vez de janela corrida de N meses) — ver `docs/decisoes/0017-report-f4p-urgente-periodo-exato-do-semestre.md`. O teste de regressão citado acima foi renomeado para `test_urgente_semestre_atual_ignora_fechados_antes_do_inicio_do_semestre` e passou a testar a fronteira do início do semestre.

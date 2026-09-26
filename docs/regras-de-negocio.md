@@ -176,7 +176,7 @@ Habilitado com **Time** e **Roadmap** (interno ou executivo) no filtro, igual à
 
 ### 12.1 Janela de datas por semestre (regra geral do Report F4P)
 
-**Vale para qualquer quadrante calculado cuja amostra dependa de uma data de fechamento/saída** — hoje CycleTime, Variabilidade e Urgente; qualquer quadrante novo que precise de um período deve reaproveitar esta mesma regra (função `f4pWindow` em `src/js/23-report-f4p.js`), não inventar uma variante própria (foi o que causou o bug corrigido pela decisão `0015`). O período depende do semestre escolhido no filtro (Roadmap interno tem prioridade sobre o executivo; `f4pSemesterState`):
+**Vale para qualquer quadrante calculado cuja amostra dependa de uma data de fechamento/saída, exceto quando o próprio quadrante documenta uma janela diferente** — hoje CycleTime e Variabilidade; qualquer quadrante novo que precise de um período deve reaproveitar esta mesma regra (função `f4pWindow` em `src/js/23-report-f4p.js`), não inventar uma variante própria (foi o que causou o bug corrigido pela decisão `0015`), a menos que tenha uma razão de negócio para divergir e documente essa divergência (é o caso do Urgente — ver §12.4 e decisão `0017`). O período depende do semestre escolhido no filtro (Roadmap interno tem prioridade sobre o executivo; `f4pSemesterState`):
 
 | Semestre selecionado | Janela |
 |---|---|
@@ -201,16 +201,16 @@ Uso em CycleTime/Variabilidade: itens **concluídos** (com `o.deploy` preenchido
 
 ### 12.4 Urgente (meta vs. realizado)
 
-Gestão da Classe de Serviço **Expedite**. Decisões e limitação de dados: `docs/decisoes/0014-report-f4p-quadrante-urgente.md` e `docs/decisoes/0015-report-f4p-urgente-limite-de-data.md` (correção de um bug de contagem).
+Gestão da Classe de Serviço **Expedite**. Decisões e limitação de dados: `docs/decisoes/0014-report-f4p-quadrante-urgente.md`, `docs/decisoes/0015-report-f4p-urgente-limite-de-data.md` (correção de um bug de contagem) e `docs/decisoes/0017-report-f4p-urgente-periodo-exato-do-semestre.md` (janela própria por período exato do semestre).
 
 - **Tag Expedite**: qualquer uma das tags cadastradas (`docs/regras-de-negocio.md` §9), escolhida em Configurações › Report F4P (`CFG.f4p.expediteTag`, padrão a tag "URGENTE"). Um item conta se `o.tagHits` inclui essa tag — **de qualquer tipo** (não usa `CFG.f4p.types`, ao contrário de CycleTime e Variabilidade).
 - **Meta**: número inteiro cadastrado por time (`CFG.f4p.teams[time].urgentMeta`), representando o teto de itens Expedite aceitável no semestre. Sem meta cadastrada, a célula mostra "--" e o Realizado fica sem cor de alerta (nem verde, nem vermelho).
-- **Realizado**: usa a **mesma janela do §12.1** (`f4pWindow`) — não uma janela própria. O portal não guarda histórico de quando uma tag foi aplicada (só o estado atual e a data de fechamento), então:
+- **Realizado**: usa uma janela **própria** (`f4pUrgentWindow`), diferente da janela geral do §12.1 — o **período exato do semestre selecionado** (1/jan–30/jun ou 1/jul–31/dez), esteja ele em curso ou já encerrado, nunca a janela corrida de N meses. Motivo (decisão `0017`): a janela corrida "vazava" itens fechados ainda dentro do semestre anterior para a contagem do semestre em curso. Sem semestre reconhecido no filtro, cai na janela corrida do §12.1 por segurança. O portal não guarda histórico de quando uma tag foi aplicada (só o estado atual e a data de fechamento), então:
   | Situação do item | Conta no Realizado? |
   |---|---|
   | Aberto (com a tag) | Sempre — não importa há quanto tempo está aberto |
-  | Fechado (com a tag) | Só se a data de fechamento (`o.deploy`) cair dentro da janela do §12.1 (últimos N meses no semestre em curso; período exato no semestre encerrado) |
-- Indicador de cor do número: Realizado > Meta → vermelho; Realizado ≤ Meta → verde; sem meta cadastrada → sem cor.
+  | Fechado (com a tag) | Só se a data de fechamento (`o.deploy`) cair dentro do período exato do semestre selecionado |
+- Indicador de cor do número: Realizado > Meta → vermelho; Realizado ≤ Meta → verde; sem meta cadastrada → sem cor — mesma convenção do CycleTime (§12.2).
 - **Tendência** (▲ aumentando / ▼ reduzindo / ◆ estável): compara quantos itens com a tag **fecharam** nos últimos 3 meses (a partir de hoje) contra os 3 meses anteriores a esses — sempre essa janela corrida de 6 meses, **independente do semestre selecionado no filtro**. Sem margem de tolerância: qualquer diferença já decide ▲ ou ▼; só empate exato é ◆. A cor da seta é neutra (não segue o vermelho/verde da Meta).
 - **Transparência**: o número do Realizado é clicável e abre a lista dos itens exatos que entraram na contagem (ID, título, situação — aberto ou fechado com a data); cada ID leva direto até o item no quadro (`gotoId`).
 

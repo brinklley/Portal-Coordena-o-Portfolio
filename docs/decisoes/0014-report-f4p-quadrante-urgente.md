@@ -16,6 +16,8 @@
    - Semestre futuro: painel inteiro desabilitado (regra já existente, decisão `0013`).
 
    > **Atualização (bug encontrado em produção)**: a regra do semestre em curso acima estava errada e foi corrigida — ver `docs/decisoes/0015-report-f4p-urgente-limite-de-data.md`. "Sem filtro de data" fazia a contagem somar todo item que já teve a tag em qualquer momento da história do time (não só a do semestre atual).
+   >
+   > **Atualização (janela própria por período exato do semestre)**: a janela usada para os itens fechados mudou de novo — deixou de ser a janela corrida de N meses (decisão `0015`) e passa a ser sempre o período exato do semestre selecionado, em curso ou encerrado. Ver `docs/decisoes/0017-report-f4p-urgente-periodo-exato-do-semestre.md`.
 
 4. **Cor do Realizado**: vermelho quando ultrapassa a Meta, verde quando está na meta ou abaixo — confirmado como o usuário descreveu ("a meta é ficar abaixo da meta").
 

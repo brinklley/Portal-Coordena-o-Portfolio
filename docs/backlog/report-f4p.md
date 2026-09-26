@@ -37,7 +37,7 @@ Por time: `[Meta] | [Realizado] [Tendência]`
 
 - **Tag Expedite**: configurável (Configurações › Report F4P), qualquer tag já cadastrada; padrão a tag "URGENTE". Conta itens de **qualquer tipo** (não usa os tipos do CT).
 - **Meta**: teto de itens Expedite no semestre, configurável por time; sem meta cadastrada, mostra "--" e não colore o Realizado.
-- **Realizado**: abertos contam sempre (não importa há quanto tempo); fechados só contam se fecharam dentro da **mesma janela por semestre usada por CycleTime/Variabilidade** (`f4pWindow`, §12.1 — últimos N meses no semestre em curso, período exato no encerrado). Corrigido pela decisão `0015` depois de um bug em produção (a versão original não tinha corte de data no semestre em curso, somando todo item já tageado alguma vez na história do time) — e de uma correção intermediária errada (usar o início do semestre em vez da janela rolante já estabelecida).
+- **Realizado**: abertos contam sempre (não importa há quanto tempo); fechados só contam se fecharam dentro de uma janela **própria do Urgente** (`f4pUrgentWindow`), diferente da janela geral de CycleTime/Variabilidade (`f4pWindow`, §12.1) — sempre o **período exato do semestre selecionado**, em curso ou já encerrado, nunca uma janela corrida de N meses. Corrigido pela decisão `0015` depois de um bug em produção (a versão original não tinha corte de data no semestre em curso, somando todo item já tageado alguma vez na história do time) — e de uma correção intermediária errada (usar o início do semestre em vez da janela rolante já estabelecida) — e ajustado de novo pela decisão `0017` depois que a janela corrida de N meses do semestre em curso se mostrou "vazando" itens fechados ainda no semestre anterior.
 - **Tendência** (▲/▼/◆): itens fechados nos últimos 3 meses vs. nos 3 meses anteriores, sempre a partir de hoje — independente do semestre selecionado no filtro. Sem margem de tolerância; cor neutra.
 - Indicador de cor do Realizado: acima da meta → vermelho; na meta ou abaixo → verde.
 - **Transparência** (decisão `0016`): o número do Realizado é clicável e abre a lista dos itens exatos contados (ID, título, aberto/fechado), cada um levando direto até o item no quadro.
@@ -49,7 +49,7 @@ Por time: `[Meta] | [Realizado] [Tendência]`
 - Indicadores: CT com P95 > máximo → ▼ vermelho; ≤ máximo → ▲ verde. Variabilidade > MAX → ▼ vermelho; dentro da faixa → ▲ verde; < MIN → ▼ laranja.
 - P50 = 0 (ou amostra vazia) → variabilidade "--". O tamanho da amostra (n) e o P50 ficam no texto de apoio (`title`) da célula, não sempre visíveis.
 - Ilustrações: as imagens reais do slide de referência (fornecidas pelo usuário), embutidas em base64 no build — não os SVGs originais cogitados inicialmente (decisão `0012`).
-- Urgente: definição por tag configurável (não fixa em "URGENTE"), realizado sempre limitado ao semestre selecionado (abertos sempre contam; fechados só dentro do período), tendência por trimestres e cores conforme decisões `0014` e `0015`.
+- Urgente: definição por tag configurável (não fixa em "URGENTE"), realizado sempre limitado ao período exato do semestre selecionado (abertos sempre contam; fechados só dentro do período), tendência por trimestres e cores conforme decisões `0014`, `0015` e `0017`.
 
 ## Configuração implementada (seção "Report F4P" na tela de Configurações)
 
