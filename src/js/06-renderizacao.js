@@ -21,9 +21,10 @@ function render(){
   const iniList = [...V.visIni].map(id => M.inis.get(id));
   const collapsed = !!S.path.ini && !S.showAllIni;
   const iniShown = collapsed ? iniList.filter(i => i.id === S.path.ini) : iniList;
-  const iniCtx = !S.path.ini ? null : collapsed
-    ? `mostrando só a selecionada <button class="linkbtn" data-act="allini">Mostrar todas (${iniList.length})</button>`
-    : `<button class="linkbtn" data-act="oneini">Recolher as demais</button>`;
+  const iniOthers = iniList.length - 1;
+  const iniCtx = !S.path.ini || !iniOthers ? null : collapsed
+    ? `mostrando só a selecionada — marque “Manter todas as iniciativas visíveis” para ver as outras ${iniOthers}`
+    : `mostrando todas — as outras ${iniOthers} ficam sem foco`;
   html += lane("ini", iniShown, M.stages.ini, it => it.st >= 0 ? M.stages.ini[it.st] : null, iniCtx, statsIni(iniList, V));
 
   if (!iniList.length){
@@ -197,7 +198,8 @@ function card(it){
     const interno = [...new Set(it.rels.flatMap(rid => M.rels.get(rid).epis.filter(e=>V.visEpi.has(e)).map(e => M.epis.get(e).interno).filter(Boolean)))].sort();
     const div = interno.some(s => it.exec && norm(s) !== norm(it.exec));
     const h = healthIni(it, V);
-    return `<button class="card lvl-ini ${S.path.ini === it.id ? "sel" : ""}" data-key="ini:${esc(it.id)}" style="${stripeStyle(it)}">
+    const sel = S.path.ini === it.id, dim = !sel && S.path.ini && S.showAllIni;
+    return `<button class="card lvl-ini ${sel ? "sel" : dim ? "dim" : ""}" data-key="ini:${esc(it.id)}" style="${stripeStyle(it)}">
       <div class="c-top"><span class="c-id">#${esc(it.id)}</span>${it.type ? `<span class="c-type">${esc(it.type)}</span>` : ""}<span class="h ${h}" title="${hTitle(h)}"></span></div>
       <div class="c-title">${esc(it.title)}</div>
       ${it.owner ? `<div class="c-meta" style="margin:-2px 0 5px">${esc(it.owner)}</div>` : ""}

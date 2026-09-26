@@ -6,7 +6,7 @@
 - **Ilhas**: cada nível e cada time é uma ilha com borda. Times distribuídos em fileiras equilibradas (maiores primeiro). Colunas com mais de 6 itens quebram em subcolunas.
 - **Barbantes** ligam pai e filho; cor = saúde do filho. No modo cadeia completa, épico → ilha do time (agregado) e, com foco num épico, item a item.
 - **Ancorar/soltar ilhas**: soltas, podem ser arrastadas; ao ancorar, um roteador (A* numa grade) redesenha os barbantes contornando as ilhas.
-- **Zoom/arrastar**, **minimapa**, **navegador de times** ("Ir para"), iniciativas recolhidas quando uma é selecionada.
+- **Zoom/arrastar**, **minimapa**, **navegador de times** ("Ir para"), iniciativas recolhidas quando uma é selecionada — a menos que "Manter todas as iniciativas visíveis" esteja ligada (opção, desligada por padrão): aí a lista de Iniciativas continua mostrando todas as do filtro, com a selecionada em foco (borda destacada) e as demais sem foco (esmaecidas), para o usuário conseguir voltar e continuar analisando as próximas sem perder o lugar. Selecionar outra iniciativa move o foco sem recolher a lista de novo. Ver `docs/decisoes/0021-manter-iniciativas-visiveis.md`.
 - **Etapas vazias** (opção, ligada por padrão) e **itens sem desdobramento** (opção, ligada por padrão).
 
 ## Filtros e busca

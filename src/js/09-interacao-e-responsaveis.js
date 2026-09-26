@@ -1,7 +1,5 @@
 /* ---------------- interação ---------------- */
 board.addEventListener("click", e => {
-  const act = e.target.closest("[data-act]");
-  if (act){ S.showAllIni = act.dataset.act === "allini"; render(); return; }
   const c = e.target.closest(".card"); if (!c) return;
   const key = c.dataset.key; const [lvl, ...rest] = key.split(":"); const id = rest.join(":");
   const scrollNext = next => { S.animateLevel = next; };
@@ -11,7 +9,7 @@ board.addEventListener("click", e => {
   }
   if (lvl === "ini"){
     if (S.path.ini === id){ S.path = {}; S.expand = false; S.focus = null; closeDrawer(); render(); return; }
-    S.path = {ini:id}; S.focus = null; S.showAllIni = false; scrollNext("rel"); vp.scrollTop = 0;
+    S.path = {ini:id}; S.focus = null; scrollNext("rel"); vp.scrollTop = 0;
   } else if (lvl === "rel"){
     if (S.path.rel === id){ delete S.path.rel; delete S.path.epi; render(); return; }
     S.path.rel = id; delete S.path.epi; scrollNext("epi");
@@ -25,10 +23,11 @@ board.addEventListener("click", e => {
 });
 
 $("btnExpand").onclick = () => { S.expand = !S.expand; S.focus = null; if (!S.expand){ delete S.path.rel; delete S.path.epi; } S.animateLevel = S.expand ? "epi" : null; render(); };
-$("btnClear").onclick = () => { S.path = {}; S.expand = false; S.focus = null; S.showAllIni = false; closeDrawer(); render(); };
+$("btnClear").onclick = () => { S.path = {}; S.expand = false; S.focus = null; closeDrawer(); render(); };
 ["fExec","fInt","fTeam"].forEach(id => $(id).onchange = e => { S.f[{fExec:"exec",fInt:"int",fTeam:"team"}[id]] = e.target.value; S.lastFilterEl = e.target; render(); });
 $("fBare").onchange = e => { S.showBare = e.target.checked; render(); };
 $("fEmpty").onchange = e => { S.showEmpty = e.target.checked; render(); };
+$("fShowAllIni").onchange = e => { S.showAllIni = e.target.checked; render(); };
 /* ---------- seletor múltiplo de responsáveis, com busca ---------- */
 let msKb = -1;
 function msLabel(){

@@ -98,7 +98,6 @@ body.with-drawer .viewport,body.with-drawer .crumbs,body.with-drawer .notice{mar
 #pins .pin{width:9px;height:9px;border-radius:50%;border:1.5px solid #fff;box-sizing:border-box;margin:-4.5px 0 0 -4.5px}
 .lk.fresh{animation:fadein .45s ease-out}
 @keyframes fadein{from{opacity:0}to{opacity:1}}
-.linkbtn{border:0;background:none;padding:0 2px;cursor:pointer;color:var(--ini);font-size:12.5px;text-decoration:underline;text-underline-offset:3px}
 #strings{z-index:1}
 #pins{z-index:4}
 .lane{position:relative;margin:0 0 64px}
