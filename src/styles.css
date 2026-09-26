@@ -441,6 +441,10 @@ tr[data-cat="disc"] .fnb{background:var(--c-disc);color:#fff} tr[data-cat="wip"]
 .f4p-warn{color:var(--warn);font-weight:700}
 .f4p-dash{color:var(--ink-3)}
 .f4p-trend{color:var(--ink-3);font-weight:600}
+/* Vazão colore a seta de tendência por Realizado vs. Reserva (decisão 0024) — .f4p-good/.f4p-bad vêm
+   antes de .f4p-trend no arquivo (mesma especificidade), então .f4p-trend venceria sem o composto abaixo. */
+.f4p-trend.f4p-good{color:#1E8E3E}
+.f4p-trend.f4p-bad{color:var(--alert)}
 .f4p-real{all:unset;cursor:pointer;font-weight:700;font-variant-numeric:tabular-nums;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px}
 .f4p-real:focus-visible{outline:2px solid var(--ini);outline-offset:2px}
 /* all:unset acima também zera a cor herdada de .f4p-good/.f4p-bad/.f4p-warn no mesmo elemento (mesma

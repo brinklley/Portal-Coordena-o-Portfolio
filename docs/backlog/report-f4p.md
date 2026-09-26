@@ -57,15 +57,16 @@ Por time: `[Meta] | [Realizado]`
 
 ## Quadrante 5 · VAZÃO (RESERVA VS REALIZADO) — implementado
 
-Gestão da entrega do time no período do roadmap selecionado. Decisões: `docs/decisoes/0022-report-f4p-quadrante-vazao.md` e `docs/decisoes/0023-report-f4p-vazao-tendencia-com-wip.md` (tendência somando itens em WIP). Regra completa: `docs/regras-de-negocio.md` §12.6.
+Gestão da entrega do time no período do roadmap selecionado. Decisões: `docs/decisoes/0022-report-f4p-quadrante-vazao.md`, `docs/decisoes/0023-report-f4p-vazao-tendencia-com-wip.md` (tendência somando itens em WIP) e `docs/decisoes/0024-report-f4p-vazao-cor-da-seta-por-realizado-vs-reserva.md` (cor da seta). Regra completa: `docs/regras-de-negocio.md` §12.6.
 
 Por time: `[Reserva] | [Realizado] [Tendência]`
 
 - **Filtro**: itens dos tipos configurados para o CT (`CFG.f4p.types` — o mesmo campo de CycleTime/Variabilidade, não uma configuração própria; padrão User Story e Technical Story), já **entregues** (categoria de fluxo Vazão, igual ao Technical Story), com `o.deploy` dentro do período exato do semestre selecionado (`f4pExactSemesterWindow`, o mesmo do Urgente/Technical Story).
 - **Realizado**: todos os itens do conjunto acima.
 - **Reserva**: subconjunto do Realizado com a **tag de capacidade do roadmap** (`CFG.anTag`, padrão "ROADMAP" — a mesma configuração já usada pela Visão analítica, §10). Nunca maior que o Realizado, por ser um filtro sobre o mesmo conjunto.
-- **Sem cor de alerta**: não há meta/teto para este quadrante — Reserva é informativa, não um limite.
+- **Sem cor nos números**: não há meta/teto para este quadrante — Reserva é informativa, não um limite.
 - **Tendência** (▲/▼/◆): separa o Realizado por mês corrido dentro do período (só os meses já decorridos, no semestre em curso) e compara o **mês corrente + itens hoje em WIP** contra a **média** (arredondada pra cima) dos meses anteriores do mesmo período (decisão `0023`). Sem meses anteriores para comparar, fica ◆.
+- **Cor da seta**: verde quando Realizado ≥ Reserva, vermelho quando Realizado < Reserva (decisão `0024`) — não alcançável em uso normal, já que Reserva é sempre subconjunto do Realizado, mas implementada como salvaguarda visual.
 - **Transparência**: tanto a Reserva quanto o Realizado são clicáveis e abrem a lista dos itens exatos de cada contagem.
 
 ## Decisões adotadas (implementadas)
@@ -78,7 +79,7 @@ Por time: `[Reserva] | [Realizado] [Tendência]`
 - Urgente: definição por tag configurável (não fixa em "URGENTE"), realizado sempre limitado ao período exato do semestre selecionado (abertos sempre contam; fechados só dentro do período), tendência por trimestres e cores conforme decisões `0014`, `0015` e `0017`.
 - Technical Story: mesmo comportamento do Urgente, contando pelo tipo do item em vez de uma tag e com meta padrão 6 (não fica "sem meta"); sem tendência. A janela por período exato do semestre foi generalizada de `f4pUrgentWindow` para `f4pExactSemesterWindow`, reaproveitada pelos dois quadrantes (decisão `0018`). Depois de ver o quadrante em produção, o Realizado passou a contar só itens já entregues (categoria de fluxo Vazão) — itens em Backlog, Discovery ou WIP não contam mais, mesmo abertos há muito tempo (decisão `0020`, única divergência real do comportamento do Urgente).
 - Situação na lista de itens (Urgente e Technical Story): categoria de fluxo do time (Backlog/Discovery/WIP/Vazão, com a data de saída na Vazão), pela mesma `catOf` usada no resto do portal, em vez de um "Aberto"/"Fechado" próprio do Report F4P (decisão `0019`).
-- Vazão: mesmo critério de "entregue" do Technical Story (categoria de fluxo Vazão), mas com os tipos configurados para o CT (`CFG.f4p.types`) em vez de um tipo fixo; Reserva/Realizado por tag de capacidade (`CFG.anTag`, reaproveitada da Visão analítica) em vez de meta vs. realizado; sem cor de alerta; Reserva e Realizado clicáveis (decisão `0022`). Tendência ajustada depois de ver o quadrante em produção: mês corrente somado aos itens hoje em WIP (trabalho a caminho de virar Vazão) contra a média dos meses anteriores, arredondada sempre pra cima (decisão `0023`).
+- Vazão: mesmo critério de "entregue" do Technical Story (categoria de fluxo Vazão), mas com os tipos configurados para o CT (`CFG.f4p.types`) em vez de um tipo fixo; Reserva/Realizado por tag de capacidade (`CFG.anTag`, reaproveitada da Visão analítica) em vez de meta vs. realizado; números sem cor; Reserva e Realizado clicáveis (decisão `0022`). Tendência ajustada depois de ver o quadrante em produção: mês corrente somado aos itens hoje em WIP (trabalho a caminho de virar Vazão) contra a média dos meses anteriores, arredondada sempre pra cima (decisão `0023`). A seta da tendência (não os números) ganhou cor por Realizado vs. Reserva: verde se Realizado ≥ Reserva, vermelho se menor (decisão `0024`).
 
 ## Configuração implementada (seção "Report F4P" na tela de Configurações)
 
@@ -111,3 +112,4 @@ Eficiência de fluxo (MIN vs ATUAL vs MAX, meta mínima 30%), Roadmap – épico
 - [x] Situação na lista de itens (Urgente e Technical Story) mostra a categoria de fluxo do time (Backlog, Discovery, WIP ou Vazão com a data), testada com item em cada categoria.
 - [x] Vazão conta só itens dos tipos configurados já entregues (Vazão) no período; Reserva é subconjunto do Realizado pela tag de capacidade, configurável; clique na Reserva e no Realizado abre a lista e navega até o item.
 - [x] Tendência do Vazão soma os itens hoje em WIP ao mês corrente e compara com a média (arredondada pra cima) dos meses anteriores; testada com os três exemplos exatos dados pelo usuário (melhora, piora, estável) e com o efeito do arredondamento.
+- [x] Seta de tendência do Vazão colorida por Realizado vs. Reserva (verde ≥, vermelho <), testada nos casos alcançáveis (Realizado maior e Realizado igual à Reserva).
