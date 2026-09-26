@@ -1,10 +1,10 @@
 /* ---------- Report F4P (Business Outcomes – Productivity) ---------- */
 /* Painel lateral com o mesmo comportamento da Visão analítica (docs/backlog/report-f4p.md).
-   Quadrantes 1 (CycleTime), 2 (Variabilidade), 3 (Urgente), 4 (Technical Story), 5 (Vazão) e 6
-   (Roadmap – Épicos) têm regra fechada; os demais aguardam definição e aparecem como "em definição".
-   Roadmap – Épicos é o único que opera sobre os cards do quadro de Épicos (M.stages.epi/e.st/e.target),
-   não sobre os itens operacionais dos times — os demais quadrantes calculados usam S.model.ops. As
-   ilustrações (selo de cada grupo e o logo do
+   Quadrantes 1 (CycleTime), 2 (Variabilidade), 3 (Urgente), 4 (Technical Story), 5 (Vazão), 6
+   (Roadmap – Épicos) e 7 (User Story) têm regra fechada; só Eficiência de fluxo aguarda definição e
+   aparece como "em definição". Roadmap – Épicos é o único que opera sobre os cards do quadro de Épicos
+   (M.stages.epi/e.st/e.target), não sobre os itens operacionais dos times — os demais quadrantes
+   calculados usam S.model.ops. As ilustrações (selo de cada grupo e o logo do
    cabeçalho) são as imagens fornecidas pelo usuário a partir do slide de referência, embutidas em
    base64 pelo build (F4P_ASSETS, gerado por scripts/build.mjs a partir de src/assets/f4p/*.png). */
 const F4P = {open:false};
@@ -16,7 +16,7 @@ const F4P_QUADS = {
   ct:    {title:"CycleTime (reserva vs atual)", side:"r", done:true},
   urg:   {title:"Urgente (meta vs realizado)", side:"r", done:true},
   ts:    {title:"Technical Story (meta vs realizado)", side:"r", done:true},
-  us:    {title:"User Story (planejado vs não planejado)", side:"r", done:false}};
+  us:    {title:"User Story (planejado vs não planejado)", side:"r", done:true}};
 /* selo (imagem) por grupo de quadrantes, na ordem de exibição de cada coluna */
 const F4P_GROUPS = [
   {side:"l", badge:"healthyRange",     alt:"Healthy range", quads:["var", "eff"]},
@@ -190,6 +190,82 @@ function f4pVazaoCell(team){
   const tip = `Reserva: itens com a tag ${CFG.anTag || "ROADMAP"} · Realizado: itens dos tipos ${(CFG.f4p.types || []).join(", ") || "nenhum tipo marcado"} entregues (Vazão) em ${f4pExactSemesterLabel(st)} · tendência: mês corrente + itens em WIP vs. média (arredondada pra cima) dos meses anteriores do período · seta em ${cls === "f4p-good" ? "verde: Realizado ≥ Reserva" : "vermelho: Realizado < Reserva"} · clique nos números para ver os itens`;
   return `<span title="${esc(tip)}"><button type="button" class="f4p-real" data-f4p-vazao-reserva-team="${esc(team)}">${reserva.length}</button><span class="f4p-sep">|</span><button type="button" class="f4p-real" data-f4p-vazao-realizado-team="${esc(team)}">${realizado.length}</button> <span class="f4p-trend ${cls}">${trend}</span></span>`;
 }
+/* Quadrante 7 · User Story (planejado vs. não planejado). Mesmo critério de "entregue" do Technical
+   Story/Vazão (categoria de fluxo Vazão, decisão `0022`), mas com uma lista de tipos própria
+   (`CFG.f4p.usTypes`, padrão "User Story"), independente de `CFG.f4p.types` (CycleTime/Variabilidade/
+   Vazão) e de `CFG.f4p.epiTypes` (Roadmap – Épicos). Mesmo período (`f4pExactSemesterWindow`) dos
+   demais quadrantes "por semestre" (decisão `0030`). */
+function f4pUsTypes(){ return new Set((CFG.f4p.usTypes || []).map(norm)); }
+function f4pUsOps(team, st){
+  st = st || f4pSemesterState();
+  const types = f4pUsTypes(), {from, to} = f4pExactSemesterWindow(st);
+  return [...S.model.ops.values()].filter(o => o.team === team && o.type && types.has(norm(o.type)) && catOf(o) === "vazao" && o.deploy && o.deploy >= from && o.deploy <= to);
+}
+/* Planejado/Não planejado formam uma PARTIÇÃO do conjunto acima (ao contrário de Reserva/Realizado do
+   Vazão, que é subconjunto/conjunto total): todo item entregue do tipo configurado está num dos dois,
+   nunca nos dois. Planejado = tem a tag de capacidade do roadmap (mesma `CFG.anTag` do Vazão/Visão
+   analítica); Não planejado = não tem. */
+function f4pUsPlanejadoItems(team, st){
+  const tag = f4pCapacityTag();
+  return f4pUsOps(team, st).filter(o => (o.tags || []).map(norm).includes(tag));
+}
+function f4pUsNaoPlanejadoItems(team, st){
+  const tag = f4pCapacityTag();
+  return f4pUsOps(team, st).filter(o => !(o.tags || []).map(norm).includes(tag));
+}
+/* itens do tipo configurado atualmente em WIP — o equivalente ao WIP do Vazão (decisão `0023`), usado
+   pela tendência deste quadrante. */
+function f4pUsWipCount(team){
+  const types = f4pUsTypes();
+  return [...S.model.ops.values()].filter(o => o.team === team && o.type && types.has(norm(o.type)) && catOf(o) === "wip").length;
+}
+/* Tendência: mesma regra do Vazão (decisão `0023`), adaptada para os artefatos User Story — separa o
+   total entregue (Planejado + Não planejado) por mês corrido dentro do período e compara o mês corrente
+   somado aos itens hoje em WIP contra a média (arredondada pra cima) dos meses anteriores. */
+function f4pUsTrend(team, st){
+  st = st || f4pSemesterState();
+  const {from, to} = f4pExactSemesterWindow(st);
+  const end = to < TODAY ? to : TODAY;
+  const nMonths = (end.getFullYear() - from.getFullYear()) * 12 + (end.getMonth() - from.getMonth()) + 1;
+  if (nMonths < 2) return "◆";
+  const counts = Array(nMonths).fill(0);
+  f4pUsOps(team, st).forEach(o => {
+    const idx = (o.deploy.getFullYear() - from.getFullYear()) * 12 + (o.deploy.getMonth() - from.getMonth());
+    if (idx >= 0 && idx < nMonths) counts[idx]++;
+  });
+  const atual = counts[nMonths - 1] + f4pUsWipCount(team);
+  const mediaAnteriores = Math.ceil(counts.slice(0, -1).reduce((a, b) => a + b, 0) / (nMonths - 1));
+  return atual > mediaAnteriores ? "▲" : atual < mediaAnteriores ? "▼" : "◆";
+}
+function f4pUsCell(team){
+  const st = f4pSemesterState(), planejado = f4pUsPlanejadoItems(team, st), naoPlanejado = f4pUsNaoPlanejadoItems(team, st), trend = f4pUsTrend(team, st);
+  const tip = `Planejado: itens ${(CFG.f4p.usTypes || []).join(", ") || "nenhum tipo marcado"} entregues (Vazão) em ${f4pExactSemesterLabel(st)} com a tag ${esc(CFG.anTag || "ROADMAP")} · Não planejado: os mesmos itens sem essa tag · tendência: mês corrente + itens em WIP vs. média (arredondada pra cima) dos meses anteriores · clique nos números para ver os itens`;
+  return `<span title="${esc(tip)}"><button type="button" class="f4p-real" data-f4p-us-team="${esc(team)}" data-f4p-us-set="planejado">${planejado.length}</button><span class="f4p-sep">|</span><button type="button" class="f4p-real" data-f4p-us-team="${esc(team)}" data-f4p-us-set="naoplanejado">${naoPlanejado.length}</button> <span class="f4p-trend">${trend}</span></span>`;
+}
+/* Conferência cruzada (decisão `0030`): o usuário pediu uma validação explícita de que Vazão Realizado
+   (todos os tipos configurados para o CT) deve ser sempre igual à soma de Technical Story Realizado +
+   User Story Planejado + User Story Não planejado — os três "recortes por tipo" do mesmo universo de
+   itens entregues no período. Isso só bate por convenção: `CFG.f4p.types` (Vazão) deveria conter
+   exatamente os tipos que os outros dois recortes cobrem juntos (Technical Story, tipo fixo; User Story,
+   `CFG.f4p.usTypes`) — se alguém reconfigurar um desses campos de forma inconsistente (ex.: adicionar um
+   terceiro tipo em `CFG.f4p.types` sem quadrante correspondente), a soma diverge, e é exatamente esse
+   erro de configuração que a conferência entrega ao usuário para investigar, em vez de silenciosamente
+   mostrar números que não se somam. */
+function f4pReconciliacao(){
+  const st = f4pSemesterState();
+  return f4pTeams().map(team => {
+    const vazao = f4pVazaoRealizadoItems(team, st).length, ts = f4pTsItems(team, st).length,
+      planejado = f4pUsPlanejadoItems(team, st).length, naoPlanejado = f4pUsNaoPlanejadoItems(team, st).length,
+      soma = ts + planejado + naoPlanejado;
+    return {team, vazao, ts, planejado, naoPlanejado, soma, ok: vazao === soma};
+  });
+}
+function f4pReconciliacaoBanner(){
+  const divergentes = f4pReconciliacao().filter(r => !r.ok);
+  if (!divergentes.length) return "";
+  const linhas = divergentes.map(r => `<li><b>${esc(r.team)}</b>: Vazão Realizado <b>${r.vazao}</b> ≠ Technical Story (${r.ts}) + User Story Planejado (${r.planejado}) + User Story Não planejado (${r.naoPlanejado}) = <b>${r.soma}</b></li>`).join("");
+  return `<div class="f4p-recon"><b>Conferência divergente.</b> Vazão Realizado deveria ser sempre igual à soma de Technical Story Realizado + User Story Planejado + User Story Não planejado (mesmos itens entregues no período, recortados por tipo). Confira a configuração de tipos (CT/Vazão, Technical Story e User Story) — algo está contando itens de forma inconsistente entre os quadrantes:<ul>${linhas}</ul></div>`;
+}
 /* tipos de ÉPICO considerados por este quadrante (Report F4P, Roadmap – Épicos): configuração própria,
    `CFG.f4p.epiTypes` (padrão "Epic"), independente de `CFG.f4p.types` (que é dos itens operacionais dos
    times, usado por CycleTime/Variabilidade/Vazão). */
@@ -351,9 +427,17 @@ $("f4pBody").addEventListener("click", e => {
     const label = {roadmap:"Roadmap", entregue:"Roadmap entregue", atual:"Atual"}[set];
     const items = set === "roadmap" ? f4pRoadmapEpis(team) : set === "entregue" ? f4pRoadmapEntregueEpis(team) : f4pAtualEpis(team, st);
     f4pItemsModal(`Roadmap – Épicos · ${team} · ${label} · ${f4pExactSemesterLabel(st)}`, items, f4pEpiSituacao);
+    return;
+  }
+  const btnUs = e.target.closest("[data-f4p-us-set]");
+  if (btnUs){
+    const team = btnUs.dataset.f4pUsTeam, set = btnUs.dataset.f4pUsSet;
+    const label = set === "planejado" ? "planejado" : "não planejado";
+    const items = set === "planejado" ? f4pUsPlanejadoItems(team, st) : f4pUsNaoPlanejadoItems(team, st);
+    f4pItemsModal(`User Story · ${team} · ${label} · ${f4pExactSemesterLabel(st)}`, items);
   }
 });
-const F4P_CELL = {var: f4pVarCell, ct: f4pCtCell, urg: f4pUrgentCell, ts: f4pTsCell, vazao: f4pVazaoCell, road: f4pRoadmapEpiCell};
+const F4P_CELL = {var: f4pVarCell, ct: f4pCtCell, urg: f4pUrgentCell, ts: f4pTsCell, vazao: f4pVazaoCell, road: f4pRoadmapEpiCell, us: f4pUsCell};
 function f4pCard(id, teams){
   const q = F4P_QUADS[id];
   const head = `<div class="f4p-card-h">${esc(q.title)}</div>${q.goal ? `<div class="f4p-goal">${esc(q.goal)}</div>` : ""}`;
@@ -384,11 +468,11 @@ function renderF4P(){
     <div><h2>Report F4P <span class="f4p-sem">Business Outcomes – Productivity</span></h2><h3>${esc(semLong(f4pSemester()))}</h3></div></div>`;
   if (!teams.length){ $("f4pBody").innerHTML = `<div class="an-empty">Nenhum time carregado para calcular o relatório.</div>`; return; }
   const left = F4P_GROUPS.filter(g => g.side === "l"), right = F4P_GROUPS.filter(g => g.side === "r");
-  $("f4pBody").innerHTML = `<div class="f4p-grid">
+  $("f4pBody").innerHTML = `${f4pReconciliacaoBanner()}<div class="f4p-grid">
       <div class="f4p-col">${left.map(g => f4pGroup(g, teams)).join("")}</div>
       <div class="f4p-col">${right.map(g => f4pGroup(g, teams)).join("")}</div>
     </div>
-    <div class="an-note">Mostra sempre todos os times carregados (${esc(teams.join(", "))}), mesmo com um time diferente selecionado no filtro — o filtro só habilita o acesso a este painel. CycleTime e Variabilidade usam itens dos tipos ${esc((CFG.f4p.types || []).join(", ") || "nenhum tipo marcado")} concluídos no período: <b>${esc(f4pPeriodLabel(st))}</b>${st.kind === "past" ? " (semestre selecionado, já encerrado)" : " (semestre selecionado ainda em curso, ou não reconhecido — usa a janela corrida)"}. Urgente conta itens com a tag <b>${esc(f4pTagName(f4pExpediteTag()))}</b>: os ainda abertos contam sempre, e os fechados só se fecharam dentro do período exato do semestre selecionado (<b>${esc(f4pExactSemesterLabel(st))}</b>) — sem histórico de quando cada item passou a se qualificar, não dá pra saber quem estava marcado antes disso. Technical Story conta só itens desse tipo já <b>entregues</b> (categoria de fluxo Vazão) dentro do mesmo período — itens ainda em Backlog, Discovery ou WIP não entram. Vazão usa os mesmos tipos de CycleTime/Variabilidade, também só itens entregues no período: Reserva é o subconjunto com a tag <b>${esc(CFG.anTag || "ROADMAP")}</b> (capacidade do roadmap); Realizado é todo o conjunto, com ou sem a tag. Roadmap – Épicos conta cards do quadro de Épicos (dos tipos <b>${esc((CFG.f4p.epiTypes || []).join(", ") || "nenhum tipo marcado")}</b>) com item do time vinculado: Roadmap segue o Target Date do épico (semestre interno) ou o vínculo com a iniciativa (semestre executivo); Roadmap entregue é o subconjunto já fechado; Atual conta só pela data de fechamento dentro do semestre, sem olhar Target Date nem iniciativa. Os demais quadrantes aguardam a definição da regra de cálculo.</div>`;
+    <div class="an-note">Mostra sempre todos os times carregados (${esc(teams.join(", "))}), mesmo com um time diferente selecionado no filtro — o filtro só habilita o acesso a este painel. CycleTime e Variabilidade usam itens dos tipos ${esc((CFG.f4p.types || []).join(", ") || "nenhum tipo marcado")} concluídos no período: <b>${esc(f4pPeriodLabel(st))}</b>${st.kind === "past" ? " (semestre selecionado, já encerrado)" : " (semestre selecionado ainda em curso, ou não reconhecido — usa a janela corrida)"}. Urgente conta itens com a tag <b>${esc(f4pTagName(f4pExpediteTag()))}</b>: os ainda abertos contam sempre, e os fechados só se fecharam dentro do período exato do semestre selecionado (<b>${esc(f4pExactSemesterLabel(st))}</b>) — sem histórico de quando cada item passou a se qualificar, não dá pra saber quem estava marcado antes disso. Technical Story conta só itens desse tipo já <b>entregues</b> (categoria de fluxo Vazão) dentro do mesmo período — itens ainda em Backlog, Discovery ou WIP não entram. Vazão usa os mesmos tipos de CycleTime/Variabilidade, também só itens entregues no período: Reserva é o subconjunto com a tag <b>${esc(CFG.anTag || "ROADMAP")}</b> (capacidade do roadmap); Realizado é todo o conjunto, com ou sem a tag. Roadmap – Épicos conta cards do quadro de Épicos (dos tipos <b>${esc((CFG.f4p.epiTypes || []).join(", ") || "nenhum tipo marcado")}</b>) com item do time vinculado: Roadmap segue o Target Date do épico (semestre interno) ou o vínculo com a iniciativa (semestre executivo); Roadmap entregue é o subconjunto já fechado; Atual conta só pela data de fechamento dentro do semestre, sem olhar Target Date nem iniciativa. User Story usa os tipos <b>${esc((CFG.f4p.usTypes || []).join(", ") || "nenhum tipo marcado")}</b>, também só itens entregues no período: Planejado é o subconjunto com a tag de capacidade; Não planejado é o restante sem a tag — juntos, os dois somam todo o entregue desses tipos (partição, não sobreposição como no Vazão). A soma de Technical Story Realizado + User Story Planejado + User Story Não planejado deveria bater com o Vazão Realizado de cada time; uma divergência aparece destacada acima. Os demais quadrantes aguardam a definição da regra de cálculo.</div>`;
 }
 function placeF4P(){ const h = document.querySelector(".top").offsetHeight; $("f4pPanel").style.top = h + "px"; $("f4pPanel").style.height = `calc(100% - ${h}px)`; }
 function openF4P(){ if (!f4pEnabled()) return; if (AN.open) closeAnalytics(); F4P.open = true; placeF4P(); $("f4pPanel").classList.add("open"); $("f4pPanel").setAttribute("aria-hidden","false"); $("f4pTab").setAttribute("aria-expanded","true"); renderF4P(); $("f4pClose").focus(); }

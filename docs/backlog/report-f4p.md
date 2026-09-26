@@ -1,6 +1,6 @@
 # Report F4P
 
-**Status**: Quadrantes 1 (CycleTime), 2 (Variabilidade), 3 (Urgente), 4 (Technical Story), 5 (Vazão) e 6 (Roadmap – Épicos) implementados — ver `docs/regras-de-negocio.md` §12 e `docs/decisoes/0011` a `0025`. **Próxima tarefa: escolher e especificar o próximo quadrante** entre Eficiência de fluxo ou User Story (seção "Quadrantes seguintes" abaixo) — mesmo processo dos anteriores: propor aqui, confirmar com o usuário, então codar.
+**Status**: Quadrantes 1 (CycleTime), 2 (Variabilidade), 3 (Urgente), 4 (Technical Story), 5 (Vazão), 6 (Roadmap – Épicos) e 7 (User Story) implementados — ver `docs/regras-de-negocio.md` §12 e `docs/decisoes/0011` a `0030`. **Próxima tarefa: especificar o último quadrante**, Eficiência de fluxo (seção "Quadrantes seguintes" abaixo) — mesmo processo dos anteriores: propor aqui, confirmar com o usuário, então codar.
 
 Tela "Report F4P" (BUSINESS OUTCOMES – PRODUCTIVITY), inspirada no slide usado pela gestão, com o mesmo comportamento da Visão analítica: **painel lateral recolhível, habilitado só quando o filtro tem um Time e um Roadmap (interno ou executivo)**, e desabilitado se o semestre selecionado ainda não começou (não há dados possíveis). O filtro só habilita o acesso; o relatório mostra **sempre todos os times carregados no momento** (`S.model.teams` — o mesmo conjunto das colunas do quadro; ver decisão `0011`, que optou por isso em vez dos times da tela de Configurações, pois esta última exclui os times dos dados de exemplo).
 
@@ -82,6 +82,19 @@ Por time: `[Roadmap] | [Roadmap entregue] | [Atual] [Tendência]`
 - **Tendência** (▲/▼/◆): mesma regra do Vazão (decisão `0023`), adaptada para o fluxo de Épicos — mês corrente do Atual + épicos do Roadmap ainda abertos (o "WIP" deste quadrante) vs. média (arredondada pra cima) dos meses anteriores.
 - **Transparência**: os três números são clicáveis e abrem a lista dos épicos exatos de cada contagem; a Situação mostra a coluna do próprio quadro de Épicos (não a categoria de fluxo operacional de nenhum time).
 
+## Quadrante 7 · USER STORY (PLANEJADO VS NÃO PLANEJADO) — implementado
+
+Mesmo critério de "entregue" do Technical Story/Vazão, mas com tipos próprios e uma divisão em partição. Decisão: `docs/decisoes/0030-report-f4p-quadrante-user-story.md`. Regra completa: `docs/regras-de-negocio.md` §12.8.
+
+Por time: `[Planejado] | [Não planejado] [Tendência]`
+
+- **Filtro**: itens dos tipos configurados para este quadrante (`CFG.f4p.usTypes`, configuração própria — padrão **User Story**, independente de `CFG.f4p.types` e de `CFG.f4p.epiTypes`), já **entregues** (categoria de fluxo Vazão), com `o.deploy` dentro do período exato do semestre selecionado (`f4pExactSemesterWindow`).
+- **Planejado**: subconjunto do conjunto acima com a **tag de capacidade do roadmap** (`CFG.anTag`).
+- **Não planejado**: o restante do conjunto acima, **sem** essa tag. Diferente do Vazão (Reserva ⊆ Realizado), aqui é uma **partição exata** — todo item entregue está num dos dois grupos, nunca nos dois.
+- **Tendência** (▲/▼/◆): mesma regra do Vazão (decisão `0023`) — mês corrente do total (Planejado + Não planejado) + itens hoje em WIP vs. média (arredondada pra cima) dos meses anteriores.
+- **Transparência**: tanto o Planejado quanto o Não planejado são clicáveis e abrem a lista dos itens exatos de cada contagem.
+- **Conferência cruzada** (decisão `0030`): Vazão Realizado, Technical Story Realizado e User Story (Planejado + Não planejado) são três recortes por tipo do mesmo universo de itens entregues no período — a soma dos dois últimos deveria sempre bater com o primeiro, por time. Quando não bate (configuração de tipos inconsistente entre os três campos), o painel mostra um aviso destacado no topo com os números exatos de cada lado, por time, para o usuário investigar.
+
 ## Decisões adotadas (implementadas)
 
 - Amostra CycleTime/Variabilidade: itens **concluídos** (com data de saída do CT) dos tipos configurados, de **todos** os itens do time (não filtrada por qual épico/iniciativa está no roadmap selecionado). **O período, porém, acompanha o semestre selecionado no filtro** (decisão `0013`, revisão do que este documento propunha originalmente): semestre em curso → últimos N meses a partir de hoje (janela corrida); semestre já encerrado → só as datas de saída dentro daquele semestre; semestre futuro → painel desabilitado (não há dados possíveis).
@@ -94,6 +107,7 @@ Por time: `[Roadmap] | [Roadmap entregue] | [Atual] [Tendência]`
 - Situação na lista de itens (Urgente e Technical Story): categoria de fluxo do time (Backlog/Discovery/WIP/Vazão, com a data de saída na Vazão), pela mesma `catOf` usada no resto do portal, em vez de um "Aberto"/"Fechado" próprio do Report F4P (decisão `0019`).
 - Vazão: mesmo critério de "entregue" do Technical Story (categoria de fluxo Vazão), mas com os tipos configurados para o CT (`CFG.f4p.types`) em vez de um tipo fixo; Reserva/Realizado por tag de capacidade (`CFG.anTag`, reaproveitada da Visão analítica) em vez de meta vs. realizado; números sem cor; Reserva e Realizado clicáveis (decisão `0022`). Tendência ajustada depois de ver o quadrante em produção: mês corrente somado aos itens hoje em WIP (trabalho a caminho de virar Vazão) contra a média dos meses anteriores, arredondada sempre pra cima (decisão `0023`). A seta da tendência (não os números) ganhou cor por Realizado vs. Reserva: verde se Realizado ≥ Reserva, vermelho se menor (decisão `0024`).
 - Roadmap – Épicos: primeiro quadrante a operar sobre o quadro de Épicos em vez dos itens operacionais dos times; "fechado" é a última coluna do próprio quadro de Épicos (`e.st`), não `catOf`. Roadmap/Roadmap entregue seguem o Target Date do épico (semestre interno) ou o vínculo com a iniciativa via Release (semestre executivo); Atual é uma contagem independente, só pela data de fechamento no período do semestre, sem olhar Target Date nem iniciativa em nenhum dos dois casos. Tendência adaptada do Vazão (decisão `0023`), usando épicos do Roadmap ainda abertos como o "WIP" deste quadrante. Tipos de épico considerados por uma configuração própria (`CFG.f4p.epiTypes`, padrão Epic), independente de `CFG.f4p.types` (decisão `0025`).
+- User Story: mesmo critério de "entregue" do Technical Story/Vazão, mas com tipos próprios (`CFG.f4p.usTypes`, padrão User Story); Planejado/Não planejado são uma partição exata (com/sem a tag de capacidade), não subconjunto/total como no Vazão. Tendência adaptada do Vazão (decisão `0023`). Adicionada uma conferência cruzada (Vazão Realizado = Technical Story Realizado + User Story Planejado + User Story Não planejado, por time) que sinaliza no painel quando a soma diverge — pedido explícito do usuário para detectar configuração de tipos inconsistente entre os três quadrantes (decisão `0030`).
 
 ## Configuração implementada (seção "Report F4P" na tela de Configurações)
 
@@ -102,14 +116,15 @@ Por time: `[Roadmap] | [Roadmap entregue] | [Atual] [Tendência]`
 - Tag de capacidade do roadmap (`CFG.anTag`, seção Visão analítica, padrão "ROADMAP") — reaproveitada pela Reserva do quadrante Vazão.
 - Por time: variabilidade mínima (1.5) e máxima (3.5), com validação MIN < MAX; meta de Urgente (inteiro ≥ 0, opcional, independente da variabilidade); e meta de Technical Story (inteiro ≥ 0, opcional, padrão efetivo 6).
 - Tipos de **épico** considerados pelo Roadmap – Épicos (`CFG.f4p.epiTypes`, padrão "Epic") — lista própria, independente da lista de tipos operacionais acima.
+- Tipos considerados pelo **User Story** (`CFG.f4p.usTypes`, padrão "User Story") — lista própria, independente das outras duas.
 
 ## Quadrantes seguintes (regras ainda em definição)
 
-Eficiência de fluxo (MIN vs ATUAL vs MAX, meta mínima 30%), User Story (planejado vs não planejado).
+Eficiência de fluxo (MIN vs ATUAL vs MAX, meta mínima 30%).
 
 ## Referências no código
 
-- Painel: `src/js/23-report-f4p.js` (`f4pEnabled`, `renderF4P`, `openF4P`, `placeF4P`, `f4pSemesterState`, `f4pSample`, `f4pMetrics`, `f4pExpediteOps`, `f4pTsOps`, `f4pVazaoOps`, `f4pVazaoWipCount`, `f4pExactSemesterWindow`, `f4pUrgentRealizado`, `f4pUrgentTrend`, `f4pUrgentCell`, `f4pTsRealizado`, `f4pTsCell`, `f4pVazaoReservaItems`, `f4pVazaoRealizadoItems`, `f4pVazaoTrend`, `f4pVazaoCell`, `f4pItemSituacao`, `f4pEpiTypeOk`, `f4pEpiClosed`, `f4pEpiHasTeam`, `f4pRoadmapEpis`, `f4pRoadmapEntregueEpis`, `f4pRoadmapAbertosEpis`, `f4pAtualEpis`, `f4pRoadmapTrend`, `f4pRoadmapEpiCell`, `f4pEpiSituacao`), aba `#f4pTab` (dentro de `.side-tabs`) e painel `#f4pPanel` em `src/index.html`.
+- Painel: `src/js/23-report-f4p.js` (`f4pEnabled`, `renderF4P`, `openF4P`, `placeF4P`, `f4pSemesterState`, `f4pSample`, `f4pMetrics`, `f4pExpediteOps`, `f4pTsOps`, `f4pVazaoOps`, `f4pVazaoWipCount`, `f4pExactSemesterWindow`, `f4pUrgentRealizado`, `f4pUrgentTrend`, `f4pUrgentCell`, `f4pTsRealizado`, `f4pTsCell`, `f4pVazaoReservaItems`, `f4pVazaoRealizadoItems`, `f4pVazaoTrend`, `f4pVazaoCell`, `f4pItemSituacao`, `f4pEpiTypeOk`, `f4pEpiClosed`, `f4pEpiHasTeam`, `f4pRoadmapEpis`, `f4pRoadmapEntregueEpis`, `f4pRoadmapAbertosEpis`, `f4pAtualEpis`, `f4pRoadmapTrend`, `f4pRoadmapEpiCell`, `f4pEpiSituacao`, `f4pUsTypes`, `f4pUsOps`, `f4pUsPlanejadoItems`, `f4pUsNaoPlanejadoItems`, `f4pUsWipCount`, `f4pUsTrend`, `f4pUsCell`, `f4pReconciliacao`, `f4pReconciliacaoBanner`), aba `#f4pTab` (dentro de `.side-tabs`) e painel `#f4pPanel` em `src/index.html`.
 - Categoria de fluxo na lista de itens (Situação) e no filtro do Vazão: `catOf(o)` em `src/js/01-configuracao-e-regras.js` — a mesma função usada no restante do portal (itens por categoria do épico, alertas de "parado na coluna").
 - Ilustrações: `src/assets/f4p/*.png`, embutidas como `F4P_ASSETS` (base64) por `scripts/build.mjs`.
 - CT de cada item: `o.ct`, `o.ready`, `o.deploy` (calculados por `recomputeCt` conforme o fluxo do time, em `src/js/01-configuracao-e-regras.js`). Limites: `limitsOf(time)`; faixa de variabilidade: `f4pRangeOf(time)`; meta de Urgente: `f4pUrgentMetaOf(time)`; tag Expedite: `f4pExpediteTag()`; meta de Technical Story: `f4pTsMetaOf(time)`; tag de capacidade (Vazão): `CFG.anTag`.
@@ -134,3 +149,7 @@ Eficiência de fluxo (MIN vs ATUAL vs MAX, meta mínima 30%), User Story (planej
 - [x] Filtro por tipo de épico configurável (`CFG.f4p.epiTypes`, padrão Epic) e por vínculo com o time (épico precisa ter item operacional do time), testados isoladamente.
 - [x] Tendência do Roadmap – Épicos soma os épicos do Roadmap ainda abertos ao mês corrente do Atual e compara com a média (arredondada pra cima) dos meses anteriores, mesma regra do Vazão; testada com os três exemplos equivalentes (melhora, piora, estável) e sem meses anteriores.
 - [x] Clique em qualquer um dos três números (Roadmap, Roadmap entregue, Atual) abre a lista dos épicos e navega até o item; Situação mostra a coluna do próprio quadro de Épicos, não a categoria de fluxo operacional.
+- [x] User Story conta só itens dos tipos configurados (`CFG.f4p.usTypes`) já entregues (Vazão) no período; Planejado e Não planejado formam uma partição exata (soma = total entregue), testado com itens com e sem a tag.
+- [x] Tendência do User Story soma os itens hoje em WIP ao mês corrente e compara com a média (arredondada pra cima) dos meses anteriores, mesma regra do Vazão; testada com os três exemplos equivalentes (melhora, piora, estável) e sem meses anteriores.
+- [x] Clique no Planejado e no Não planejado abre a lista dos itens exatos e navega até o item.
+- [x] Conferência cruzada: Vazão Realizado = Technical Story Realizado + User Story Planejado + User Story Não planejado, testada com o exemplo exato dado pelo usuário (38 = 27+4+7) e com um caso de configuração divergente, confirmando que o aviso aparece só quando a soma não bate.
