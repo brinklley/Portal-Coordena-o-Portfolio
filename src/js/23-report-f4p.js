@@ -144,11 +144,21 @@ function f4pTsCell(team){
   const tip = `Tipo: Technical Story · itens abertos (qualquer data) + fechados em ${f4pExactSemesterLabel(st)} · clique no número para ver os itens`;
   return `<span title="${esc(tip)}"><span class="f4p-lo">${meta}</span><span class="f4p-sep">|</span><button type="button" class="f4p-real ${cls}" data-f4p-ts-team="${esc(team)}">${realizado}</button></span>`;
 }
+/* Situação de um item na lista de itens do Report F4P: mesma categoria de coluna do resto do portal
+   (Backlog/Discovery/WIP/Vazão, mapeada por time em Configurações › fluxo — catOf/CAT_LABEL), em vez de
+   um "Aberto"/"Fechado" próprio do Report F4P. Decisão 0019: mais coerente com o que o usuário já vê no
+   quadro e no painel de detalhes (itens por categoria do épico). Vazão mostra também a data de saída,
+   quando existir. */
+const F4P_SIT_LABEL = {none:"Backlog", disc:"Discovery", wip:"WIP", vazao:"Vazão"};
+function f4pItemSituacao(o){
+  const cat = catOf(o), lab = F4P_SIT_LABEL[cat] || F4P_SIT_LABEL.none;
+  return cat === "vazao" && o.deploy ? `${lab} · ${fmtL(o.deploy)}` : lab;
+}
 /* modal com a lista dos itens que compõem o Realizado (abre ao clicar no número) */
 function f4pItemsModal(title, items){
   const rows = items.length ? items.map(o => `<tr><td><button type="button" class="idb" data-f4p-go="${esc(o.id)}">${esc(o.id)}</button></td>
       <td>${esc(o.title || "(sem título)")}</td>
-      <td class="c">${o.deploy ? `Fechado · ${fmtL(o.deploy)}` : "Aberto"}</td></tr>`).join("")
+      <td class="c">${esc(f4pItemSituacao(o))}</td></tr>`).join("")
     : `<tr><td colspan="3" class="muted">Nenhum item nesta contagem.</td></tr>`;
   $("f4pItemsTitle").textContent = title;
   $("f4pItemsBody").innerHTML = `<table class="ctab f4p-items-tbl"><thead><tr><th>ID</th><th>Título</th><th>Situação</th></tr></thead><tbody>${rows}</tbody></table>`;

@@ -212,7 +212,7 @@ Gestão da Classe de Serviço **Expedite**. Decisões e limitação de dados: `d
   | Fechado (com a tag) | Só se a data de fechamento (`o.deploy`) cair dentro do período exato do semestre selecionado |
 - Indicador de cor do número: Realizado > Meta → vermelho; Realizado ≤ Meta → verde; sem meta cadastrada → sem cor — mesma convenção do CycleTime (§12.2).
 - **Tendência** (▲ aumentando / ▼ reduzindo / ◆ estável): compara quantos itens com a tag **fecharam** nos últimos 3 meses (a partir de hoje) contra os 3 meses anteriores a esses — sempre essa janela corrida de 6 meses, **independente do semestre selecionado no filtro**. Sem margem de tolerância: qualquer diferença já decide ▲ ou ▼; só empate exato é ◆. A cor da seta é neutra (não segue o vermelho/verde da Meta).
-- **Transparência**: o número do Realizado é clicável e abre a lista dos itens exatos que entraram na contagem (ID, título, situação — aberto ou fechado com a data); cada ID leva direto até o item no quadro (`gotoId`).
+- **Transparência**: o número do Realizado é clicável e abre a lista dos itens exatos que entraram na contagem (ID, título, situação); cada ID leva direto até o item no quadro (`gotoId`). A coluna "Situação" mostra a **categoria da coluna atual** do item — Backlog, Discovery, WIP ou Vazão (com a data de saída, quando existir) — pela mesma configuração de fluxo por time usada no resto do portal (`catOf`, Configurações › fluxo dos times), não um "Aberto"/"Fechado" próprio do Report F4P (decisão `0019`). A contagem em si (o que entra no Realizado) continua decidida por `o.deploy` estar ou não preenchido, como na tabela acima — só a exibição na lista mudou.
 
 ### 12.5 Technical Story (meta vs. realizado)
 
@@ -223,7 +223,7 @@ Mesmo comportamento do Urgente (§12.4), mas conta itens pelo **tipo** do item e
 - **Realizado**: mesma regra do Urgente — usa `f4pExactSemesterWindow` (período exato do semestre selecionado, em curso ou encerrado); abertos contam sempre, fechados só contam se `o.deploy` cair dentro desse período.
 - Indicador de cor do número: Realizado > Meta → vermelho; Realizado ≤ Meta → verde — sempre colorido (a meta nunca fica em branco).
 - **Sem seta de tendência**: ao contrário do Urgente, este quadrante não tem indicador de tendência.
-- **Transparência**: o número do Realizado é clicável e abre a lista dos itens exatos que entraram na contagem, igual ao Urgente (`gotoId` para navegar até o item).
+- **Transparência**: o número do Realizado é clicável e abre a lista dos itens exatos que entraram na contagem, igual ao Urgente — mesma coluna "Situação" por categoria de fluxo (`gotoId` para navegar até o item).
 
 ### 12.6 Demais quadrantes
 

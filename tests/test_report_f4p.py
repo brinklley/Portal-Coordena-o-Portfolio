@@ -182,6 +182,7 @@ def test_urgente_clique_no_numero_abre_lista_e_permite_navegar(page):
     rows = page.locator("#f4pItemsBody tbody tr")
     assert rows.count() == 1
     assert alvo_id in page.inner_text("#f4pItemsBody")
+    assert "Vazão" in page.inner_text("#f4pItemsBody")     # Situação segue a categoria do fluxo (decisão 0019), não "Fechado"
     page.click(f'button[data-f4p-go="{alvo_id}"]')
     assert not page.is_visible("#f4pItemsBg")
     assert not page.is_visible("#f4pPanel.open")           # o painel F4P também fecha, para não esconder o item
@@ -339,6 +340,7 @@ def test_ts_clique_no_numero_abre_lista_e_permite_navegar(page):
     rows = page.locator("#f4pItemsBody tbody tr")
     assert rows.count() == 1
     assert alvo_id in page.inner_text("#f4pItemsBody")
+    assert "Vazão" in page.inner_text("#f4pItemsBody")     # Situação segue a categoria do fluxo (decisão 0019), não "Fechado"
     page.click(f'button[data-f4p-go="{alvo_id}"]')
     assert not page.is_visible("#f4pItemsBg")
     assert not page.is_visible("#f4pPanel.open")
@@ -385,3 +387,28 @@ def test_ts_meta_zero_e_valida(page):
     page.fill('input[data-f4pteam="core"][data-f4pf="tsMeta"]', "0")
     page.click("#cfgSave"); page.wait_for_timeout(200)
     assert page.evaluate("CFG.f4p.teams.core") == {"tsMeta": 0}
+
+# ---------------- Situação dos itens (Urgente e Technical Story) ----------------
+# Decisão 0019: a lista de itens (clique no Realizado) mostra a mesma categoria de coluna do resto do
+# portal (Backlog/Discovery/WIP/Vazão, mapeada por time em Configurações — catOf/CAT_LABEL), não um
+# "Aberto"/"Fechado" próprio do Report F4P.
+
+def test_situacao_dos_itens_usa_categoria_do_fluxo_do_time(page):
+    carregar(page, "times.xlsx")   # fluxo do CORE tem coluna de Discovery (Refinamento), ao contrário do f4p.xlsx
+    r = page.evaluate("""()=>{
+      const mk = (id, stName, deploy) => { const o = {id, team:'CORE', stName, deploy: deploy || null}; return f4pItemSituacao(o); };
+      return {
+        backlog: mk('SIT1', 'Backlog'),
+        discovery: mk('SIT2', 'Refinamento'),
+        wip: mk('SIT3', 'Em Desenvolvimento'),
+        vazaoSemData: mk('SIT4', 'Pronto para Deploy'),
+        vazaoComData: mk('SIT5', 'Fechado', new Date(2026, 6, 21)),
+        semColuna: mk('SIT6', null),
+      };
+    }""")
+    assert r["backlog"] == "Backlog"
+    assert r["discovery"] == "Discovery"
+    assert r["wip"] == "WIP"
+    assert r["vazaoSemData"] == "Vazão"
+    assert r["vazaoComData"] == "Vazão · 21/07/2026"
+    assert r["semColuna"] == "Backlog"   # sem coluna reconhecida no fluxo do time: mesmo padrão de catOf ("none")
