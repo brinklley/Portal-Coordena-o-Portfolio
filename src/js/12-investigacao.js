@@ -62,7 +62,7 @@ function investigate(q){
       + (bare && (S.f.team || S.f.int) ? ". Os filtros de Time e Roadmap interno dependem dos épicos, então itens sem desdobramento não aparecem com eles." : ""), "Remova esses filtros ou use “Limpar filtros”."); return steps;
   }
   add(true, "Visível com os filtros atuais", "Nenhum filtro esconde o item.");
-  if (lvl === "ini" && S.path.ini && S.path.ini !== id && !S.showAllIni) add(false, "Recolhido na lista", "Outra iniciativa está selecionada, e as demais ficam recolhidas.", "Clique em “Mostrar todas” no nível de Iniciativas, ou use “Ir para qualquer ID”.");
+  if (lvl === "ini" && S.path.ini && S.path.ini !== id && !S.showAllIni) add(false, "Recolhido na lista", "Outra iniciativa está selecionada, e as demais ficam recolhidas.", "Marque “Manter todas as iniciativas visíveis” nos filtros, ou use “Ir para qualquer ID”.");
   else add(true, "Deveria aparecer no quadro", "Use “Ir para qualquer ID” para ir até ele.");
   return steps;
 }
