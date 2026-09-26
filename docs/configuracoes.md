@@ -22,9 +22,9 @@ Testes: `tests/test_configuracoes.py`.
 | `tags` | BLOCKED, PAUSADO, URGENTE, DATA FIXA | tags cadastradas (nome, outros nomes, cor, nível, data) |
 | `typeColors[nível][tipo]` | `{}` | cor da faixa do card por tipo |
 | `fields[nível]` | `[]` | campos adicionais exibidos nos cards |
-| `anTag`, `anClassCol`, `anFreeze` | ROADMAP, Classificação_Despesas_Comitê, 0 | visão analítica |
+| `anTag`, `anClassCol`, `anFreeze` | ROADMAP, Classificação_Despesas_Comitê, 0 | visão analítica; `anTag` também é a tag de capacidade (Reserva) do quadrante Vazão do Report F4P |
 | `f4p.months` | 6 | período (meses) da amostra do P95/P50 do Report F4P |
-| `f4p.types` | user story, technical story | tipos considerados na amostra de CycleTime/Variabilidade do Report F4P |
+| `f4p.types` | user story, technical story | tipos considerados na amostra de CycleTime/Variabilidade e no Realizado/Reserva do quadrante Vazão do Report F4P |
 | `f4p.expediteTag` | urgent (id da tag URGENTE) | tag cadastrada que marca a Classe de Serviço Expedite, usada pelo quadrante Urgente |
 | `f4p.teams[time]` | `{}` | por time: `min`/`max` da variabilidade esperada (padrão efetivo 1.5/3.5), `urgentMeta` (teto de itens Expedite no semestre; sem padrão) e `tsMeta` (teto de itens Technical Story no semestre; padrão efetivo 6) |
 | `azure.orgs` | `[]` | organizações (sem token) |

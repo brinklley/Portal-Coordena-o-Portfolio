@@ -176,7 +176,7 @@ Habilitado com **Time** e **Roadmap** (interno ou executivo) no filtro, igual à
 
 ### 12.1 Janela de datas por semestre (regra geral do Report F4P)
 
-**Vale para qualquer quadrante calculado cuja amostra dependa de uma data de fechamento/saída, exceto quando o próprio quadrante documenta uma janela diferente** — hoje CycleTime e Variabilidade; qualquer quadrante novo que precise de um período deve reaproveitar esta mesma regra (função `f4pWindow` em `src/js/23-report-f4p.js`), não inventar uma variante própria (foi o que causou o bug corrigido pela decisão `0015`), a menos que tenha uma razão de negócio para divergir e documente essa divergência (é o caso de Urgente e Technical Story, cuja meta é "por semestre" — ver §12.4, §12.5 e decisões `0017`/`0018`, função `f4pExactSemesterWindow`). O período depende do semestre escolhido no filtro (Roadmap interno tem prioridade sobre o executivo; `f4pSemesterState`):
+**Vale para qualquer quadrante calculado cuja amostra dependa de uma data de fechamento/saída, exceto quando o próprio quadrante documenta uma janela diferente** — hoje CycleTime e Variabilidade; qualquer quadrante novo que precise de um período deve reaproveitar esta mesma regra (função `f4pWindow` em `src/js/23-report-f4p.js`), não inventar uma variante própria (foi o que causou o bug corrigido pela decisão `0015`), a menos que tenha uma razão de negócio para divergir e documente essa divergência (é o caso de Urgente, Technical Story e Vazão, cuja meta é "por semestre" — ver §12.4, §12.5, §12.6 e decisões `0017`/`0018`/`0022`, função `f4pExactSemesterWindow`). O período depende do semestre escolhido no filtro (Roadmap interno tem prioridade sobre o executivo; `f4pSemesterState`):
 
 | Semestre selecionado | Janela |
 |---|---|
@@ -225,6 +225,17 @@ Mesmo comportamento do Urgente (§12.4), mas conta itens pelo **tipo** do item e
 - **Sem seta de tendência**: ao contrário do Urgente, este quadrante não tem indicador de tendência.
 - **Transparência**: o número do Realizado é clicável e abre a lista dos itens exatos que entraram na contagem, igual ao Urgente — mesma coluna "Situação" por categoria de fluxo (`gotoId` para navegar até o item).
 
-### 12.6 Demais quadrantes
+### 12.6 Vazão (reserva vs. realizado)
 
-Eficiência de fluxo, Roadmap–Épicos, Vazão e User Story ainda não têm regra de cálculo definida; aparecem no painel como "em definição", mantendo a mesma grade e as mesmas colunas de time dos quadrantes calculados.
+Gestão da entrega do time no período do roadmap selecionado. Decisões: `docs/decisoes/0022-report-f4p-quadrante-vazao.md` e `docs/decisoes/0023-report-f4p-vazao-tendencia-com-wip.md` (tendência somando itens em WIP).
+
+- **Filtro de dados**: itens dos **tipos configurados para o CT** (`CFG.f4p.types`, o mesmo campo de CycleTime/Variabilidade — padrão User Story e Technical Story; não é uma configuração própria), cuja categoria de fluxo atual (`catOf`, decisão `0019`) seja **Vazão** (entregue) — itens em Nenhum (Backlog), Discovery ou WIP não contam. Período: `f4pExactSemesterWindow` (o mesmo do Urgente/Technical Story) — 1/jan–30/jun ou 1/jul–31/dez do semestre selecionado no filtro (Roadmap interno tem prioridade sobre o executivo), esteja ele em curso ou já encerrado; `o.deploy` precisa cair dentro desse período.
+- **Realizado**: todos os itens do conjunto acima, com ou sem a tag de capacidade.
+- **Reserva**: subconjunto do Realizado cujo `o.tags` inclui a **tag que marca a capacidade do roadmap** (`CFG.anTag`, padrão "ROADMAP" — a mesma configuração já usada pela Visão analítica, §10, para a coluna Capacidade; casamento pelo texto da tag, não pelo id de uma tag cadastrada). Por construção, Reserva nunca é maior que Realizado — é um filtro sobre o mesmo conjunto, não uma contagem à parte.
+- **Sem indicador de cor**: não há meta/teto configurável para este quadrante (Reserva é informativa, não um limite a não ultrapassar), então os números não ficam vermelhos nem verdes.
+- **Tendência** (▲ melhora / ▼ piora / ◆ estável): separa o Realizado por mês corrido dentro do período do semestre — só os meses já decorridos, se o semestre estiver em curso (meses futuros não têm itens possíveis, então ficam de fora do cálculo em vez de contarem como zero) — e compara o **mês corrente** (ou o último mês do semestre, se já encerrado) **mais os itens hoje em WIP** contra a **média** dos meses anteriores do mesmo período, arredondada sempre **para cima** (decisão `0023`). Itens em WIP ainda não viraram Vazão, mas sinalizam entrega a caminho, então somam a favor da tendência mesmo antes de serem entregues. Sem meses anteriores para comparar (semestre com um único mês decorrido), fica ◆.
+- **Transparência**: tanto o número da Reserva quanto o do Realizado são clicáveis e abrem a lista dos itens exatos que entraram em cada contagem, igual aos demais quadrantes calculados (`gotoId` para navegar até o item).
+
+### 12.7 Demais quadrantes
+
+Eficiência de fluxo, Roadmap–Épicos e User Story ainda não têm regra de cálculo definida; aparecem no painel como "em definição", mantendo a mesma grade e as mesmas colunas de time dos quadrantes calculados.

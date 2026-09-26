@@ -1,7 +1,7 @@
 /* ---------- Report F4P (Business Outcomes – Productivity) ---------- */
 /* Painel lateral com o mesmo comportamento da Visão analítica (docs/backlog/report-f4p.md).
-   Quadrantes 1 (CycleTime), 2 (Variabilidade), 3 (Urgente) e 4 (Technical Story) têm regra fechada; os
-   demais aguardam definição e aparecem como "em definição". As ilustrações (selo de cada grupo e o logo do
+   Quadrantes 1 (CycleTime), 2 (Variabilidade), 3 (Urgente), 4 (Technical Story) e 5 (Vazão) têm regra
+   fechada; os demais aguardam definição e aparecem como "em definição". As ilustrações (selo de cada grupo e o logo do
    cabeçalho) são as imagens fornecidas pelo usuário a partir do slide de referência, embutidas em
    base64 pelo build (F4P_ASSETS, gerado por scripts/build.mjs a partir de src/assets/f4p/*.png). */
 const F4P = {open:false};
@@ -9,7 +9,7 @@ const F4P_QUADS = {
   var:   {title:"Variabilidade (min vs atual vs max)", side:"l", done:true},
   eff:   {title:"Eficiência de fluxo (min vs atual vs max)", side:"l", done:false, goal:"Meta mínima 30%"},
   road:  {title:"Roadmap – Épicos (reserva vs roadmap entregue vs atual)", side:"l", done:false},
-  vazao: {title:"Vazão (reserva vs realizado)", side:"l", done:false},
+  vazao: {title:"Vazão (reserva vs realizado)", side:"l", done:true},
   ct:    {title:"CycleTime (reserva vs atual)", side:"r", done:true},
   urg:   {title:"Urgente (meta vs realizado)", side:"r", done:true},
   ts:    {title:"Technical Story (meta vs realizado)", side:"r", done:true},
@@ -125,6 +125,63 @@ function f4pTsItems(team, st){
   return f4pTsOps(team).filter(o => catOf(o) === "vazao" && o.deploy && o.deploy >= from && o.deploy <= to);
 }
 function f4pTsRealizado(team, st){ return f4pTsItems(team, st).length; }
+/* Quadrante 5 · Vazão: itens **entregues** (categoria de fluxo "Vazão", igual ao Technical Story —
+   decisão 0022) dos tipos configurados para o CT (`CFG.f4p.types`, o mesmo campo de CycleTime/
+   Variabilidade — não uma configuração própria), cuja saída caiu dentro do período exato do semestre
+   selecionado (`f4pExactSemesterWindow`). */
+function f4pVazaoOps(team, st){
+  st = st || f4pSemesterState();
+  const types = f4pTypes(), {from, to} = f4pExactSemesterWindow(st);
+  return [...S.model.ops.values()].filter(o => o.team === team && o.type && types.has(norm(o.type)) && catOf(o) === "vazao" && o.deploy && o.deploy >= from && o.deploy <= to);
+}
+/* tag que marca a capacidade do roadmap — a mesma configuração já usada pela Visão analítica (§10,
+   CFG.anTag, padrão "ROADMAP"); Reserva reaproveita essa tag em vez de ganhar uma configuração própria. */
+const f4pCapacityTag = () => norm(CFG.anTag || "ROADMAP");
+/* Reserva: subconjunto do Realizado com a tag de capacidade — nunca maior que o Realizado, por
+   construção (é um filtro sobre o mesmo conjunto, não uma contagem à parte). Realizado: todos os itens
+   do conjunto acima, com ou sem a tag. */
+function f4pVazaoRealizadoItems(team, st){ return f4pVazaoOps(team, st); }
+function f4pVazaoReservaItems(team, st){
+  const tag = f4pCapacityTag();
+  return f4pVazaoOps(team, st).filter(o => (o.tags || []).map(norm).includes(tag));
+}
+/* itens do time (dos tipos configurados, mesmo filtro do Vazão) atualmente na categoria de fluxo WIP —
+   contagem "ao vivo", sem filtro de período (WIP não tem uma data de saída pra filtrar por semestre;
+   é o instantâneo de agora). Usada pela tendência (decisão 0023): itens em WIP são trabalho a caminho
+   de virar Vazão em breve, então entram a favor da tendência mesmo antes de serem entregues. */
+function f4pVazaoWipCount(team){
+  const types = f4pTypes();
+  return [...S.model.ops.values()].filter(o => o.team === team && o.type && types.has(norm(o.type)) && catOf(o) === "wip").length;
+}
+/* Tendência: separa o Realizado por mês corrido dentro do período do semestre (só os meses já
+   decorridos, se o semestre estiver em curso — meses futuros não têm itens possíveis, então ficam de
+   fora do cálculo em vez de contarem como zero, o que enviesaria a tendência para "piora" logo no
+   início de um semestre novo) e compara o mês corrente (ou o último mês do semestre, se já encerrado)
+   contra a média dos meses anteriores do mesmo período, arredondada sempre para cima. Diferente de uma
+   comparação simples, o mês corrente entra na conta somado aos itens **hoje** em WIP (decisão 0023) —
+   eles ainda não viraram Vazão, mas sinalizam entrega a caminho, então contam a favor da tendência:
+   mês corrente + WIP > média → melhora (▲); < média → piora (▼); igual → estável (◆). Sem meses
+   anteriores para comparar (semestre com um único mês decorrido), fica ◆. */
+function f4pVazaoTrend(team, st){
+  st = st || f4pSemesterState();
+  const {from, to} = f4pExactSemesterWindow(st);
+  const end = to < TODAY ? to : TODAY;
+  const nMonths = (end.getFullYear() - from.getFullYear()) * 12 + (end.getMonth() - from.getMonth()) + 1;
+  if (nMonths < 2) return "◆";
+  const counts = Array(nMonths).fill(0);
+  f4pVazaoRealizadoItems(team, st).forEach(o => {
+    const idx = (o.deploy.getFullYear() - from.getFullYear()) * 12 + (o.deploy.getMonth() - from.getMonth());
+    if (idx >= 0 && idx < nMonths) counts[idx]++;
+  });
+  const atual = counts[nMonths - 1] + f4pVazaoWipCount(team);
+  const mediaAnteriores = Math.ceil(counts.slice(0, -1).reduce((a, b) => a + b, 0) / (nMonths - 1));
+  return atual > mediaAnteriores ? "▲" : atual < mediaAnteriores ? "▼" : "◆";
+}
+function f4pVazaoCell(team){
+  const st = f4pSemesterState(), reserva = f4pVazaoReservaItems(team, st), realizado = f4pVazaoRealizadoItems(team, st), trend = f4pVazaoTrend(team, st);
+  const tip = `Reserva: itens com a tag ${CFG.anTag || "ROADMAP"} · Realizado: itens dos tipos ${(CFG.f4p.types || []).join(", ") || "nenhum tipo marcado"} entregues (Vazão) em ${f4pExactSemesterLabel(st)} · tendência: mês corrente + itens em WIP vs. média (arredondada pra cima) dos meses anteriores do período · clique nos números para ver os itens`;
+  return `<span title="${esc(tip)}"><button type="button" class="f4p-real" data-f4p-vazao-reserva-team="${esc(team)}">${reserva.length}</button><span class="f4p-sep">|</span><button type="button" class="f4p-real" data-f4p-vazao-realizado-team="${esc(team)}">${realizado.length}</button> <span class="f4p-trend">${trend}</span></span>`;
+}
 /* Tendência: itens Expedite fechados nos últimos 3 meses vs. nos 3 meses antes desses — sempre a
    partir de hoje, independente do semestre selecionado no filtro. Sem margem de tolerância: mais → ▲,
    menos → ▼, igual → ◆. */
@@ -187,9 +244,13 @@ $("f4pBody").addEventListener("click", e => {
   const btnU = e.target.closest("[data-f4p-urgent-team]");
   if (btnU){ const team = btnU.dataset.f4pUrgentTeam; f4pItemsModal(`Urgente · ${team} · ${f4pExactSemesterLabel(st)}`, f4pUrgentItems(team, st)); return; }
   const btnT = e.target.closest("[data-f4p-ts-team]");
-  if (btnT){ const team = btnT.dataset.f4pTsTeam; f4pItemsModal(`Technical Story · ${team} · ${f4pExactSemesterLabel(st)}`, f4pTsItems(team, st)); }
+  if (btnT){ const team = btnT.dataset.f4pTsTeam; f4pItemsModal(`Technical Story · ${team} · ${f4pExactSemesterLabel(st)}`, f4pTsItems(team, st)); return; }
+  const btnVR = e.target.closest("[data-f4p-vazao-reserva-team]");
+  if (btnVR){ const team = btnVR.dataset.f4pVazaoReservaTeam; f4pItemsModal(`Vazão · ${team} · reserva · ${f4pExactSemesterLabel(st)}`, f4pVazaoReservaItems(team, st)); return; }
+  const btnVZ = e.target.closest("[data-f4p-vazao-realizado-team]");
+  if (btnVZ){ const team = btnVZ.dataset.f4pVazaoRealizadoTeam; f4pItemsModal(`Vazão · ${team} · realizado · ${f4pExactSemesterLabel(st)}`, f4pVazaoRealizadoItems(team, st)); }
 });
-const F4P_CELL = {var: f4pVarCell, ct: f4pCtCell, urg: f4pUrgentCell, ts: f4pTsCell};
+const F4P_CELL = {var: f4pVarCell, ct: f4pCtCell, urg: f4pUrgentCell, ts: f4pTsCell, vazao: f4pVazaoCell};
 function f4pCard(id, teams){
   const q = F4P_QUADS[id];
   const head = `<div class="f4p-card-h">${esc(q.title)}</div>${q.goal ? `<div class="f4p-goal">${esc(q.goal)}</div>` : ""}`;
@@ -224,7 +285,7 @@ function renderF4P(){
       <div class="f4p-col">${left.map(g => f4pGroup(g, teams)).join("")}</div>
       <div class="f4p-col">${right.map(g => f4pGroup(g, teams)).join("")}</div>
     </div>
-    <div class="an-note">Mostra sempre todos os times carregados (${esc(teams.join(", "))}), mesmo com um time diferente selecionado no filtro — o filtro só habilita o acesso a este painel. CycleTime e Variabilidade usam itens dos tipos ${esc((CFG.f4p.types || []).join(", ") || "nenhum tipo marcado")} concluídos no período: <b>${esc(f4pPeriodLabel(st))}</b>${st.kind === "past" ? " (semestre selecionado, já encerrado)" : " (semestre selecionado ainda em curso, ou não reconhecido — usa a janela corrida)"}. Urgente conta itens com a tag <b>${esc(f4pTagName(f4pExpediteTag()))}</b>: os ainda abertos contam sempre, e os fechados só se fecharam dentro do período exato do semestre selecionado (<b>${esc(f4pExactSemesterLabel(st))}</b>) — sem histórico de quando cada item passou a se qualificar, não dá pra saber quem estava marcado antes disso. Technical Story conta só itens desse tipo já <b>entregues</b> (categoria de fluxo Vazão) dentro do mesmo período — itens ainda em Backlog, Discovery ou WIP não entram. Os demais quadrantes aguardam a definição da regra de cálculo.</div>`;
+    <div class="an-note">Mostra sempre todos os times carregados (${esc(teams.join(", "))}), mesmo com um time diferente selecionado no filtro — o filtro só habilita o acesso a este painel. CycleTime e Variabilidade usam itens dos tipos ${esc((CFG.f4p.types || []).join(", ") || "nenhum tipo marcado")} concluídos no período: <b>${esc(f4pPeriodLabel(st))}</b>${st.kind === "past" ? " (semestre selecionado, já encerrado)" : " (semestre selecionado ainda em curso, ou não reconhecido — usa a janela corrida)"}. Urgente conta itens com a tag <b>${esc(f4pTagName(f4pExpediteTag()))}</b>: os ainda abertos contam sempre, e os fechados só se fecharam dentro do período exato do semestre selecionado (<b>${esc(f4pExactSemesterLabel(st))}</b>) — sem histórico de quando cada item passou a se qualificar, não dá pra saber quem estava marcado antes disso. Technical Story conta só itens desse tipo já <b>entregues</b> (categoria de fluxo Vazão) dentro do mesmo período — itens ainda em Backlog, Discovery ou WIP não entram. Vazão usa os mesmos tipos de CycleTime/Variabilidade, também só itens entregues no período: Reserva é o subconjunto com a tag <b>${esc(CFG.anTag || "ROADMAP")}</b> (capacidade do roadmap); Realizado é todo o conjunto, com ou sem a tag. Os demais quadrantes aguardam a definição da regra de cálculo.</div>`;
 }
 function placeF4P(){ const h = document.querySelector(".top").offsetHeight; $("f4pPanel").style.top = h + "px"; $("f4pPanel").style.height = `calc(100% - ${h}px)`; }
 function openF4P(){ if (!f4pEnabled()) return; if (AN.open) closeAnalytics(); F4P.open = true; placeF4P(); $("f4pPanel").classList.add("open"); $("f4pPanel").setAttribute("aria-hidden","false"); $("f4pTab").setAttribute("aria-expanded","true"); renderF4P(); $("f4pClose").focus(); }
