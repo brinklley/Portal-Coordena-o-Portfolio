@@ -1,6 +1,6 @@
 # Report F4P
 
-**Status**: Quadrantes 1 (CycleTime), 2 (Variabilidade), 3 (Urgente) e 4 (Technical Story) implementados — ver `docs/regras-de-negocio.md` §12 e `docs/decisoes/0011` a `0019`. **Próxima tarefa: escolher e especificar o próximo quadrante** entre Eficiência de fluxo, Roadmap–Épicos, Vazão ou User Story (seção "Quadrantes seguintes" abaixo) — mesmo processo dos anteriores: propor aqui, confirmar com o usuário, então codar.
+**Status**: Quadrantes 1 (CycleTime), 2 (Variabilidade), 3 (Urgente) e 4 (Technical Story) implementados — ver `docs/regras-de-negocio.md` §12 e `docs/decisoes/0011` a `0020`. **Próxima tarefa: escolher e especificar o próximo quadrante** entre Eficiência de fluxo, Roadmap–Épicos, Vazão ou User Story (seção "Quadrantes seguintes" abaixo) — mesmo processo dos anteriores: propor aqui, confirmar com o usuário, então codar.
 
 Tela "Report F4P" (BUSINESS OUTCOMES – PRODUCTIVITY), inspirada no slide usado pela gestão, com o mesmo comportamento da Visão analítica: **painel lateral recolhível, habilitado só quando o filtro tem um Time e um Roadmap (interno ou executivo)**, e desabilitado se o semestre selecionado ainda não começou (não há dados possíveis). O filtro só habilita o acesso; o relatório mostra **sempre todos os times carregados no momento** (`S.model.teams` — o mesmo conjunto das colunas do quadro; ver decisão `0011`, que optou por isso em vez dos times da tela de Configurações, pois esta última exclui os times dos dados de exemplo).
 
@@ -44,13 +44,13 @@ Por time: `[Meta] | [Realizado] [Tendência]`
 
 ## Quadrante 4 · TECHNICAL STORY (META VS REALIZADO) — implementado
 
-Mesmo comportamento do Quadrante 3 (Urgente), com duas diferenças de negócio. Decisão: `docs/decisoes/0018-report-f4p-quadrante-technical-story.md`. Regra completa: `docs/regras-de-negocio.md` §12.5.
+Mesmo comportamento do Quadrante 3 (Urgente), com diferenças de negócio. Decisões: `docs/decisoes/0018-report-f4p-quadrante-technical-story.md` e `docs/decisoes/0020-report-f4p-technical-story-so-itens-entregues.md`. Regra completa: `docs/regras-de-negocio.md` §12.5.
 
 Por time: `[Meta] | [Realizado]`
 
 - **O que conta**: itens do **tipo Technical Story** — tipo fixo (não configurável, ao contrário dos tipos de CycleTime/Variabilidade), em vez de uma tag.
 - **Meta**: teto de itens Technical Story no semestre, configurável por time; **padrão 6** quando o time não cadastra a própria (diferente do Urgente, que fica sem meta).
-- **Realizado**: mesma janela do Urgente (`f4pExactSemesterWindow`, decisões `0017`/`0018`) — abertos contam sempre; fechados só contam se fecharam dentro do período exato do semestre selecionado.
+- **Realizado**: usa a mesma janela do Urgente (`f4pExactSemesterWindow`, decisões `0017`/`0018`), mas **diferente do Urgente** só conta itens já **entregues** — categoria de fluxo Vazão (`catOf`, decisão `0019`) — com `o.deploy` dentro do período; itens em Backlog, Discovery ou WIP não contam, mesmo abertos há muito tempo (decisão `0020`).
 - Indicador de cor do Realizado: acima da meta → vermelho; na meta ou abaixo → verde. Sempre colorido (a meta nunca fica "sem valor").
 - Sem seta de tendência (o usuário não pediu uma para este quadrante).
 - **Transparência**: o número do Realizado é clicável e abre a lista dos itens exatos contados, igual ao Urgente — mesma Situação por categoria de fluxo.
@@ -63,7 +63,7 @@ Por time: `[Meta] | [Realizado]`
 - P50 = 0 (ou amostra vazia) → variabilidade "--". O tamanho da amostra (n) e o P50 ficam no texto de apoio (`title`) da célula, não sempre visíveis.
 - Ilustrações: as imagens reais do slide de referência (fornecidas pelo usuário), embutidas em base64 no build — não os SVGs originais cogitados inicialmente (decisão `0012`).
 - Urgente: definição por tag configurável (não fixa em "URGENTE"), realizado sempre limitado ao período exato do semestre selecionado (abertos sempre contam; fechados só dentro do período), tendência por trimestres e cores conforme decisões `0014`, `0015` e `0017`.
-- Technical Story: mesmo comportamento do Urgente, contando pelo tipo do item em vez de uma tag e com meta padrão 6 (não fica "sem meta"); sem tendência. A janela por período exato do semestre foi generalizada de `f4pUrgentWindow` para `f4pExactSemesterWindow`, reaproveitada pelos dois quadrantes (decisão `0018`).
+- Technical Story: mesmo comportamento do Urgente, contando pelo tipo do item em vez de uma tag e com meta padrão 6 (não fica "sem meta"); sem tendência. A janela por período exato do semestre foi generalizada de `f4pUrgentWindow` para `f4pExactSemesterWindow`, reaproveitada pelos dois quadrantes (decisão `0018`). Depois de ver o quadrante em produção, o Realizado passou a contar só itens já entregues (categoria de fluxo Vazão) — itens em Backlog, Discovery ou WIP não contam mais, mesmo abertos há muito tempo (decisão `0020`, única divergência real do comportamento do Urgente).
 - Situação na lista de itens (Urgente e Technical Story): categoria de fluxo do time (Backlog/Discovery/WIP/Vazão, com a data de saída na Vazão), pela mesma `catOf` usada no resto do portal, em vez de um "Aberto"/"Fechado" próprio do Report F4P (decisão `0019`).
 
 ## Configuração implementada (seção "Report F4P" na tela de Configurações)
@@ -92,4 +92,5 @@ Eficiência de fluxo (MIN vs ATUAL vs MAX, meta mínima 30%), Roadmap – épico
 - [x] Configurações novas validadas (MIN < MAX; meta de Urgente independente) e persistidas; exportação/importação incluem os novos campos.
 - [x] Urgente conta só itens com a tag configurada, de qualquer tipo; realizado ao vivo no semestre em curso e por fechamento no semestre encerrado; tendência por trimestres testada com casos de alta, queda e estabilidade.
 - [x] Technical Story conta só itens desse tipo; realizado com a mesma janela por período exato do semestre do Urgente; meta com padrão 6 testada com e sem valor próprio por time; clique no número abre a lista e navega até o item.
+- [x] Technical Story ignora itens em Backlog, Discovery ou WIP no Realizado, mesmo abertos há muito tempo; conta só itens na categoria de fluxo Vazão com data de saída dentro do período (decisão `0020`), testado com item em cada categoria.
 - [x] Situação na lista de itens (Urgente e Technical Story) mostra a categoria de fluxo do time (Backlog, Discovery, WIP ou Vazão com a data), testada com item em cada categoria.

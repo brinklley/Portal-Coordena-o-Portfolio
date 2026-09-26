@@ -271,54 +271,70 @@ def test_urgente_meta_zero_e_valida(page):
 # ---------------- Quadrante 4 · Technical Story (meta vs. realizado) ----------------
 # Mesmo comportamento do Urgente (docs/decisoes/0018), mas conta itens pelo tipo "Technical Story" em
 # vez de uma tag, e a meta tem padrão 6 em vez de ficar "sem meta" quando o time não cadastra a própria.
+# Decisão 0020: diferente do Urgente, só conta itens já ENTREGUES (categoria de fluxo Vazão) — itens em
+# Backlog, Discovery ou WIP não entram no Realizado, mesmo abertos há muito tempo. Os testes abaixo dão
+# um fluxo próprio (Backlog/Discovery/WIP/Vazao) a cada time sintético via S.model.teamFlow + CFG.flow,
+# para controlar a categoria de cada item independente dos dados aleatórios das fixtures.
 
-def test_ts_conta_so_itens_do_tipo_technical_story(page):
+def test_ts_conta_so_itens_do_tipo_technical_story_e_entregues(page):
     carregar(page, "f4p.xlsx")
     n = page.evaluate("""()=>{
-      S.model.ops.set("t1", {team:"F4P_TS1", type:"Technical Story"});
-      S.model.ops.set("t2", {team:"F4P_TS1", type:"User Story"});
-      S.model.ops.set("t3", {team:"F4P_TS1", type:"Bug"});
+      S.model.teamFlow.F4P_TS1 = ["Backlog", "Vazao"];
+      CFG.flow.f4p_ts1 = {cat:{vazao:"vazao"}, ct:[]};
+      const hoje = new Date();
+      S.model.ops.set("t1", {team:"F4P_TS1", type:"Technical Story", stName:"Vazao", deploy:hoje});
+      S.model.ops.set("t2", {team:"F4P_TS1", type:"User Story", stName:"Vazao", deploy:hoje});
+      S.model.ops.set("t3", {team:"F4P_TS1", type:"Bug", stName:"Vazao", deploy:hoje});
       S.f.exec = semestre(TODAY);
       return f4pTsRealizado("F4P_TS1");
     }""")
     assert n == 1
 
-def test_ts_semestre_atual_conta_abertos_e_fechados(page):
-    """Semestre em curso: aberto conta sempre; fechado conta se fechou dentro do período exato do
-    semestre selecionado (mesma janela do Urgente, f4pExactSemesterWindow)."""
-    carregar(page, "f4p.xlsx")
-    n = page.evaluate("""()=>{
-      S.f.exec = semestre(TODAY);
-      const inicioDoSemestre = f4pSemesterState().start;
-      S.model.ops.set("t1", {team:"F4P_TS2", type:"Technical Story", deploy:null});
-      S.model.ops.set("t2", {team:"F4P_TS2", type:"Technical Story", deploy:new Date(inicioDoSemestre.getTime() + 5 * 864e5)});
-      return f4pTsRealizado("F4P_TS2", f4pSemesterState());
-    }""")
-    assert n == 2
-
-def test_ts_semestre_atual_ignora_fechados_antes_do_inicio_do_semestre(page):
+def test_ts_ignora_itens_em_backlog_discovery_ou_wip(page):
+    """Regra pedida pelo usuário depois de ver o quadrante em produção (decisão 0020): itens ainda não
+    entregues não devem contar, nem mesmo os abertos há muito tempo — ao contrário do Urgente."""
     carregar(page, "f4p.xlsx")
     r = page.evaluate("""()=>{
+      S.model.teamFlow.F4P_TS2 = ["Backlog", "Discovery", "WIP", "Vazao"];
+      CFG.flow.f4p_ts2 = {cat:{discovery:"disc", wip:"wip", vazao:"vazao"}, ct:[]};
+      S.f.exec = semestre(TODAY);
+      const hoje = new Date();
+      S.model.ops.set("b1", {team:"F4P_TS2", type:"Technical Story", stName:"Backlog", deploy:null});
+      S.model.ops.set("d1", {team:"F4P_TS2", type:"Technical Story", stName:"Discovery", deploy:null});
+      S.model.ops.set("w1", {team:"F4P_TS2", type:"Technical Story", stName:"WIP", deploy:null});
+      S.model.ops.set("v1", {team:"F4P_TS2", type:"Technical Story", stName:"Vazao", deploy:hoje});
+      S.model.ops.set("v2", {team:"F4P_TS2", type:"Technical Story", stName:"Vazao", deploy:null});   // Vazão mas sem data de saída: não conta
+      return f4pTsRealizado("F4P_TS2", f4pSemesterState());
+    }""")
+    assert r == 1
+
+def test_ts_semestre_atual_ignora_entregues_antes_do_inicio_do_semestre(page):
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.teamFlow.F4P_TS3 = ["Backlog", "Vazao"];
+      CFG.flow.f4p_ts3 = {cat:{vazao:"vazao"}, ct:[]};
       S.f.exec = semestre(TODAY);
       const inicioDoSemestre = f4pSemesterState().start;
       const antesDoSemestre = new Date(inicioDoSemestre.getTime() - 864e5);    // véspera do início do semestre: não conta
       const depoisDoInicio = new Date(inicioDoSemestre.getTime() + 5 * 864e5); // dentro do semestre: conta
-      S.model.ops.set("t1", {team:"F4P_TS3", type:"Technical Story", deploy:antesDoSemestre});
-      S.model.ops.set("t2", {team:"F4P_TS3", type:"Technical Story", deploy:depoisDoInicio});
-      S.model.ops.set("t3", {team:"F4P_TS3", type:"Technical Story", deploy:null});           // aberto há qualquer tempo: conta
+      S.model.ops.set("t1", {team:"F4P_TS3", type:"Technical Story", stName:"Vazao", deploy:antesDoSemestre});
+      S.model.ops.set("t2", {team:"F4P_TS3", type:"Technical Story", stName:"Vazao", deploy:depoisDoInicio});
+      S.model.ops.set("t3", {team:"F4P_TS3", type:"Technical Story", stName:"Backlog", deploy:null});   // ainda aberto: não conta (decisão 0020)
       return f4pTsRealizado("F4P_TS3", f4pSemesterState());
     }""")
-    assert r == 2
+    assert r == 1
 
-def test_ts_semestre_passado_conta_so_fechados_no_periodo(page):
+def test_ts_semestre_passado_conta_so_entregues_no_periodo(page):
     carregar(page, "f4p.xlsx")
     r = page.evaluate("""()=>{
+      S.model.teamFlow.F4P_TS4 = ["Backlog", "Vazao"];
+      CFG.flow.f4p_ts4 = {cat:{vazao:"vazao"}, ct:[]};
       const curStart = f4pSemStart(semestre(TODAY));
       const prevMid = new Date(curStart.getFullYear(), curStart.getMonth() - 3, 15);
       const prevSem = semestre(prevMid);
-      S.model.ops.set("t1", {team:"F4P_TS4", type:"Technical Story", deploy:prevMid});    // fechado dentro do semestre anterior
-      S.model.ops.set("t2", {team:"F4P_TS4", type:"Technical Story", deploy:null});       // ainda aberto
-      S.model.ops.set("t3", {team:"F4P_TS4", type:"Technical Story", deploy:curStart});   // fechado, mas no semestre atual
+      S.model.ops.set("t1", {team:"F4P_TS4", type:"Technical Story", stName:"Vazao", deploy:prevMid});   // entregue dentro do semestre anterior
+      S.model.ops.set("t2", {team:"F4P_TS4", type:"Technical Story", stName:"Backlog", deploy:null});    // ainda aberto
+      S.model.ops.set("t3", {team:"F4P_TS4", type:"Technical Story", stName:"Vazao", deploy:curStart});  // entregue, mas no semestre atual
       S.f.int = prevSem;
       return f4pTsRealizado("F4P_TS4", f4pSemesterState());
     }""")
@@ -349,10 +365,13 @@ def test_ts_clique_no_numero_abre_lista_e_permite_navegar(page):
 def test_ts_meta_padrao_6_colore_vermelho_ou_verde(page):
     carregar(page, "f4p.xlsx")
     r = page.evaluate("""()=>{
-      for (let i = 1; i <= 6; i++) S.model.ops.set("m"+i, {team:"F4P_TS_META", type:"Technical Story", deploy:null});
+      S.model.teamFlow.F4P_TS_META = ["Backlog", "Vazao"];
+      CFG.flow.f4p_ts_meta = {cat:{vazao:"vazao"}, ct:[]};
+      const hoje = new Date();
+      for (let i = 1; i <= 6; i++) S.model.ops.set("m"+i, {team:"F4P_TS_META", type:"Technical Story", stName:"Vazao", deploy:hoje});
       S.f.exec = semestre(TODAY);
-      const naMeta = f4pTsCell("F4P_TS_META");             // 6 itens, sem meta cadastrada: usa o padrão 6 (6 <= 6)
-      S.model.ops.set("m7", {team:"F4P_TS_META", type:"Technical Story", deploy:null});
+      const naMeta = f4pTsCell("F4P_TS_META");             // 6 itens entregues, sem meta cadastrada: usa o padrão 6 (6 <= 6)
+      S.model.ops.set("m7", {team:"F4P_TS_META", type:"Technical Story", stName:"Vazao", deploy:hoje});
       const acimaDaMeta = f4pTsCell("F4P_TS_META");        // 7 > 6 (padrão)
       CFG.f4p.teams.f4p_ts_meta = {tsMeta: 10};
       const metaPropria = f4pTsCell("F4P_TS_META");        // 7 <= 10 (meta própria do time)

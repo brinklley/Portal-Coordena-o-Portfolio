@@ -216,11 +216,11 @@ Gestão da Classe de Serviço **Expedite**. Decisões e limitação de dados: `d
 
 ### 12.5 Technical Story (meta vs. realizado)
 
-Mesmo comportamento do Urgente (§12.4), mas conta itens pelo **tipo** do item em vez de uma tag, e a meta tem um padrão numérico em vez de ficar "sem meta". Decisão: `docs/decisoes/0018-report-f4p-quadrante-technical-story.md`.
+Mesmo comportamento do Urgente (§12.4), mas conta itens pelo **tipo** do item em vez de uma tag, a meta tem um padrão numérico em vez de ficar "sem meta", e o Realizado só considera itens **já entregues**. Decisões: `docs/decisoes/0018-report-f4p-quadrante-technical-story.md` e `docs/decisoes/0020-report-f4p-technical-story-so-itens-entregues.md`.
 
 - **O que conta**: itens cujo tipo é **Technical Story** (`norm(o.type) === "technical story"`) — tipo fixo, não usa `CFG.f4p.types` (que é só de CycleTime/Variabilidade) nem é configurável, ao contrário da tag do Urgente.
 - **Meta**: número inteiro cadastrado por time (`CFG.f4p.teams[time].tsMeta`). **Padrão 6** quando o time não cadastra a própria meta — diferente do Urgente, que fica sem meta (e sem cor) nesse caso.
-- **Realizado**: mesma regra do Urgente — usa `f4pExactSemesterWindow` (período exato do semestre selecionado, em curso ou encerrado); abertos contam sempre, fechados só contam se `o.deploy` cair dentro desse período.
+- **Realizado**: usa `f4pExactSemesterWindow` (período exato do semestre selecionado, em curso ou encerrado), mas **diferente do Urgente** só conta itens cuja categoria de fluxo atual (`catOf`, mesma classificação usada na Situação, §12.4/decisão `0019`) seja **Vazão** — e cujo `o.deploy` caia dentro desse período. Itens em Backlog, Discovery ou WIP **não contam**, mesmo abertos há muito tempo (decisão `0020`): a meta deste quadrante mede entrega no período, não risco em aberto.
 - Indicador de cor do número: Realizado > Meta → vermelho; Realizado ≤ Meta → verde — sempre colorido (a meta nunca fica em branco).
 - **Sem seta de tendência**: ao contrário do Urgente, este quadrante não tem indicador de tendência.
 - **Transparência**: o número do Realizado é clicável e abre a lista dos itens exatos que entraram na contagem, igual ao Urgente — mesma coluna "Situação" por categoria de fluxo (`gotoId` para navegar até o item).
