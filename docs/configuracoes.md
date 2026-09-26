@@ -26,6 +26,7 @@ Testes: `tests/test_configuracoes.py`.
 | `f4p.months` | 6 | período (meses) da amostra do P95/P50 do Report F4P |
 | `f4p.types` | user story, technical story | tipos considerados na amostra de CycleTime/Variabilidade e no Realizado/Reserva do quadrante Vazão do Report F4P |
 | `f4p.epiTypes` | epic | tipos de **épico** (não de item de time) considerados pelo quadrante Roadmap – Épicos do Report F4P; configuração própria, independente de `f4p.types` |
+| `f4p.usTypes` | user story | tipos considerados pelo quadrante User Story do Report F4P; configuração própria, independente de `f4p.types` e `f4p.epiTypes` |
 | `f4p.expediteTag` | urgent (id da tag URGENTE) | tag cadastrada que marca a Classe de Serviço Expedite, usada pelo quadrante Urgente |
 | `f4p.teams[time]` | `{}` | por time: `min`/`max` da variabilidade esperada (padrão efetivo 1.5/3.5), `urgentMeta` (teto de itens Expedite no semestre; sem padrão) e `tsMeta` (teto de itens Technical Story no semestre; padrão efetivo 6) |
 | `azure.orgs` | `[]` | organizações (sem token) |

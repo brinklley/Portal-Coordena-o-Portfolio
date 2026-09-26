@@ -1060,3 +1060,302 @@ def test_roadmap_epico_com_itens_de_dois_times_conta_para_ambos(page):
       return {core: f4pRoadmapEpis("F4P_V26E_CORE").map(e=>e.id), mobile: f4pRoadmapEpis("F4P_V26E_MOBILE").map(e=>e.id)};
     }""")
     assert r == {"core": ["emix5"], "mobile": ["emix5"]}
+
+# ---------------- Quadrante 7 · User Story (planejado vs. não planejado) ----------------
+# Decisão 0030. Mesmo critério de "entregue" (categoria de fluxo Vazão) do Technical Story/Vazão, mas
+# com tipos próprios (CFG.f4p.usTypes, padrão User Story). Planejado/Não planejado são uma PARTIÇÃO do
+# conjunto entregue (com/sem a tag de capacidade) — diferente do Vazão, onde Reserva é subconjunto do
+# Realizado.
+
+def test_us_conta_so_tipos_configurados_e_entregues(page):
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.teamFlow.F4P_US1 = ["Backlog", "Vazao"];
+      CFG.flow.f4p_us1 = {cat:{vazao:"vazao"}, ct:[]};
+      const hoje = new Date();
+      S.model.ops.set("u1", {team:"F4P_US1", type:"User Story", stName:"Vazao", deploy:hoje, tags:[]});
+      S.model.ops.set("u2", {team:"F4P_US1", type:"Technical Story", stName:"Vazao", deploy:hoje, tags:[]});   // tipo não configurado (default só User Story): não conta
+      S.model.ops.set("u3", {team:"F4P_US1", type:"User Story", stName:"Backlog", deploy:null, tags:[]});      // não entregue: não conta
+      S.f.exec = semestre(TODAY);
+      return f4pUsOps("F4P_US1", f4pSemesterState()).length;
+    }""")
+    assert r == 1
+
+def test_us_planejado_e_nao_planejado_sao_particao_exata(page):
+    """Diferente do Vazão (Reserva ⊆ Realizado), aqui Planejado + Não planejado = todo o entregue, sem
+    sobreposição: cada item está num dos dois grupos, nunca nos dois."""
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.teamFlow.F4P_US2 = ["Backlog", "Vazao"];
+      CFG.flow.f4p_us2 = {cat:{vazao:"vazao"}, ct:[]};
+      const hoje = new Date();
+      S.model.ops.set("u1", {team:"F4P_US2", type:"User Story", stName:"Vazao", deploy:hoje, tags:["ROADMAP"]});
+      S.model.ops.set("u2", {team:"F4P_US2", type:"User Story", stName:"Vazao", deploy:hoje, tags:["Roadmap"]});   // mesma tag, outra caixa
+      S.model.ops.set("u3", {team:"F4P_US2", type:"User Story", stName:"Vazao", deploy:hoje, tags:[]});
+      S.f.exec = semestre(TODAY);
+      const st = f4pSemesterState();
+      return {planejado: f4pUsPlanejadoItems("F4P_US2", st).length, naoPlanejado: f4pUsNaoPlanejadoItems("F4P_US2", st).length, total: f4pUsOps("F4P_US2", st).length};
+    }""")
+    assert r == {"planejado": 2, "naoPlanejado": 1, "total": 3}
+
+def test_us_usa_tag_de_capacidade_configuravel(page):
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.teamFlow.F4P_US3 = ["Backlog", "Vazao"];
+      CFG.flow.f4p_us3 = {cat:{vazao:"vazao"}, ct:[]};
+      CFG.anTag = "CAPACIDADE";
+      const hoje = new Date();
+      S.model.ops.set("u1", {team:"F4P_US3", type:"User Story", stName:"Vazao", deploy:hoje, tags:["CAPACIDADE"]});
+      S.model.ops.set("u2", {team:"F4P_US3", type:"User Story", stName:"Vazao", deploy:hoje, tags:["ROADMAP"]});   // tag antiga: não conta mais como planejado
+      S.f.exec = semestre(TODAY);
+      const st = f4pSemesterState();
+      const r = {planejado: f4pUsPlanejadoItems("F4P_US3", st).length, naoPlanejado: f4pUsNaoPlanejadoItems("F4P_US3", st).length};
+      CFG.anTag = "ROADMAP";
+      return r;
+    }""")
+    assert r == {"planejado": 1, "naoPlanejado": 1}
+
+def test_us_usa_tipos_configuraveis_proprios_independentes_do_ct(page):
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.teamFlow.F4P_US4 = ["Backlog", "Vazao"];
+      CFG.flow.f4p_us4 = {cat:{vazao:"vazao"}, ct:[]};
+      CFG.f4p.usTypes = ["feature"];
+      const hoje = new Date();
+      S.model.ops.set("u1", {team:"F4P_US4", type:"Feature", stName:"Vazao", deploy:hoje, tags:[]});
+      S.model.ops.set("u2", {team:"F4P_US4", type:"User Story", stName:"Vazao", deploy:hoje, tags:[]});   // não é mais o tipo configurado
+      S.f.exec = semestre(TODAY);
+      const n = f4pUsOps("F4P_US4", f4pSemesterState()).length;
+      CFG.f4p.usTypes = ["user story"];
+      return n;
+    }""")
+    assert r == 1
+
+def test_us_ignora_itens_em_backlog_discovery_ou_wip(page):
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.teamFlow.F4P_US5 = ["Backlog", "Discovery", "WIP", "Vazao"];
+      CFG.flow.f4p_us5 = {cat:{discovery:"disc", wip:"wip", vazao:"vazao"}, ct:[]};
+      S.f.exec = semestre(TODAY);
+      const hoje = new Date();
+      S.model.ops.set("b1", {team:"F4P_US5", type:"User Story", stName:"Backlog", deploy:null, tags:[]});
+      S.model.ops.set("d1", {team:"F4P_US5", type:"User Story", stName:"Discovery", deploy:null, tags:[]});
+      S.model.ops.set("w1", {team:"F4P_US5", type:"User Story", stName:"WIP", deploy:null, tags:[]});
+      S.model.ops.set("v1", {team:"F4P_US5", type:"User Story", stName:"Vazao", deploy:hoje, tags:[]});
+      return f4pUsOps("F4P_US5", f4pSemesterState()).length;
+    }""")
+    assert r == 1
+
+def test_us_semestre_atual_ignora_entregues_antes_do_inicio_do_semestre(page):
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.teamFlow.F4P_US6 = ["Backlog", "Vazao"];
+      CFG.flow.f4p_us6 = {cat:{vazao:"vazao"}, ct:[]};
+      S.f.exec = semestre(TODAY);
+      const inicioDoSemestre = f4pSemesterState().start;
+      const antesDoSemestre = new Date(inicioDoSemestre.getTime() - 864e5);
+      const depoisDoInicio = new Date(inicioDoSemestre.getTime() + 5 * 864e5);
+      S.model.ops.set("u1", {team:"F4P_US6", type:"User Story", stName:"Vazao", deploy:antesDoSemestre, tags:[]});
+      S.model.ops.set("u2", {team:"F4P_US6", type:"User Story", stName:"Vazao", deploy:depoisDoInicio, tags:[]});
+      return f4pUsOps("F4P_US6", f4pSemesterState()).length;
+    }""")
+    assert r == 1
+
+def test_us_semestre_passado_conta_so_entregues_no_periodo(page):
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.teamFlow.F4P_US7 = ["Backlog", "Vazao"];
+      CFG.flow.f4p_us7 = {cat:{vazao:"vazao"}, ct:[]};
+      const curStart = f4pSemStart(semestre(TODAY));
+      const prevMid = new Date(curStart.getFullYear(), curStart.getMonth() - 3, 15);
+      const prevSem = semestre(prevMid);
+      S.model.ops.set("u1", {team:"F4P_US7", type:"User Story", stName:"Vazao", deploy:prevMid, tags:[]});
+      S.model.ops.set("u2", {team:"F4P_US7", type:"User Story", stName:"Backlog", deploy:null, tags:[]});
+      S.model.ops.set("u3", {team:"F4P_US7", type:"User Story", stName:"Vazao", deploy:curStart, tags:[]});
+      S.f.int = prevSem;
+      return f4pUsOps("F4P_US7", f4pSemesterState()).length;
+    }""")
+    assert r == 1
+
+def test_us_tendencia_soma_wip_ao_mes_atual_exemplo_melhora(page):
+    """Mesmo exemplo exato do Vazão (decisão 0023): média 1, mês atual 0, 3 itens em WIP: 0+3=3 > 1 → melhora."""
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.teamFlow.F4P_UST1 = ["Backlog", "WIP", "Vazao"];
+      CFG.flow.f4p_ust1 = {cat:{wip:"wip", vazao:"vazao"}, ct:[]};
+      const st = {kind:"current", start:new Date(TODAY.getFullYear(), TODAY.getMonth() - 1, 1), end:new Date(TODAY.getFullYear(), TODAY.getMonth() + 6, 0)};
+      const mesAnterior = new Date(TODAY.getFullYear(), TODAY.getMonth() - 1, 15);
+      S.model.ops.set("v1", {team:"F4P_UST1", type:"User Story", stName:"Vazao", deploy:mesAnterior, tags:[]});
+      for (let i = 0; i < 3; i++) S.model.ops.set("w"+i, {team:"F4P_UST1", type:"User Story", stName:"WIP", deploy:null, tags:[]});
+      return f4pUsTrend("F4P_UST1", st);
+    }""")
+    assert r == "▲"
+
+def test_us_tendencia_soma_wip_ao_mes_atual_exemplo_piora(page):
+    """Média 2, mês atual 0, 1 item em WIP: 0+1=1 < 2 → piora."""
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.teamFlow.F4P_UST2 = ["Backlog", "WIP", "Vazao"];
+      CFG.flow.f4p_ust2 = {cat:{wip:"wip", vazao:"vazao"}, ct:[]};
+      const st = {kind:"current", start:new Date(TODAY.getFullYear(), TODAY.getMonth() - 1, 1), end:new Date(TODAY.getFullYear(), TODAY.getMonth() + 6, 0)};
+      const mesAnterior = new Date(TODAY.getFullYear(), TODAY.getMonth() - 1, 10);
+      for (let i = 0; i < 2; i++) S.model.ops.set("v"+i, {team:"F4P_UST2", type:"User Story", stName:"Vazao", deploy:mesAnterior, tags:[]});
+      S.model.ops.set("w0", {team:"F4P_UST2", type:"User Story", stName:"WIP", deploy:null, tags:[]});
+      return f4pUsTrend("F4P_UST2", st);
+    }""")
+    assert r == "▼"
+
+def test_us_tendencia_soma_wip_ao_mes_atual_exemplo_estavel(page):
+    """Média 3, mês atual 2, 1 item em WIP: 2+1=3 == 3 → estável."""
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.teamFlow.F4P_UST3 = ["Backlog", "WIP", "Vazao"];
+      CFG.flow.f4p_ust3 = {cat:{wip:"wip", vazao:"vazao"}, ct:[]};
+      const st = {kind:"current", start:new Date(TODAY.getFullYear(), TODAY.getMonth() - 1, 1), end:new Date(TODAY.getFullYear(), TODAY.getMonth() + 6, 0)};
+      const mesAnterior = new Date(TODAY.getFullYear(), TODAY.getMonth() - 1, 10), mesAtual = new Date(TODAY.getFullYear(), TODAY.getMonth(), 1);
+      for (let i = 0; i < 3; i++) S.model.ops.set("v"+i, {team:"F4P_UST3", type:"User Story", stName:"Vazao", deploy:mesAnterior, tags:[]});
+      for (let i = 0; i < 2; i++) S.model.ops.set("c"+i, {team:"F4P_UST3", type:"User Story", stName:"Vazao", deploy:mesAtual, tags:[]});
+      S.model.ops.set("w0", {team:"F4P_UST3", type:"User Story", stName:"WIP", deploy:null, tags:[]});
+      return f4pUsTrend("F4P_UST3", st);
+    }""")
+    assert r == "◆"
+
+def test_us_tendencia_sem_meses_anteriores_fica_neutra(page):
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      const st = {kind:"current", start:new Date(TODAY.getFullYear(), TODAY.getMonth(), 1), end:new Date(TODAY.getFullYear(), TODAY.getMonth() + 6, 0)};
+      return f4pUsTrend("F4P_US_VAZIO", st);
+    }""")
+    assert r == "◆"
+
+def test_us_wip_conta_so_tipos_configurados_do_time(page):
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.teamFlow.F4P_UST5 = ["Backlog", "WIP", "Vazao"];
+      CFG.flow.f4p_ust5 = {cat:{wip:"wip", vazao:"vazao"}, ct:[]};
+      S.model.ops.set("w1", {team:"F4P_UST5", type:"User Story", stName:"WIP", deploy:null, tags:[]});
+      S.model.ops.set("w2", {team:"F4P_UST5", type:"Technical Story", stName:"WIP", deploy:null, tags:[]});   // tipo não configurado: não conta
+      S.model.ops.set("w3", {team:"F4P_UST5_OUTRO", type:"User Story", stName:"WIP", deploy:null, tags:[]});   // outro time: não conta
+      return f4pUsWipCount("F4P_UST5");
+    }""")
+    assert r == 1
+
+def test_us_clique_no_planejado_abre_lista_e_permite_navegar(page):
+    carregar(page, "f4p.xlsx")
+    alvo_id = page.evaluate("""()=>{
+      S.f.team='CORE'; S.f.exec=semestre(TODAY);
+      [...S.model.ops.values()].filter(o=>o.team==='CORE').forEach(o => { o.deploy = null; });
+      const alvo = [...S.model.ops.values()].find(o=>o.team==='CORE');
+      alvo.type = 'User Story'; alvo.tags = ['ROADMAP'];
+      alvo.deploy = new Date(f4pSemesterState().start.getTime() + 5 * 864e5);
+      render();
+      return alvo.id;
+    }""")
+    page.click("#f4pTab")
+    page.click('button[data-f4p-us-team="CORE"][data-f4p-us-set="planejado"]')
+    assert page.is_visible("#f4pItemsBg")
+    rows = page.locator("#f4pItemsBody tbody tr")
+    assert rows.count() == 1
+    assert alvo_id in page.inner_text("#f4pItemsBody")
+    page.click(f'button[data-f4p-go="{alvo_id}"]')
+    assert not page.is_visible("#f4pItemsBg")
+    assert not page.is_visible("#f4pPanel.open")
+    assert page.evaluate("document.getElementById('goto').value") == alvo_id
+
+def test_us_clique_no_nao_planejado_mostra_so_os_sem_a_tag(page):
+    carregar(page, "f4p.xlsx")
+    page.evaluate("""()=>{
+      S.f.team='CORE'; S.f.exec=semestre(TODAY);
+      [...S.model.ops.values()].filter(o=>o.team==='CORE').forEach(o => { o.deploy = null; });
+      const dentro = new Date(f4pSemesterState().start.getTime() + 5 * 864e5);
+      const ops = [...S.model.ops.values()].filter(o=>o.team==='CORE').slice(0, 2);
+      ops[0].type = 'User Story'; ops[0].deploy = dentro; ops[0].tags = ['ROADMAP'];
+      ops[1].type = 'User Story'; ops[1].deploy = dentro; ops[1].tags = [];
+      render();
+    }""")
+    page.click("#f4pTab")
+    page.click('button[data-f4p-us-team="CORE"][data-f4p-us-set="naoplanejado"]')
+    assert page.is_visible("#f4pItemsBg")
+    assert page.locator("#f4pItemsBody tbody tr").count() == 1
+
+def test_us_aparece_calculado_no_painel(page):
+    carregar(page, "f4p.xlsx")
+    page.evaluate("()=>{ S.f.team='CORE'; S.f.exec=semestre(TODAY); render(); }")
+    page.click("#f4pTab")
+    assert "User Story (planejado vs não planejado)" in page.inner_text("#f4pBody")
+    assert "f4p-sep" in page.evaluate("f4pUsCell('CORE')")
+
+def test_configuracao_us_types_tem_padrao_user_story(page):
+    r = page.evaluate("()=>{ const c = normCfg({}); return c.f4p.usTypes; }")
+    assert r == ["user story"]
+
+def test_configuracao_us_types_persiste_e_entra_na_exportacao(page):
+    carregar(page, "times.xlsx")
+    page.evaluate("()=>{ CFG.f4p.usTypes = ['user story', 'feature']; }")
+    page.click("#btnCfg")
+    with page.expect_download() as d:
+        page.click("#cfgExport")
+    txt = open(d.value.path(), encoding="utf-8").read()
+    assert '"usTypes"' in txt and '"feature"' in txt
+
+# ---------------- Conferência cruzada Vazão × Technical Story × User Story (decisão 0030) ----------------
+# O usuário pediu uma validação explícita: Vazão Realizado deve ser sempre igual à soma de Technical
+# Story Realizado + User Story Planejado + User Story Não planejado (mesmo universo de itens entregues
+# no período, recortado por tipo). Exemplo exato dado pelo usuário: MOBILE com 38 no Vazão Realizado,
+# distribuídos em 27 Technical Story + 4 User Story planejado + 7 User Story não planejado (38 = 27+4+7).
+
+def test_reconciliacao_bate_com_o_exemplo_exato_do_usuario(page):
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.teamFlow.MOBILE_RECON = ["Backlog", "WIP", "Vazao"];
+      CFG.flow.mobile_recon = {cat:{wip:"wip", vazao:"vazao"}, ct:[]};
+      S.model.teams.push("MOBILE_RECON");
+      S.f.team = "MOBILE_RECON"; S.f.exec = semestre(TODAY);
+      const hoje = new Date();
+      for (let i = 0; i < 27; i++) S.model.ops.set("ts"+i, {team:"MOBILE_RECON", type:"Technical Story", stName:"Vazao", deploy:hoje, tags:[]});
+      for (let i = 0; i < 4; i++) S.model.ops.set("usp"+i, {team:"MOBILE_RECON", type:"User Story", stName:"Vazao", deploy:hoje, tags:["ROADMAP"]});
+      for (let i = 0; i < 7; i++) S.model.ops.set("usn"+i, {team:"MOBILE_RECON", type:"User Story", stName:"Vazao", deploy:hoje, tags:[]});
+      render();
+      return f4pReconciliacao().find(x => x.team === "MOBILE_RECON");
+    }""")
+    assert r == {"team": "MOBILE_RECON", "vazao": 38, "ts": 27, "planejado": 4, "naoPlanejado": 7, "soma": 38, "ok": True}
+
+def test_reconciliacao_sinaliza_divergencia_quando_configuracao_de_tipos_diverge(page):
+    """Se CFG.f4p.types (Vazão) contar um tipo que os outros dois quadrantes não cobrem (ex.: um
+    terceiro tipo além de Technical Story e dos tipos de User Story), a soma diverge — e é exatamente
+    esse erro de configuração que a conferência deve sinalizar."""
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.teamFlow.DIVERGE = ["Backlog", "Vazao"];
+      CFG.flow.diverge = {cat:{vazao:"vazao"}, ct:[]};
+      CFG.f4p.types = ["user story", "technical story", "internal bug"];
+      S.model.teams.push("DIVERGE");
+      S.f.team = "DIVERGE"; S.f.exec = semestre(TODAY);
+      const hoje = new Date();
+      S.model.ops.set("ib1", {team:"DIVERGE", type:"Internal Bug", stName:"Vazao", deploy:hoje, tags:[]});
+      S.model.ops.set("us1", {team:"DIVERGE", type:"User Story", stName:"Vazao", deploy:hoje, tags:[]});
+      render();
+      const rec = f4pReconciliacao().find(x => x.team === "DIVERGE");
+      CFG.f4p.types = ["user story", "technical story"];
+      return rec;
+    }""")
+    assert r == {"team": "DIVERGE", "vazao": 2, "ts": 0, "planejado": 0, "naoPlanejado": 1, "soma": 1, "ok": False}
+
+def test_reconciliacao_banner_aparece_so_quando_ha_divergencia(page):
+    carregar(page, "f4p.xlsx")
+    page.evaluate("""()=>{
+      S.model.teamFlow.DIVERGE2 = ["Backlog", "Vazao"];
+      CFG.flow.diverge2 = {cat:{vazao:"vazao"}, ct:[]};
+      CFG.f4p.types = ["user story", "technical story", "internal bug"];
+      S.model.teams.push("DIVERGE2");
+      S.f.team = "DIVERGE2"; S.f.exec = semestre(TODAY);
+      const hoje = new Date();
+      S.model.ops.set("ib1", {team:"DIVERGE2", type:"Internal Bug", stName:"Vazao", deploy:hoje, tags:[]});
+      render();
+    }""")
+    page.click("#f4pTab")
+    assert page.locator(".f4p-recon").count() == 1
+    assert "DIVERGE2" in page.inner_text(".f4p-recon")
+    assert "Vazão Realizado" in page.inner_text(".f4p-recon")
+    page.evaluate("()=>{ CFG.f4p.types = ['user story', 'technical story']; render(); }")
+    assert page.locator(".f4p-recon").count() == 0

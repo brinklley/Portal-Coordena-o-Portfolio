@@ -46,6 +46,8 @@ function cfgForm(err){
     <p class="help">Os tipos acima valem para CycleTime, Variabilidade e Vazão. O quadrante Urgente conta itens da tag Expedite acima de <b>qualquer</b> tipo; Technical Story conta só itens desse tipo, fixo.</p>
     <p class="help">Tipos de <b>épico</b> (não de item de time) considerados pelo quadrante <b>Roadmap – Épicos</b>; padrão Epic.</p>
     <div class="typelist">${typesByLevel("epi").map(([ty, n]) => `<label><input type="checkbox" data-f4pepitype="${esc(norm(ty))}" ${(d.f4p.epiTypes || []).includes(norm(ty)) ? "checked" : ""}> ${esc(ty)} <span class="muted">${n}</span></label>`).join("") || `<span class="muted">Carregue uma planilha com a coluna Work Item Type nos épicos para ver os tipos.</span>`}</div>
+    <p class="help">Tipos considerados pelo quadrante <b>User Story (planejado vs não planejado)</b>; padrão User Story — configuração própria, independente da lista de tipos acima.</p>
+    <div class="typelist">${typesFound().map(([ty, n]) => `<label><input type="checkbox" data-f4pustype="${esc(norm(ty))}" ${(d.f4p.usTypes || []).includes(norm(ty)) ? "checked" : ""}> ${esc(ty)} <span class="muted">${n}</span></label>`).join("") || `<span class="muted">Carregue uma planilha para ver os tipos.</span>`}</div>
     <table class="ctab" ${teams.length ? "" : "hidden"}><thead><tr><th>Time</th><th>Variabilidade mínima</th><th>Variabilidade máxima</th><th>Meta de Urgente (Expedite) no semestre</th><th>Meta de Technical Story no semestre</th></tr></thead><tbody>
     ${teams.map(tm => { const k = norm(tm), v = d.f4p.teams[k] || {};
       return `<tr><td>${esc(tm)}</td>
@@ -110,6 +112,8 @@ function readForm(){
     .concat((d.f4p.types || []).filter(x => !$("cfgBody").querySelector(`input[data-f4ptype="${cssEsc(x)}"]`)));
   d.f4p.epiTypes = [...$("cfgBody").querySelectorAll("input[data-f4pepitype]")].filter(i => i.checked).map(i => i.dataset.f4pepitype)
     .concat((d.f4p.epiTypes || []).filter(x => !$("cfgBody").querySelector(`input[data-f4pepitype="${cssEsc(x)}"]`)));
+  d.f4p.usTypes = [...$("cfgBody").querySelectorAll("input[data-f4pustype]")].filter(i => i.checked).map(i => i.dataset.f4pustype)
+    .concat((d.f4p.usTypes || []).filter(x => !$("cfgBody").querySelector(`input[data-f4pustype="${cssEsc(x)}"]`)));
   const f4pRows = {};
   $("cfgBody").querySelectorAll("input[data-f4pteam]").forEach(inp => {
     const k = inp.dataset.f4pteam, f = inp.dataset.f4pf, raw = parseFloat(inp.value.replace(",", "."));

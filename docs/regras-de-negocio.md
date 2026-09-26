@@ -254,6 +254,17 @@ Gestão da entrega do time no período do roadmap selecionado. Decisões: `docs/
 - **Tendência** (▲ melhora / ▼ piora / ◆ estável): mesma regra inspiracional do Vazão (§12.6, decisão `0023`), adaptada para o fluxo de Épicos — separa o Atual por mês corrido dentro do período (só os meses já decorridos, no semestre em curso) e compara o **mês corrente mais os épicos do Roadmap ainda abertos** (o "WIP" deste quadrante — épicos do Roadmap que ainda não chegaram na última coluna) contra a **média** dos meses anteriores, arredondada sempre para cima. Sem meses anteriores para comparar, fica ◆.
 - **Transparência**: os três números (Roadmap, Roadmap entregue, Atual) são clicáveis e abrem a lista dos épicos exatos que entraram em cada contagem (`gotoId` para navegar até o item). A coluna "Situação" mostra a **coluna do próprio quadro de Épicos** (não a categoria de fluxo operacional de nenhum time), com a data de saída quando o épico estiver fechado.
 
-### 12.8 Demais quadrantes
+### 12.8 User Story (planejado vs. não planejado)
 
-Eficiência de fluxo e User Story ainda não têm regra de cálculo definida; aparecem no painel como "em definição", mantendo a mesma grade e as mesmas colunas de time dos quadrantes calculados.
+Mesmo critério de "entregue" do Technical Story/Vazão (categoria de fluxo Vazão, `catOf`), mas com uma lista de tipos própria e uma divisão em **partição** (não subconjunto/conjunto total como no Vazão). Decisão: `docs/decisoes/0030-report-f4p-quadrante-user-story.md`.
+
+- **Filtro de dados**: itens dos **tipos configurados para este quadrante** (`CFG.f4p.usTypes`, configuração própria — padrão **User Story** — independente de `CFG.f4p.types` e de `CFG.f4p.epiTypes`) cuja categoria de fluxo atual seja **Vazão** (entregue), cujo `o.deploy` caia dentro do **período exato do semestre selecionado** (`f4pExactSemesterWindow`, mesma janela do Urgente/Technical Story/Vazão).
+- **Planejado**: subconjunto do conjunto acima cujo `o.tags` inclui a **tag de capacidade do roadmap** (`CFG.anTag`, a mesma do Vazão/Visão analítica).
+- **Não planejado**: o **restante** do conjunto acima — os itens **sem** essa tag. Diferente do Vazão (Reserva ⊆ Realizado), aqui Planejado e Não planejado formam uma **partição exata**: todo item entregue do tipo configurado está num dos dois grupos, nunca nos dois, e a soma dos dois é sempre igual ao total entregue.
+- **Tendência** (▲ melhora / ▼ piora / ◆ estável): mesma regra inspiracional do Vazão (§12.6, decisão `0023`) — separa o total entregue (Planejado + Não planejado) por mês corrido dentro do período e compara o mês corrente mais os itens hoje em WIP (dos tipos configurados) contra a média (arredondada pra cima) dos meses anteriores.
+- **Transparência**: tanto o Planejado quanto o Não planejado são clicáveis e abrem a lista dos itens exatos de cada contagem, igual aos demais quadrantes calculados.
+- **Conferência cruzada** (decisão `0030`): como Vazão, Technical Story e User Story são três recortes por tipo do mesmo universo de itens entregues no período, a soma **Technical Story Realizado + User Story Planejado + User Story Não planejado** deveria sempre igualar o **Vazão Realizado** de cada time — isso só é garantido por convenção entre as três configurações de tipos (`CFG.f4p.types`, o tipo fixo do Technical Story e `CFG.f4p.usTypes`), não por um vínculo estrutural no código. Quando um time diverge (ex.: `CFG.f4p.types` passa a incluir um tipo que nenhum dos outros dois quadrantes cobre), o painel mostra um aviso destacado no topo, listando o time e os números exatos de cada lado da conta, para o usuário investigar a configuração — em vez de mostrar números inconsistentes sem sinalização.
+
+### 12.9 Demais quadrantes
+
+Eficiência de fluxo ainda não tem regra de cálculo definida; aparece no painel como "em definição", mantendo a mesma grade e as mesmas colunas de time dos quadrantes calculados.
