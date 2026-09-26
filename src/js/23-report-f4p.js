@@ -1,14 +1,17 @@
 /* ---------- Report F4P (Business Outcomes – Productivity) ---------- */
 /* Painel lateral com o mesmo comportamento da Visão analítica (docs/backlog/report-f4p.md).
-   Quadrantes 1 (CycleTime), 2 (Variabilidade), 3 (Urgente), 4 (Technical Story) e 5 (Vazão) têm regra
-   fechada; os demais aguardam definição e aparecem como "em definição". As ilustrações (selo de cada grupo e o logo do
+   Quadrantes 1 (CycleTime), 2 (Variabilidade), 3 (Urgente), 4 (Technical Story), 5 (Vazão) e 6
+   (Roadmap – Épicos) têm regra fechada; os demais aguardam definição e aparecem como "em definição".
+   Roadmap – Épicos é o único que opera sobre os cards do quadro de Épicos (M.stages.epi/e.st/e.target),
+   não sobre os itens operacionais dos times — os demais quadrantes calculados usam S.model.ops. As
+   ilustrações (selo de cada grupo e o logo do
    cabeçalho) são as imagens fornecidas pelo usuário a partir do slide de referência, embutidas em
    base64 pelo build (F4P_ASSETS, gerado por scripts/build.mjs a partir de src/assets/f4p/*.png). */
 const F4P = {open:false};
 const F4P_QUADS = {
   var:   {title:"Variabilidade (min vs atual vs max)", side:"l", done:true},
   eff:   {title:"Eficiência de fluxo (min vs atual vs max)", side:"l", done:false, goal:"Meta mínima 30%"},
-  road:  {title:"Roadmap – Épicos (reserva vs roadmap entregue vs atual)", side:"l", done:false},
+  road:  {title:"Roadmap – Épicos (roadmap vs roadmap entregue vs atual)", side:"l", done:true},
   vazao: {title:"Vazão (reserva vs realizado)", side:"l", done:true},
   ct:    {title:"CycleTime (reserva vs atual)", side:"r", done:true},
   urg:   {title:"Urgente (meta vs realizado)", side:"r", done:true},
@@ -187,6 +190,81 @@ function f4pVazaoCell(team){
   const tip = `Reserva: itens com a tag ${CFG.anTag || "ROADMAP"} · Realizado: itens dos tipos ${(CFG.f4p.types || []).join(", ") || "nenhum tipo marcado"} entregues (Vazão) em ${f4pExactSemesterLabel(st)} · tendência: mês corrente + itens em WIP vs. média (arredondada pra cima) dos meses anteriores do período · seta em ${cls === "f4p-good" ? "verde: Realizado ≥ Reserva" : "vermelho: Realizado < Reserva"} · clique nos números para ver os itens`;
   return `<span title="${esc(tip)}"><button type="button" class="f4p-real" data-f4p-vazao-reserva-team="${esc(team)}">${reserva.length}</button><span class="f4p-sep">|</span><button type="button" class="f4p-real" data-f4p-vazao-realizado-team="${esc(team)}">${realizado.length}</button> <span class="f4p-trend ${cls}">${trend}</span></span>`;
 }
+/* tipos de ÉPICO considerados por este quadrante (Report F4P, Roadmap – Épicos): configuração própria,
+   `CFG.f4p.epiTypes` (padrão "Epic"), independente de `CFG.f4p.types` (que é dos itens operacionais dos
+   times, usado por CycleTime/Variabilidade/Vazão). */
+function f4pEpiTypeOk(e){ const types = new Set((CFG.f4p.epiTypes || []).map(norm)); return !types.size || (e.type && types.has(norm(e.type))); }
+/* épico fechado: chegou na última coluna do próprio quadro de Épicos (M.stages.epi, pelo índice `st`) —
+   diferente de catOf/Vazão, que categoriza os itens OPERACIONAIS de cada time; aqui é a posição do
+   próprio card de épico no seu quadro, não dos itens vinculados a ele. */
+function f4pEpiClosed(e){ const stages = S.model.stages.epi; return e.st >= 0 && e.st === stages.length - 1; }
+/* um épico "pertence" a um time do Report F4P se tiver pelo menos um item operacional daquele time
+   vinculado — mesma ideia de S.model.teams (colunas do painel), aplicada aos épicos individualmente. */
+function f4pEpiHasTeam(e, team){ return e.ops.some(k => { const o = S.model.ops.get(k); return o && o.team === team; }); }
+/* Quadrante · Roadmap – Épicos. "Roadmap": épicos (dos tipos configurados, com item do time vinculado)
+   do semestre selecionado no filtro — mesma prioridade Interno > Executivo do resto do Report F4P
+   (f4pSemester). Semestre INTERNO: usa o Target Date do próprio épico (`e.interno`, calculado no build
+   do modelo a partir do Target Date). Semestre EXECUTIVO: sobe até a iniciativa e desce de novo —
+   Iniciativa (Roadmap Executivo) → Release → Épico — usando o vínculo do épico com a iniciativa, não a
+   data do próprio épico (pedido explícito do usuário: os dois métodos usam critérios diferentes,
+   dependendo de qual dos dois filtros de roadmap está ativo). Conta todos os épicos do conjunto,
+   qualquer estágio; "Roadmap entregue" é o subconjunto já fechado (decisão 0025). */
+function f4pRoadmapEpis(team){
+  const sem = f4pSemester();
+  if (!sem || !S.model) return [];
+  const found = new Map();
+  const add = e => { if (f4pEpiTypeOk(e) && f4pEpiHasTeam(e, team)) found.set(e.id, e); };
+  if (S.f.int){
+    S.model.epis.forEach(e => { if (norm(e.interno) === norm(sem)) add(e); });
+  } else {
+    S.model.inis.forEach(i => {
+      if (norm(i.exec) !== norm(sem)) return;
+      i.rels.forEach(rid => { const r = S.model.rels.get(rid); if (!r) return;
+        r.epis.forEach(eid => { const e = S.model.epis.get(eid); if (e) add(e); }); });
+    });
+  }
+  return [...found.values()];
+}
+function f4pRoadmapEntregueEpis(team){ return f4pRoadmapEpis(team).filter(f4pEpiClosed); }
+/* épicos do Roadmap ainda não entregues — o "WIP" deste quadrante (item ainda dentro do escopo do
+   Roadmap, mas que não chegou na última coluna do quadro de Épicos). Usado pela tendência, igual ao
+   papel do WIP operacional na tendência do Vazão (decisão 0023). */
+function f4pRoadmapAbertosEpis(team){ return f4pRoadmapEpis(team).filter(e => !f4pEpiClosed(e)); }
+/* "Atual": épicos (dos tipos configurados, com item do time vinculado) fechados cuja data de
+   fechamento (`stDate`, a data da própria coluna final do quadro de Épicos) caiu dentro do período
+   exato do semestre selecionado — independente do vínculo com a iniciativa e do Target Date do próprio
+   épico (pedido explícito do usuário: nem um nem outro entram aqui, só quantos épicos chegaram
+   fechados dentro do range de datas do semestre, qualquer que seja o roadmap selecionado). */
+function f4pAtualEpis(team, st){
+  st = st || f4pSemesterState();
+  const {from, to} = f4pExactSemesterWindow(st);
+  return [...S.model.epis.values()].filter(e => f4pEpiTypeOk(e) && f4pEpiHasTeam(e, team) && f4pEpiClosed(e) && e.stDate && e.stDate >= from && e.stDate <= to);
+}
+/* Tendência: mesma regra do Vazão (decisão 0023), adaptada para o fluxo de Épicos — separa o Atual por
+   mês corrido dentro do período (só os meses já decorridos, no semestre em curso) e compara o mês
+   corrente somado aos épicos do Roadmap ainda abertos (o "WIP" deste quadrante) contra a média
+   (arredondada pra cima) dos meses anteriores. Sem meses anteriores para comparar, fica ◆. */
+function f4pRoadmapTrend(team, st){
+  st = st || f4pSemesterState();
+  const {from, to} = f4pExactSemesterWindow(st);
+  const end = to < TODAY ? to : TODAY;
+  const nMonths = (end.getFullYear() - from.getFullYear()) * 12 + (end.getMonth() - from.getMonth()) + 1;
+  if (nMonths < 2) return "◆";
+  const counts = Array(nMonths).fill(0);
+  f4pAtualEpis(team, st).forEach(e => {
+    const idx = (e.stDate.getFullYear() - from.getFullYear()) * 12 + (e.stDate.getMonth() - from.getMonth());
+    if (idx >= 0 && idx < nMonths) counts[idx]++;
+  });
+  const atual = counts[nMonths - 1] + f4pRoadmapAbertosEpis(team).length;
+  const mediaAnteriores = Math.ceil(counts.slice(0, -1).reduce((a, b) => a + b, 0) / (nMonths - 1));
+  return atual > mediaAnteriores ? "▲" : atual < mediaAnteriores ? "▼" : "◆";
+}
+function f4pRoadmapEpiCell(team){
+  const st = f4pSemesterState(), roadmap = f4pRoadmapEpis(team), entregue = f4pRoadmapEntregueEpis(team), atual = f4pAtualEpis(team, st), trend = f4pRoadmapTrend(team, st);
+  const criterio = S.f.int ? "pelo Target Date do próprio épico" : "vinculados às iniciativas do Roadmap Executivo selecionado";
+  const tip = `Roadmap: épicos dos tipos ${(CFG.f4p.epiTypes || []).join(", ") || "nenhum tipo marcado"} com item do time, do semestre selecionado (${criterio}) · Roadmap entregue: os que já chegaram na última coluna do quadro de Épicos · Atual: épicos fechados dentro do período exato do semestre (${f4pExactSemesterLabel(st)}), sem considerar vínculo com iniciativa nem Target Date · tendência: mês corrente + épicos do Roadmap ainda abertos vs. média (arredondada pra cima) dos meses anteriores · clique nos números para ver os itens`;
+  return `<span title="${esc(tip)}"><button type="button" class="f4p-real" data-f4p-road-team="${esc(team)}" data-f4p-road-set="roadmap">${roadmap.length}</button><span class="f4p-sep">|</span><button type="button" class="f4p-real" data-f4p-road-team="${esc(team)}" data-f4p-road-set="entregue">${entregue.length}</button><span class="f4p-sep">|</span><button type="button" class="f4p-real" data-f4p-road-team="${esc(team)}" data-f4p-road-set="atual">${atual.length}</button> <span class="f4p-trend">${trend}</span></span>`;
+}
 /* Tendência: itens Expedite fechados nos últimos 3 meses vs. nos 3 meses antes desses — sempre a
    partir de hoje, independente do semestre selecionado no filtro. Sem margem de tolerância: mais → ▲,
    menos → ▼, igual → ◆. */
@@ -226,11 +304,22 @@ function f4pItemSituacao(o){
   const cat = catOf(o), lab = F4P_SIT_LABEL[cat] || F4P_SIT_LABEL.none;
   return cat === "vazao" && o.deploy ? `${lab} · ${fmtL(o.deploy)}` : lab;
 }
-/* modal com a lista dos itens que compõem o Realizado (abre ao clicar no número) */
-function f4pItemsModal(title, items){
+/* Situação de um épico na lista de itens do Roadmap – Épicos: a coluna do próprio quadro de Épicos
+   (M.stages.epi pelo índice `st`), não a categoria de fluxo operacional por time (`catOf`/`f4pItemSituacao`
+   são de outra granularidade — o item ali é um registro de time, aqui é o card de épico). Mostra também a
+   data de saída (`stDate`) quando o épico estiver na última coluna (fechado). */
+function f4pEpiSituacao(e){
+  const stages = S.model.stages.epi, lab = e.st >= 0 ? stages[e.st] : "Sem status";
+  return e.st >= 0 && e.st === stages.length - 1 && e.stDate ? `${lab} · ${fmtL(e.stDate)}` : lab;
+}
+/* modal com a lista dos itens que compõem o Realizado (abre ao clicar no número). situacaoFn deixa a
+   coluna Situação genérica: itens operacionais usam f4pItemSituacao (categoria de fluxo por time);
+   épicos (Roadmap – Épicos) usam f4pEpiSituacao (coluna do próprio quadro de Épicos). */
+function f4pItemsModal(title, items, situacaoFn){
+  situacaoFn = situacaoFn || f4pItemSituacao;
   const rows = items.length ? items.map(o => `<tr><td><button type="button" class="idb" data-f4p-go="${esc(o.id)}">${esc(o.id)}</button></td>
       <td>${esc(o.title || "(sem título)")}</td>
-      <td class="c">${esc(f4pItemSituacao(o))}</td></tr>`).join("")
+      <td class="c">${esc(situacaoFn(o))}</td></tr>`).join("")
     : `<tr><td colspan="3" class="muted">Nenhum item nesta contagem.</td></tr>`;
   $("f4pItemsTitle").textContent = title;
   $("f4pItemsBody").innerHTML = `<table class="ctab f4p-items-tbl"><thead><tr><th>ID</th><th>Título</th><th>Situação</th></tr></thead><tbody>${rows}</tbody></table>`;
@@ -253,9 +342,16 @@ $("f4pBody").addEventListener("click", e => {
   const btnVR = e.target.closest("[data-f4p-vazao-reserva-team]");
   if (btnVR){ const team = btnVR.dataset.f4pVazaoReservaTeam; f4pItemsModal(`Vazão · ${team} · reserva · ${f4pExactSemesterLabel(st)}`, f4pVazaoReservaItems(team, st)); return; }
   const btnVZ = e.target.closest("[data-f4p-vazao-realizado-team]");
-  if (btnVZ){ const team = btnVZ.dataset.f4pVazaoRealizadoTeam; f4pItemsModal(`Vazão · ${team} · realizado · ${f4pExactSemesterLabel(st)}`, f4pVazaoRealizadoItems(team, st)); }
+  if (btnVZ){ const team = btnVZ.dataset.f4pVazaoRealizadoTeam; f4pItemsModal(`Vazão · ${team} · realizado · ${f4pExactSemesterLabel(st)}`, f4pVazaoRealizadoItems(team, st)); return; }
+  const btnRoad = e.target.closest("[data-f4p-road-set]");
+  if (btnRoad){
+    const team = btnRoad.dataset.f4pRoadTeam, set = btnRoad.dataset.f4pRoadSet;
+    const label = {roadmap:"Roadmap", entregue:"Roadmap entregue", atual:"Atual"}[set];
+    const items = set === "roadmap" ? f4pRoadmapEpis(team) : set === "entregue" ? f4pRoadmapEntregueEpis(team) : f4pAtualEpis(team, st);
+    f4pItemsModal(`Roadmap – Épicos · ${team} · ${label} · ${f4pExactSemesterLabel(st)}`, items, f4pEpiSituacao);
+  }
 });
-const F4P_CELL = {var: f4pVarCell, ct: f4pCtCell, urg: f4pUrgentCell, ts: f4pTsCell, vazao: f4pVazaoCell};
+const F4P_CELL = {var: f4pVarCell, ct: f4pCtCell, urg: f4pUrgentCell, ts: f4pTsCell, vazao: f4pVazaoCell, road: f4pRoadmapEpiCell};
 function f4pCard(id, teams){
   const q = F4P_QUADS[id];
   const head = `<div class="f4p-card-h">${esc(q.title)}</div>${q.goal ? `<div class="f4p-goal">${esc(q.goal)}</div>` : ""}`;
@@ -290,7 +386,7 @@ function renderF4P(){
       <div class="f4p-col">${left.map(g => f4pGroup(g, teams)).join("")}</div>
       <div class="f4p-col">${right.map(g => f4pGroup(g, teams)).join("")}</div>
     </div>
-    <div class="an-note">Mostra sempre todos os times carregados (${esc(teams.join(", "))}), mesmo com um time diferente selecionado no filtro — o filtro só habilita o acesso a este painel. CycleTime e Variabilidade usam itens dos tipos ${esc((CFG.f4p.types || []).join(", ") || "nenhum tipo marcado")} concluídos no período: <b>${esc(f4pPeriodLabel(st))}</b>${st.kind === "past" ? " (semestre selecionado, já encerrado)" : " (semestre selecionado ainda em curso, ou não reconhecido — usa a janela corrida)"}. Urgente conta itens com a tag <b>${esc(f4pTagName(f4pExpediteTag()))}</b>: os ainda abertos contam sempre, e os fechados só se fecharam dentro do período exato do semestre selecionado (<b>${esc(f4pExactSemesterLabel(st))}</b>) — sem histórico de quando cada item passou a se qualificar, não dá pra saber quem estava marcado antes disso. Technical Story conta só itens desse tipo já <b>entregues</b> (categoria de fluxo Vazão) dentro do mesmo período — itens ainda em Backlog, Discovery ou WIP não entram. Vazão usa os mesmos tipos de CycleTime/Variabilidade, também só itens entregues no período: Reserva é o subconjunto com a tag <b>${esc(CFG.anTag || "ROADMAP")}</b> (capacidade do roadmap); Realizado é todo o conjunto, com ou sem a tag. Os demais quadrantes aguardam a definição da regra de cálculo.</div>`;
+    <div class="an-note">Mostra sempre todos os times carregados (${esc(teams.join(", "))}), mesmo com um time diferente selecionado no filtro — o filtro só habilita o acesso a este painel. CycleTime e Variabilidade usam itens dos tipos ${esc((CFG.f4p.types || []).join(", ") || "nenhum tipo marcado")} concluídos no período: <b>${esc(f4pPeriodLabel(st))}</b>${st.kind === "past" ? " (semestre selecionado, já encerrado)" : " (semestre selecionado ainda em curso, ou não reconhecido — usa a janela corrida)"}. Urgente conta itens com a tag <b>${esc(f4pTagName(f4pExpediteTag()))}</b>: os ainda abertos contam sempre, e os fechados só se fecharam dentro do período exato do semestre selecionado (<b>${esc(f4pExactSemesterLabel(st))}</b>) — sem histórico de quando cada item passou a se qualificar, não dá pra saber quem estava marcado antes disso. Technical Story conta só itens desse tipo já <b>entregues</b> (categoria de fluxo Vazão) dentro do mesmo período — itens ainda em Backlog, Discovery ou WIP não entram. Vazão usa os mesmos tipos de CycleTime/Variabilidade, também só itens entregues no período: Reserva é o subconjunto com a tag <b>${esc(CFG.anTag || "ROADMAP")}</b> (capacidade do roadmap); Realizado é todo o conjunto, com ou sem a tag. Roadmap – Épicos conta cards do quadro de Épicos (dos tipos <b>${esc((CFG.f4p.epiTypes || []).join(", ") || "nenhum tipo marcado")}</b>) com item do time vinculado: Roadmap segue o Target Date do épico (semestre interno) ou o vínculo com a iniciativa (semestre executivo); Roadmap entregue é o subconjunto já fechado; Atual conta só pela data de fechamento dentro do semestre, sem olhar Target Date nem iniciativa. Os demais quadrantes aguardam a definição da regra de cálculo.</div>`;
 }
 function placeF4P(){ const h = document.querySelector(".top").offsetHeight; $("f4pPanel").style.top = h + "px"; $("f4pPanel").style.height = `calc(100% - ${h}px)`; }
 function openF4P(){ if (!f4pEnabled()) return; if (AN.open) closeAnalytics(); F4P.open = true; placeF4P(); $("f4pPanel").classList.add("open"); $("f4pPanel").setAttribute("aria-hidden","false"); $("f4pTab").setAttribute("aria-expanded","true"); renderF4P(); $("f4pClose").focus(); }

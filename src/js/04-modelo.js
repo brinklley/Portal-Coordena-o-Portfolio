@@ -67,8 +67,9 @@ function buildModel(tables){
     const id = nid(r[eId]); if (!id) return;
     const tgt = eTgt >= 0 ? toDate(r[eTgt]) : null;
     if (eTgt >= 0 && filled(r[eTgt]) && !tgt) warn.badDates++;
+    const st = statusOf(r,fEpi);
     const e = {lvl:"epi", id, title: filled(r[eTitle]) ? String(r[eTitle]) : null, parent: nid(r[ePar]),
-      target: tgt, interno: semestre(tgt), st: statusOf(r,fEpi), ops:[], link:linkOf(HE, r), type:typeOf(HE, r), x:extrasOf(HE, r, fEpi)};
+      target: tgt, interno: semestre(tgt), st, stDate: st >= 0 ? toDate(r[fEpi[st].i]) : null, ops:[], link:linkOf(HE, r), type:typeOf(HE, r), x:extrasOf(HE, r, fEpi)};
     epis.set(id,e);
   });
 
