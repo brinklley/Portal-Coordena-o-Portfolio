@@ -28,4 +28,4 @@ Visualizador encadeado Iniciativa → Release → Épico → itens dos times, co
 - Telas e funcionalidades: `docs/telas.md`
 - Arquitetura e mapa dos arquivos: `docs/arquitetura.md`
 - Decisões e motivos: `docs/decisoes/`
-- **Próxima tarefa: Report F4P — escolher e especificar o próximo quadrante** (Eficiência de fluxo, Roadmap–Épicos, Vazão, Technical Story ou User Story) → `docs/backlog/report-f4p.md` (Quadrantes 1, 2 e 3 já implementados). Demais pendências: `docs/backlog/pendencias.md`
+- **Próxima tarefa: Report F4P — escolher e especificar o próximo quadrante** (Eficiência de fluxo, Roadmap–Épicos, Vazão ou User Story) → `docs/backlog/report-f4p.md` (Quadrantes 1, 2, 3 e 4 já implementados; decisões em `docs/decisoes/0011` a `0019`). Demais pendências: `docs/backlog/pendencias.md`

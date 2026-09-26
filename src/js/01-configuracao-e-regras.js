@@ -49,6 +49,12 @@ function f4pUrgentMetaOf(team){
   const t = (CFG.f4p.teams || {})[norm(team)] || {};
   return t.urgentMeta != null && t.urgentMeta >= 0 ? t.urgentMeta : null;
 }
+/* meta de itens Technical Story do time no semestre (Report F4P): ao contrário de Urgente, tem padrão
+   (6) — não fica sem meta/sem cor quando o time não cadastra um valor próprio. */
+function f4pTsMetaOf(team){
+  const t = (CFG.f4p.teams || {})[norm(team)] || {};
+  return t.tsMeta != null && t.tsMeta >= 0 ? t.tsMeta : 6;
+}
 /* tag configurada como Classe de Serviço Expedite (Report F4P) e o nome dela pra exibir */
 const f4pExpediteTag = () => CFG.f4p.expediteTag || "urgent";
 const f4pTagName = id => (CFG.tags.find(t => t.id === id) || {}).name || id;

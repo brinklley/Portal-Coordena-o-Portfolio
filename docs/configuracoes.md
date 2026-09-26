@@ -26,7 +26,7 @@ Testes: `tests/test_configuracoes.py`.
 | `f4p.months` | 6 | período (meses) da amostra do P95/P50 do Report F4P |
 | `f4p.types` | user story, technical story | tipos considerados na amostra de CycleTime/Variabilidade do Report F4P |
 | `f4p.expediteTag` | urgent (id da tag URGENTE) | tag cadastrada que marca a Classe de Serviço Expedite, usada pelo quadrante Urgente |
-| `f4p.teams[time]` | `{}` | por time: `min`/`max` da variabilidade esperada (padrão efetivo 1.5/3.5) e `urgentMeta` (teto de itens Expedite no semestre; sem padrão) |
+| `f4p.teams[time]` | `{}` | por time: `min`/`max` da variabilidade esperada (padrão efetivo 1.5/3.5), `urgentMeta` (teto de itens Expedite no semestre; sem padrão) e `tsMeta` (teto de itens Technical Story no semestre; padrão efetivo 6) |
 | `azure.orgs` | `[]` | organizações (sem token) |
 | `azure.sources` | `[]` | fontes: `id, role, org, project, team, level, alias, stages` |
 | `azure.maps[fonte]` | `{}` | mapeamento de colunas antigas (`colunaId` ou `colunaId|Done` → coluna atual) |
@@ -38,7 +38,7 @@ Testes: `tests/test_configuracoes.py`.
 - Por time: atenção < CT máximo < outlier; atenção ou outlier exigem CT máximo.
 - Regra geral: atenção < atraso < outlier.
 - Fluxo de cada time: pelo menos **duas** colunas em "Entra no CT"; as abas com problema ficam em vermelho.
-- Report F4P: `min` e `max` da variabilidade de um time só valem preenchidos os dois juntos, e `min` < `max`. `urgentMeta` é independente (pode ser preenchido sem `min`/`max`), aceita zero.
+- Report F4P: `min` e `max` da variabilidade de um time só valem preenchidos os dois juntos, e `min` < `max`. `urgentMeta` e `tsMeta` são independentes (podem ser preenchidos sem `min`/`max` nem um do outro), aceitam zero.
 - Com erro, nada é salvo e os valores digitados são preservados no formulário.
 
 ## Times listados na configuração
