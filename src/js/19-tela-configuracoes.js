@@ -37,16 +37,19 @@ function cfgForm(err){
       <label title="Use quando o semestre operacional termina antes do último dia do calendário (ex.: congelamento de fim de ano)">Dias antes do fim do semestre<input type="number" min="0" id="cfgAnFreeze" value="${d.anFreeze || 0}" style="width:120px"></label>
     </div>
     <h4>Report F4P</h4>
-    <p class="help">Painel Report F4P (aba à esquerda, junto com a Visão analítica): mostra sempre todos os times carregados. O quadrante <b>CycleTime</b> usa o CT máximo por time (tabela “Alertas por time” acima); os campos abaixo valem para a amostra do P95/P50 e para a faixa esperada de <b>Variabilidade</b> (P95 ÷ P50) de cada time. Sem valor por time, usa-se o padrão 1.5–3.5.</p>
+    <p class="help">Painel Report F4P (aba à esquerda, junto com a Visão analítica): mostra sempre todos os times carregados. O quadrante <b>CycleTime</b> usa o CT máximo por time (tabela “Alertas por time” acima); os campos abaixo valem para a amostra do P95/P50, para a faixa esperada de <b>Variabilidade</b> (P95 ÷ P50) e para a <b>Meta de Urgente</b> de cada time. Sem valor por time, Variabilidade usa o padrão 1.5–3.5 e Urgente fica sem meta (sem cor de alerta).</p>
     <div class="grid3">
       <label>Período do P95/P50 (meses)<input type="number" min="1" id="cfgF4pMonths" value="${d.f4p.months}" style="width:100px"></label>
+      <label>Tag da Classe de Serviço Expedite (quadrante Urgente)<select id="cfgF4pExpedite" style="width:200px">${(d.tags || []).map(tg => `<option value="${esc(tg.id)}" ${tg.id === (d.f4p.expediteTag || "urgent") ? "selected" : ""}>${esc(tg.name)}</option>`).join("") || `<option value="">Nenhuma tag cadastrada</option>`}</select></label>
     </div>
     <div class="typelist">${typesFound().map(([ty, n]) => `<label><input type="checkbox" data-f4ptype="${esc(norm(ty))}" ${(d.f4p.types || []).includes(norm(ty)) ? "checked" : ""}> ${esc(ty)} <span class="muted">${n}</span></label>`).join("") || `<span class="muted">Carregue uma planilha para ver os tipos.</span>`}</div>
-    <table class="ctab" ${teams.length ? "" : "hidden"}><thead><tr><th>Time</th><th>Variabilidade mínima</th><th>Variabilidade máxima</th></tr></thead><tbody>
+    <p class="help">Os tipos acima valem só para CycleTime e Variabilidade. O quadrante Urgente conta itens da tag Expedite acima de <b>qualquer</b> tipo.</p>
+    <table class="ctab" ${teams.length ? "" : "hidden"}><thead><tr><th>Time</th><th>Variabilidade mínima</th><th>Variabilidade máxima</th><th>Meta de Urgente (Expedite) no semestre</th></tr></thead><tbody>
     ${teams.map(tm => { const k = norm(tm), v = d.f4p.teams[k] || {};
       return `<tr><td>${esc(tm)}</td>
         <td><input type="number" min="0.1" step="0.1" data-f4pteam="${esc(k)}" data-f4pf="min" value="${v.min ?? ""}" placeholder="1,5" aria-label="Variabilidade mínima de ${esc(tm)}"></td>
-        <td><input type="number" min="0.1" step="0.1" data-f4pteam="${esc(k)}" data-f4pf="max" value="${v.max ?? ""}" placeholder="3,5" aria-label="Variabilidade máxima de ${esc(tm)}"></td></tr>`; }).join("") || `<tr><td colspan="3" class="muted">Carregue uma planilha para ver os times.</td></tr>`}
+        <td><input type="number" min="0.1" step="0.1" data-f4pteam="${esc(k)}" data-f4pf="max" value="${v.max ?? ""}" placeholder="3,5" aria-label="Variabilidade máxima de ${esc(tm)}"></td>
+        <td><input type="number" min="0" step="1" data-f4pteam="${esc(k)}" data-f4pf="urgentMeta" value="${v.urgentMeta ?? ""}" placeholder="sem meta" aria-label="Meta de Urgente de ${esc(tm)}"></td></tr>`; }).join("") || `<tr><td colspan="4" class="muted">Carregue uma planilha para ver os times.</td></tr>`}
     </tbody></table>
     <h4>Tipos considerados no CT do épico</h4>
     <p class="help">O CycleTime mostrado nos cards de épico usa só os itens dos tipos marcados. Os alertas de cada item continuam valendo para todos os tipos.</p>
@@ -99,20 +102,25 @@ function readForm(){
   d.ctTypes = [...$("cfgBody").querySelectorAll("input[data-cttype]")].filter(i => i.checked).map(i => i.dataset.cttype)
     .concat((d.ctTypes || []).filter(x => !$("cfgBody").querySelector(`input[data-cttype="${cssEsc(x)}"]`)));
   d.f4p.months = (() => { const v = parseInt($("cfgF4pMonths").value, 10); return v > 0 ? v : 6; })();
+  d.f4p.expediteTag = $("cfgF4pExpedite").value || "urgent";
   d.f4p.types = [...$("cfgBody").querySelectorAll("input[data-f4ptype]")].filter(i => i.checked).map(i => i.dataset.f4ptype)
     .concat((d.f4p.types || []).filter(x => !$("cfgBody").querySelector(`input[data-f4ptype="${cssEsc(x)}"]`)));
   const f4pRows = {};
   $("cfgBody").querySelectorAll("input[data-f4pteam]").forEach(inp => {
-    const k = inp.dataset.f4pteam, v = parseFloat(inp.value.replace(",", "."));
-    (f4pRows[k] ||= {})[inp.dataset.f4pf] = v > 0 ? v : undefined;
+    const k = inp.dataset.f4pteam, f = inp.dataset.f4pf, raw = parseFloat(inp.value.replace(",", "."));
+    (f4pRows[k] ||= {})[f] = f === "urgentMeta" ? (raw >= 0 ? raw : undefined) : (raw > 0 ? raw : undefined);
   });
   d.f4p.teams = {};
   Object.entries(f4pRows).forEach(([k, r]) => {
-    if (r.min === undefined && r.max === undefined) return;
     const bad = f => $("cfgBody").querySelector(`input[data-f4pteam="${cssEsc(k)}"][data-f4pf="${f}"]`).classList.add("bad");
-    if (r.min === undefined || r.max === undefined){ err = err || "Para a variabilidade de um time, preencha o mínimo e o máximo juntos."; bad(r.min === undefined ? "min" : "max"); return; }
-    if (r.min >= r.max){ err = err || "A variabilidade mínima precisa ser menor que a máxima."; bad("min"); return; }
-    d.f4p.teams[k] = {min: r.min, max: r.max};
+    const entry = {};
+    if (r.min !== undefined || r.max !== undefined){
+      if (r.min === undefined || r.max === undefined){ err = err || "Para a variabilidade de um time, preencha o mínimo e o máximo juntos."; bad(r.min === undefined ? "min" : "max"); }
+      else if (r.min >= r.max){ err = err || "A variabilidade mínima precisa ser menor que a máxima."; bad("min"); }
+      else { entry.min = r.min; entry.max = r.max; }
+    }
+    if (r.urgentMeta !== undefined) entry.urgentMeta = r.urgentMeta;
+    if (Object.keys(entry).length) d.f4p.teams[k] = entry;
   });
   $("cfgBody").querySelectorAll("input[data-tc-lvl]").forEach(i => {
     const l = i.dataset.tcLvl, k = i.dataset.tcType; d.typeColors[l] = d.typeColors[l] || {};

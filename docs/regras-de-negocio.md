@@ -197,6 +197,20 @@ Itens **concluídos** (com `o.deploy` preenchido, isto é, já saíram do CT) do
 - Indicador: acima do máximo → ▼ vermelho; dentro da faixa → ▲ verde; abaixo do mínimo → ▼ laranja.
 - P50 = 0 ou sem amostra → "--"; o tamanho da amostra (n) e o P50 ficam disponíveis no texto de apoio (title) da célula.
 
-### 12.4 Demais quadrantes
+### 12.4 Urgente (meta vs. realizado)
 
-Eficiência de fluxo, Roadmap–Épicos, Vazão, Urgente, Technical Story e User Story ainda não têm regra de cálculo definida; aparecem no painel como "em definição", mantendo a mesma grade e as mesmas colunas de time dos quadrantes calculados.
+Gestão da Classe de Serviço **Expedite**. Decisões e limitação de dados: `docs/decisoes/0014-report-f4p-quadrante-urgente.md`.
+
+- **Tag Expedite**: qualquer uma das tags cadastradas (`docs/regras-de-negocio.md` §9), escolhida em Configurações › Report F4P (`CFG.f4p.expediteTag`, padrão a tag "URGENTE"). Um item conta se `o.tagHits` inclui essa tag — **de qualquer tipo** (não usa `CFG.f4p.types`, ao contrário de CycleTime e Variabilidade).
+- **Meta**: número inteiro cadastrado por time (`CFG.f4p.teams[time].urgentMeta`), representando o teto de itens Expedite aceitável no semestre. Sem meta cadastrada, a célula mostra "--" e o Realizado fica sem cor de alerta (nem verde, nem vermelho).
+- **Realizado**: depende do semestre selecionado no filtro, pela mesma razão de §12.1 (o portal não guarda histórico de quando uma tag foi aplicada — só o estado atual):
+  | Semestre selecionado | Realizado conta |
+  |---|---|
+  | Em curso, ou nenhum reconhecido | Todos os itens do time com a tag, **abertos ou fechados** (contagem ao vivo) |
+  | Já encerrado | Só os itens com a tag que **fecharam** (`o.deploy` preenchido) dentro do período daquele semestre |
+- Indicador de cor do número: Realizado > Meta → vermelho; Realizado ≤ Meta → verde; sem meta cadastrada → sem cor.
+- **Tendência** (▲ aumentando / ▼ reduzindo / ◆ estável): compara quantos itens com a tag **fecharam** nos últimos 3 meses (a partir de hoje) contra os 3 meses anteriores a esses — sempre essa janela corrida de 6 meses, **independente do semestre selecionado no filtro**. Sem margem de tolerância: qualquer diferença já decide ▲ ou ▼; só empate exato é ◆. A cor da seta é neutra (não segue o vermelho/verde da Meta).
+
+### 12.5 Demais quadrantes
+
+Eficiência de fluxo, Roadmap–Épicos, Vazão, Technical Story e User Story ainda não têm regra de cálculo definida; aparecem no painel como "em definição", mantendo a mesma grade e as mesmas colunas de time dos quadrantes calculados.

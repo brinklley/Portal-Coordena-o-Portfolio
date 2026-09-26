@@ -9,7 +9,7 @@ const cfgDefaults = () => ({teams:{}, warnDays:30, alertDays:60, outlierDays:90,
   ctTypes:["user story","technical story","technical solution"], tags:TAG_DEFAULTS(),
   typeColors:{ini:{}, rel:{}, epi:{}, op:{}}, fields:{ini:[], rel:[], epi:[], op:[]}, ctCols:null, flow:{},
   anTag:"ROADMAP", anClassCol:"Classificação_Despesas_Comitê", anFreeze:0,
-  f4p:{months:6, types:["user story","technical story"], teams:{}},
+  f4p:{months:6, types:["user story","technical story"], expediteTag:"urgent", teams:{}},
   azure:{orgs:[], sources:[], maps:{}, fields:{epic:"ID_EPICO_UNICRED", roadmap:"AnoSemestreRoadmap"}, excludeRemoved:true}});
 /* aceita configurações antigas (ctMax + warnPct) e converte para limites por time */
 function normCfg(j){
@@ -22,6 +22,7 @@ function normCfg(j){
   const f4pD = cfgDefaults().f4p, jf = j.f4p || {};
   c.f4p = {months: jf.months > 0 ? jf.months : f4pD.months,
     types: Array.isArray(jf.types) && jf.types.length ? jf.types : f4pD.types,
+    expediteTag: typeof jf.expediteTag === "string" && jf.expediteTag ? jf.expediteTag : f4pD.expediteTag,
     teams: {...(jf.teams || {})}};
   const az = j.azure || {};   // tokens nunca fazem parte da configuração
   c.azure = {orgs:(az.orgs || []).map(o => ({org:o.org})), sources:az.sources || [], maps:az.maps || {},
@@ -43,6 +44,14 @@ function f4pRangeOf(team){
   const t = (CFG.f4p.teams || {})[norm(team)] || {};
   return {min: t.min > 0 ? t.min : 1.5, max: t.max > 0 ? t.max : 3.5, planned: t.min > 0 && t.max > 0};
 }
+/* meta de itens Expedite/Urgente do time no semestre (Report F4P): null quando o time não tem meta cadastrada */
+function f4pUrgentMetaOf(team){
+  const t = (CFG.f4p.teams || {})[norm(team)] || {};
+  return t.urgentMeta != null && t.urgentMeta >= 0 ? t.urgentMeta : null;
+}
+/* tag configurada como Classe de Serviço Expedite (Report F4P) e o nome dela pra exibir */
+const f4pExpediteTag = () => CFG.f4p.expediteTag || "urgent";
+const f4pTagName = id => (CFG.tags.find(t => t.id === id) || {}).name || id;
 function saveCfg(){ try { localStorage.setItem(CFG_KEY, JSON.stringify(CFG)); return true; } catch(e){ return false; } }
 /* Padrão: Vazão = de "Aguardando Deploy"/"Pronto para Deploy" até o fim; WIP = de "READY" até antes da Vazão. */
 /* Padrão: Discovery = depois da primeira coluna (Backlog) até antes do WIP;
