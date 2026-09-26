@@ -212,6 +212,7 @@ Gestão da Classe de Serviço **Expedite**. Decisões e limitação de dados: `d
   | Fechado (com a tag) | Só se a data de fechamento (`o.deploy`) cair dentro da janela do §12.1 (últimos N meses no semestre em curso; período exato no semestre encerrado) |
 - Indicador de cor do número: Realizado > Meta → vermelho; Realizado ≤ Meta → verde; sem meta cadastrada → sem cor.
 - **Tendência** (▲ aumentando / ▼ reduzindo / ◆ estável): compara quantos itens com a tag **fecharam** nos últimos 3 meses (a partir de hoje) contra os 3 meses anteriores a esses — sempre essa janela corrida de 6 meses, **independente do semestre selecionado no filtro**. Sem margem de tolerância: qualquer diferença já decide ▲ ou ▼; só empate exato é ◆. A cor da seta é neutra (não segue o vermelho/verde da Meta).
+- **Transparência**: o número do Realizado é clicável e abre a lista dos itens exatos que entraram na contagem (ID, título, situação — aberto ou fechado com a data); cada ID leva direto até o item no quadro (`gotoId`).
 
 ### 12.5 Demais quadrantes
 

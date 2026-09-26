@@ -161,6 +161,28 @@ def test_urgente_semestre_atual_ignora_fechados_fora_da_janela_de_meses(page):
     }""")
     assert r == 2
 
+def test_urgente_clique_no_numero_abre_lista_e_permite_navegar(page):
+    """Melhoria pedida pelo usuário: clicar no Realizado mostra quais itens entraram na contagem, e cada
+    um leva direto até o item no quadro."""
+    carregar(page, "f4p.xlsx")
+    alvo_id = page.evaluate("""()=>{
+      S.f.team='CORE'; S.f.exec=semestre(TODAY);
+      const alvo = [...S.model.ops.values()].find(o=>o.team==='CORE');
+      alvo.tagHits = [...(alvo.tagHits||[]), CFG.tags.find(t=>t.id==='urgent')];
+      render();
+      return alvo.id;
+    }""")
+    page.click("#f4pTab")
+    page.click('button[data-f4p-urgent-team="CORE"]')
+    assert page.is_visible("#f4pItemsBg")
+    rows = page.locator("#f4pItemsBody tbody tr")
+    assert rows.count() == 1
+    assert alvo_id in page.inner_text("#f4pItemsBody")
+    page.click(f'button[data-f4p-go="{alvo_id}"]')
+    assert not page.is_visible("#f4pItemsBg")
+    assert not page.is_visible("#f4pPanel.open")           # o painel F4P também fecha, para não esconder o item
+    assert page.evaluate("document.getElementById('goto').value") == alvo_id
+
 def test_urgente_semestre_passado_conta_so_fechados_no_periodo(page):
     """Sem histórico de quando a tag foi aplicada, um semestre já encerrado só pode contar o que fechou
     (tem o.deploy) dentro daquele período — itens ainda abertos, ou fechados fora do período, ficam de fora."""

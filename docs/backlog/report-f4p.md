@@ -40,6 +40,7 @@ Por time: `[Meta] | [Realizado] [Tendência]`
 - **Realizado**: abertos contam sempre (não importa há quanto tempo); fechados só contam se fecharam dentro da **mesma janela por semestre usada por CycleTime/Variabilidade** (`f4pWindow`, §12.1 — últimos N meses no semestre em curso, período exato no encerrado). Corrigido pela decisão `0015` depois de um bug em produção (a versão original não tinha corte de data no semestre em curso, somando todo item já tageado alguma vez na história do time) — e de uma correção intermediária errada (usar o início do semestre em vez da janela rolante já estabelecida).
 - **Tendência** (▲/▼/◆): itens fechados nos últimos 3 meses vs. nos 3 meses anteriores, sempre a partir de hoje — independente do semestre selecionado no filtro. Sem margem de tolerância; cor neutra.
 - Indicador de cor do Realizado: acima da meta → vermelho; na meta ou abaixo → verde.
+- **Transparência** (decisão `0016`): o número do Realizado é clicável e abre a lista dos itens exatos contados (ID, título, aberto/fechado), cada um levando direto até o item no quadro.
 
 ## Decisões adotadas (implementadas)
 
