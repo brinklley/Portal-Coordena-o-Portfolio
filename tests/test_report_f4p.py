@@ -734,3 +734,329 @@ def test_vazao_aparece_calculado_no_painel(page):
     page.click("#f4pTab")
     assert "Vazão (reserva vs realizado)" in page.inner_text("#f4pBody")
     assert "f4p-sep" in page.evaluate("f4pVazaoCell('CORE')")
+
+# ---------------- Quadrante 6 · Roadmap – Épicos (roadmap vs roadmap entregue vs atual) ----------------
+# Decisão 0025. Diferente dos demais quadrantes (que operam sobre S.model.ops), este opera sobre os
+# cards do quadro de Épicos (S.model.epis / S.model.stages.epi / e.st / e.target). "Fechado" aqui é a
+# última coluna do PRÓPRIO quadro de Épicos, não a categoria de fluxo (catOf) de nenhum time.
+
+def test_roadmap_interno_usa_target_date_do_proprio_epico(page):
+    """Semestre Interno selecionado: 'Roadmap' usa o Target Date/semestre do próprio épico (e.interno),
+    sem olhar o vínculo com a iniciativa."""
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.stages.epi = ["Backlog", "Fechado"];
+      const sem = semestre(TODAY);
+      S.f.int = sem;
+      S.model.ops.set("rop1", {team:"F4P_RD1"});
+      S.model.ops.set("rop2", {team:"F4P_RD1"});
+      S.model.epis.set("re1", {id:"re1", parent:null, target:TODAY, interno:sem, st:0, stDate:null, ops:["rop1"], type:"Epic"});
+      S.model.epis.set("re2", {id:"re2", parent:null, target:null, interno:"2099 1", st:0, stDate:null, ops:["rop2"], type:"Epic"});   // outro semestre: não conta
+      return f4pRoadmapEpis("F4P_RD1").map(e=>e.id);
+    }""")
+    assert r == ["re1"]
+
+def test_roadmap_executivo_usa_vinculo_com_a_iniciativa_ignorando_target_date_do_epico(page):
+    """Semestre Executivo selecionado: 'Roadmap' sobe Iniciativa → Release → Épico pela iniciativa com
+    o AnoSemestreRoadmap selecionado, independente do Target Date/semestre do próprio épico."""
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.stages.epi = ["Backlog", "Fechado"];
+      const sem = semestre(TODAY);
+      S.f.exec = sem;
+      S.model.ops.set("rop1", {team:"F4P_RD2"});
+      S.model.ops.set("rop2", {team:"F4P_RD2"});
+      // e1: Target Date de outro semestre, mas vinculado (via release) a uma iniciativa do semestre selecionado — conta
+      S.model.epis.set("re1", {id:"re1", parent:"r1", target:null, interno:"2099 1", st:0, stDate:null, ops:["rop1"], type:"Epic"});
+      S.model.rels.set("r1", {id:"r1", parent:"i1", epis:["re1"]});
+      S.model.inis.set("i1", {id:"i1", exec:sem, rels:["r1"]});
+      // e2: Target Date do semestre selecionado, mas SEM vínculo com nenhuma iniciativa do roadmap executivo — não conta
+      S.model.epis.set("re2", {id:"re2", parent:null, target:TODAY, interno:sem, st:0, stDate:null, ops:["rop2"], type:"Epic"});
+      return f4pRoadmapEpis("F4P_RD2").map(e=>e.id);
+    }""")
+    assert r == ["re1"]
+
+def test_roadmap_entregue_e_subconjunto_ja_fechado(page):
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.stages.epi = ["Backlog", "Fechado"];
+      const sem = semestre(TODAY);
+      S.f.int = sem;
+      S.model.ops.set("rop1", {team:"F4P_RD3"});
+      S.model.ops.set("rop2", {team:"F4P_RD3"});
+      S.model.epis.set("re1", {id:"re1", parent:null, target:TODAY, interno:sem, st:1, stDate:TODAY, ops:["rop1"], type:"Epic"});   // fechado
+      S.model.epis.set("re2", {id:"re2", parent:null, target:TODAY, interno:sem, st:0, stDate:null, ops:["rop2"], type:"Epic"});   // aberto
+      return {roadmap: f4pRoadmapEpis("F4P_RD3").length, entregue: f4pRoadmapEntregueEpis("F4P_RD3").length};
+    }""")
+    assert r == {"roadmap": 2, "entregue": 1}
+
+def test_atual_ignora_target_date_no_filtro_interno(page):
+    """'Atual' conta só pela data de fechamento dentro do período do semestre — mesmo um épico com
+    Target Date/semestre diferente do selecionado (que não entraria no 'Roadmap') conta aqui, desde que
+    tenha fechado dentro do período (pedido explícito do usuário: sem levar o Target Date em conta)."""
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.stages.epi = ["Backlog", "Fechado"];
+      const sem = semestre(TODAY);
+      S.f.int = sem;
+      const st = f4pSemesterState();
+      const dentro = new Date(st.start.getTime() + 5 * 864e5);
+      S.model.ops.set("rop1", {team:"F4P_RD4"});
+      S.model.epis.set("re1", {id:"re1", parent:null, target:null, interno:"2099 1", st:1, stDate:dentro, ops:["rop1"], type:"Epic"});
+      return {roadmap: f4pRoadmapEpis("F4P_RD4").length, atual: f4pAtualEpis("F4P_RD4", st).length};
+    }""")
+    assert r == {"roadmap": 0, "atual": 1}
+
+def test_atual_ignora_vinculo_com_iniciativa_no_filtro_executivo(page):
+    """No filtro Executivo, 'Atual' também não olha o vínculo com iniciativa — um épico sem release/
+    iniciativa (que não entraria no 'Roadmap' executivo) ainda conta em 'Atual' se fechou no período."""
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.stages.epi = ["Backlog", "Fechado"];
+      const sem = semestre(TODAY);
+      S.f.exec = sem;
+      const st = f4pSemesterState();
+      const dentro = new Date(st.start.getTime() + 5 * 864e5);
+      S.model.ops.set("rop1", {team:"F4P_RD5"});
+      S.model.epis.set("re1", {id:"re1", parent:null, target:null, interno:null, st:1, stDate:dentro, ops:["rop1"], type:"Epic"});   // sem parent/release/iniciativa
+      return {roadmap: f4pRoadmapEpis("F4P_RD5").length, atual: f4pAtualEpis("F4P_RD5", st).length};
+    }""")
+    assert r == {"roadmap": 0, "atual": 1}
+
+def test_roadmap_filtra_por_tipo_de_epico_configurado(page):
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.stages.epi = ["Backlog", "Fechado"];
+      const sem = semestre(TODAY);
+      S.f.int = sem;
+      S.model.ops.set("rop1", {team:"F4P_RD6"});
+      S.model.ops.set("rop2", {team:"F4P_RD6"});
+      S.model.epis.set("re1", {id:"re1", parent:null, target:TODAY, interno:sem, st:0, stDate:null, ops:["rop1"], type:"Epic"});
+      S.model.epis.set("re2", {id:"re2", parent:null, target:TODAY, interno:sem, st:0, stDate:null, ops:["rop2"], type:"User Story"});   // tipo não configurado: não conta
+      return f4pRoadmapEpis("F4P_RD6").map(e=>e.id);
+    }""")
+    assert r == ["re1"]
+
+def test_roadmap_usa_tipos_de_epico_configuraveis(page):
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.stages.epi = ["Backlog", "Fechado"];
+      const sem = semestre(TODAY);
+      S.f.int = sem;
+      CFG.f4p.epiTypes = ["feature"];
+      S.model.ops.set("rop1", {team:"F4P_RD7"});
+      S.model.epis.set("re1", {id:"re1", parent:null, target:TODAY, interno:sem, st:0, stDate:null, ops:["rop1"], type:"Feature"});
+      const n = f4pRoadmapEpis("F4P_RD7").length;
+      CFG.f4p.epiTypes = ["epic"];
+      return n;
+    }""")
+    assert r == 1
+
+def test_roadmap_conta_so_epicos_com_item_do_time(page):
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.stages.epi = ["Backlog", "Fechado"];
+      const sem = semestre(TODAY);
+      S.f.int = sem;
+      S.model.ops.set("rop1", {team:"F4P_RD8"});
+      S.model.ops.set("rop2", {team:"F4P_RD8_OUTRO"});
+      S.model.epis.set("re1", {id:"re1", parent:null, target:TODAY, interno:sem, st:0, stDate:null, ops:["rop1"], type:"Epic"});
+      S.model.epis.set("re2", {id:"re2", parent:null, target:TODAY, interno:sem, st:0, stDate:null, ops:["rop2"], type:"Epic"});   // item de outro time: não conta
+      return f4pRoadmapEpis("F4P_RD8").map(e=>e.id);
+    }""")
+    assert r == ["re1"]
+
+def test_roadmap_tendencia_soma_abertos_ao_mes_atual_exemplo_melhora(page):
+    """Mesmas regras inspiracionais da tendência do Vazão (decisão 0023), adaptadas para o fluxo de
+    Épicos: mês atual + épicos do Roadmap ainda abertos vs. média dos meses anteriores.
+    Média 1, mês atual 0, 3 abertos: 0+3=3 > 1 → melhora."""
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.stages.epi = ["Backlog", "Fechado"];
+      const sem = semestre(TODAY);
+      S.f.int = sem;
+      const st = {kind:"current", start:new Date(TODAY.getFullYear(), TODAY.getMonth() - 1, 1), end:new Date(TODAY.getFullYear(), TODAY.getMonth() + 6, 0)};
+      const mesAnterior = new Date(TODAY.getFullYear(), TODAY.getMonth() - 1, 15);
+      S.model.ops.set("rop0", {team:"F4P_RDT1"});
+      S.model.epis.set("re0", {id:"re0", parent:null, target:null, interno:sem, st:1, stDate:mesAnterior, ops:["rop0"], type:"Epic"});   // fechado no mês anterior: média = 1
+      for (let i = 0; i < 3; i++){
+        S.model.ops.set("ropw"+i, {team:"F4P_RDT1"});
+        S.model.epis.set("rew"+i, {id:"rew"+i, parent:null, target:null, interno:sem, st:0, stDate:null, ops:["ropw"+i], type:"Epic"});   // ainda abertos: 3
+      }
+      return f4pRoadmapTrend("F4P_RDT1", st);
+    }""")
+    assert r == "▲"
+
+def test_roadmap_tendencia_soma_abertos_ao_mes_atual_exemplo_piora(page):
+    """Média 2, mês atual 0, 1 aberto: 0+1=1 < 2 → piora."""
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.stages.epi = ["Backlog", "Fechado"];
+      const sem = semestre(TODAY);
+      S.f.int = sem;
+      const st = {kind:"current", start:new Date(TODAY.getFullYear(), TODAY.getMonth() - 1, 1), end:new Date(TODAY.getFullYear(), TODAY.getMonth() + 6, 0)};
+      const mesAnterior = new Date(TODAY.getFullYear(), TODAY.getMonth() - 1, 10);
+      for (let i = 0; i < 2; i++){
+        S.model.ops.set("rop"+i, {team:"F4P_RDT2"});
+        S.model.epis.set("re"+i, {id:"re"+i, parent:null, target:null, interno:sem, st:1, stDate:mesAnterior, ops:["rop"+i], type:"Epic"});   // fechados no mês anterior: média = 2
+      }
+      S.model.ops.set("ropw0", {team:"F4P_RDT2"});
+      S.model.epis.set("rew0", {id:"rew0", parent:null, target:null, interno:sem, st:0, stDate:null, ops:["ropw0"], type:"Epic"});   // aberto: 1
+      return f4pRoadmapTrend("F4P_RDT2", st);
+    }""")
+    assert r == "▼"
+
+def test_roadmap_tendencia_soma_abertos_ao_mes_atual_exemplo_estavel(page):
+    """Média 3, mês atual 2, 1 aberto: 2+1=3 == 3 → estável."""
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.stages.epi = ["Backlog", "Fechado"];
+      const sem = semestre(TODAY);
+      S.f.int = sem;
+      const st = {kind:"current", start:new Date(TODAY.getFullYear(), TODAY.getMonth() - 1, 1), end:new Date(TODAY.getFullYear(), TODAY.getMonth() + 6, 0)};
+      const mesAnterior = new Date(TODAY.getFullYear(), TODAY.getMonth() - 1, 10), mesAtual = new Date(TODAY.getFullYear(), TODAY.getMonth(), 1);
+      for (let i = 0; i < 3; i++){
+        S.model.ops.set("rop"+i, {team:"F4P_RDT3"});
+        S.model.epis.set("re"+i, {id:"re"+i, parent:null, target:null, interno:sem, st:1, stDate:mesAnterior, ops:["rop"+i], type:"Epic"});   // fechados no mês anterior: média = 3
+      }
+      for (let i = 0; i < 2; i++){
+        S.model.ops.set("ropc"+i, {team:"F4P_RDT3"});
+        S.model.epis.set("rec"+i, {id:"rec"+i, parent:null, target:null, interno:sem, st:1, stDate:mesAtual, ops:["ropc"+i], type:"Epic"});   // fechados no mês atual: 2
+      }
+      S.model.ops.set("ropw0", {team:"F4P_RDT3"});
+      S.model.epis.set("rew0", {id:"rew0", parent:null, target:null, interno:sem, st:0, stDate:null, ops:["ropw0"], type:"Epic"});   // aberto: 1
+      return f4pRoadmapTrend("F4P_RDT3", st);
+    }""")
+    assert r == "◆"
+
+def test_roadmap_tendencia_sem_meses_anteriores_fica_neutra(page):
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      const st = {kind:"current", start:new Date(TODAY.getFullYear(), TODAY.getMonth(), 1), end:new Date(TODAY.getFullYear(), TODAY.getMonth() + 6, 0)};
+      return f4pRoadmapTrend("F4P_RD_VAZIO", st);
+    }""")
+    assert r == "◆"
+
+def test_roadmap_clique_no_numero_abre_lista_de_epicos_com_situacao_do_proprio_quadro(page):
+    """Clicar em qualquer um dos três números (Roadmap, Roadmap entregue, Atual) abre a lista dos
+    épicos considerados, com a Situação sendo a coluna do próprio quadro de Épicos (não a categoria de
+    fluxo operacional de nenhum time)."""
+    carregar(page, "times.xlsx")
+    alvo_id = page.evaluate("""()=>{
+      S.model.stages.epi = ["Backlog", "Fechado"];
+      const sem = semestre(TODAY);
+      S.f.team = 'CORE'; S.f.int = sem;
+      S.model.ops.set("rop1", {team:"CORE"});
+      S.model.epis.set("re_click", {id:"re_click", parent:null, target:TODAY, interno:sem, st:0, stDate:null, ops:["rop1"], type:"Epic"});
+      render();
+      return "re_click";
+    }""")
+    page.click("#f4pTab")
+    page.click('button[data-f4p-road-team="CORE"][data-f4p-road-set="roadmap"]')
+    assert page.is_visible("#f4pItemsBg")
+    assert alvo_id in page.inner_text("#f4pItemsBody")
+    assert "Backlog" in page.inner_text("#f4pItemsBody")    # Situação = coluna do quadro de Épicos, não catOf
+    page.click(f'button[data-f4p-go="{alvo_id}"]')
+    assert not page.is_visible("#f4pItemsBg")
+    assert not page.is_visible("#f4pPanel.open")
+    assert page.evaluate("document.getElementById('goto').value") == alvo_id
+
+def test_roadmap_epicos_aparece_calculado_no_painel(page):
+    carregar(page, "f4p.xlsx")
+    page.evaluate("()=>{ S.f.team='CORE'; S.f.exec=semestre(TODAY); render(); }")
+    page.click("#f4pTab")
+    assert "Roadmap – Épicos (roadmap vs roadmap entregue vs atual)" in page.inner_text("#f4pBody")
+    assert "f4p-sep" in page.evaluate("f4pRoadmapEpiCell('CORE')")
+
+def test_configuracao_epi_types_tem_padrao_epic(page):
+    r = page.evaluate("()=>{ const c = normCfg({}); return c.f4p.epiTypes; }")
+    assert r == ["epic"]
+
+def test_configuracao_epi_types_persiste_e_entra_na_exportacao(page):
+    carregar(page, "times.xlsx")
+    page.evaluate("()=>{ CFG.f4p.epiTypes = ['epic', 'feature']; }")
+    page.click("#btnCfg")
+    with page.expect_download() as d:
+        page.click("#cfgExport")
+    txt = open(d.value.path(), encoding="utf-8").read()
+    assert '"epiTypes"' in txt and '"feature"' in txt
+
+# Decisão 0026: reforço do vínculo épico↔time — o vínculo é sempre pelos itens filhos (Parent → Child),
+# nunca por Target Date do épico ou pelo vínculo com a iniciativa. Cenário de falha relatado pelo
+# usuário: um épico aparecer contabilizado no time errado quando todos os seus itens filhos são de
+# outro time. Investigação confirmou que a decisão 0025 já implementava a regra corretamente nos três
+# números (Roadmap, Roadmap entregue, Atual) e nos dois branches (Interno e Executivo); os testes abaixo
+# travam esse comportamento explicitamente, cobrindo os casos que ainda não tinham um teste dedicado.
+
+def test_roadmap_executivo_epico_conta_so_para_o_time_dos_itens_filhos(page):
+    """Cenário de falha do usuário: épico vinculado (via iniciativa do Roadmap Executivo) ao time CORE,
+    mas cujos itens filhos são todos do MOBILE — deve contar só para o MOBILE, nunca para o CORE."""
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.stages.epi = ["Backlog", "Fechado"];
+      const sem = semestre(TODAY);
+      S.f.exec = sem;
+      S.model.ops.set("mop1", {team:"F4P_V26_MOBILE"});
+      S.model.epis.set("emix", {id:"emix", parent:"rmix", target:null, interno:null, st:0, stDate:null, ops:["mop1"], type:"Epic"});
+      S.model.rels.set("rmix", {id:"rmix", parent:"imix", epis:["emix"]});
+      S.model.inis.set("imix", {id:"imix", exec:sem, rels:["rmix"]});
+      return {core: f4pRoadmapEpis("F4P_V26_CORE").map(e=>e.id), mobile: f4pRoadmapEpis("F4P_V26_MOBILE").map(e=>e.id)};
+    }""")
+    assert r == {"core": [], "mobile": ["emix"]}
+
+def test_roadmap_interno_epico_conta_so_para_o_time_dos_itens_filhos(page):
+    """Mesmo cenário de falha, mas no Roadmap Interno (Target Date do próprio épico): o vínculo com o
+    time continua sendo só pelos itens filhos, não pelo Target Date."""
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.stages.epi = ["Backlog", "Fechado"];
+      const sem = semestre(TODAY);
+      S.f.int = sem;
+      S.model.ops.set("mop2", {team:"F4P_V26B_MOBILE"});
+      S.model.epis.set("emix2", {id:"emix2", parent:null, target:TODAY, interno:sem, st:0, stDate:null, ops:["mop2"], type:"Epic"});
+      return {core: f4pRoadmapEpis("F4P_V26B_CORE").map(e=>e.id), mobile: f4pRoadmapEpis("F4P_V26B_MOBILE").map(e=>e.id)};
+    }""")
+    assert r == {"core": [], "mobile": ["emix2"]}
+
+def test_roadmap_entregue_epico_conta_so_para_o_time_dos_itens_filhos(page):
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.stages.epi = ["Backlog", "Fechado"];
+      const sem = semestre(TODAY);
+      S.f.int = sem;
+      S.model.ops.set("mop3", {team:"F4P_V26C_MOBILE"});
+      S.model.epis.set("emix3", {id:"emix3", parent:null, target:TODAY, interno:sem, st:1, stDate:TODAY, ops:["mop3"], type:"Epic"});   // fechado
+      return {core: f4pRoadmapEntregueEpis("F4P_V26C_CORE").map(e=>e.id), mobile: f4pRoadmapEntregueEpis("F4P_V26C_MOBILE").map(e=>e.id)};
+    }""")
+    assert r == {"core": [], "mobile": ["emix3"]}
+
+def test_atual_epico_conta_so_para_o_time_dos_itens_filhos(page):
+    """'Atual' já é independente do Target Date e do vínculo com iniciativa (decisão 0025), mas continua
+    dependendo do vínculo com o time pelos itens filhos — mesmo cenário de falha, aplicado ao Atual."""
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.stages.epi = ["Backlog", "Fechado"];
+      const sem = semestre(TODAY);
+      S.f.int = sem;
+      const st = f4pSemesterState();
+      const dentro = new Date(st.start.getTime() + 5 * 864e5);
+      S.model.ops.set("mop4", {team:"F4P_V26D_MOBILE"});
+      S.model.epis.set("emix4", {id:"emix4", parent:null, target:null, interno:null, st:1, stDate:dentro, ops:["mop4"], type:"Epic"});
+      return {core: f4pAtualEpis("F4P_V26D_CORE", st).map(e=>e.id), mobile: f4pAtualEpis("F4P_V26D_MOBILE", st).map(e=>e.id)};
+    }""")
+    assert r == {"core": [], "mobile": ["emix4"]}
+
+def test_roadmap_epico_com_itens_de_dois_times_conta_para_ambos(page):
+    """Um épico com itens filhos de mais de um time conta para cada time que efetivamente tem item
+    vinculado — não é um "dono único"; a exclusão só vale para o time que não tem nenhum item."""
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.stages.epi = ["Backlog", "Fechado"];
+      const sem = semestre(TODAY);
+      S.f.int = sem;
+      S.model.ops.set("cop1", {team:"F4P_V26E_CORE"});
+      S.model.ops.set("mop5", {team:"F4P_V26E_MOBILE"});
+      S.model.epis.set("emix5", {id:"emix5", parent:null, target:TODAY, interno:sem, st:0, stDate:null, ops:["cop1", "mop5"], type:"Epic"});
+      return {core: f4pRoadmapEpis("F4P_V26E_CORE").map(e=>e.id), mobile: f4pRoadmapEpis("F4P_V26E_MOBILE").map(e=>e.id)};
+    }""")
+    assert r == {"core": ["emix5"], "mobile": ["emix5"]}

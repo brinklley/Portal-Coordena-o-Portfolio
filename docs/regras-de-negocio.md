@@ -158,8 +158,10 @@ Cada alerta traz: diagnóstico com a meta como referência (ex.: "Já consumiu 9
 
 Habilitada com **Time** e **Roadmap** (interno ou executivo) no filtro. Uma linha por épico com itens do time.
 
-- **QTD**: itens dos tipos do CT, no time.
-- **Capacidade**: itens do time com a tag de capacidade (padrão `ROADMAP`); **Projetada**: todos (dos tipos do CT).
+- **QTD**: itens dos tipos do CT, no time, do épico daquela linha.
+- **Projetada**: sempre a **soma do QTD de cada épico** mostrado na tabela (nunca uma contagem à parte) — itens do time dos tipos do CT, de todos os épicos visíveis.
+- **Capacidade**: sempre a **soma do "reservado" de cada épico** mostrado na tabela — subconjunto do QTD de cada épico cujo `o.tags` inclui a tag de capacidade (`CFG.anTag`, padrão `ROADMAP`). A linha do épico mostra essa quantidade reservada logo após a descrição do épico (decisão `0027`); o badge "X US" que ficava ao lado foi removido por ser redundante com a coluna QTD (decisão `0028`).
+- **Transparência** (decisões `0027`/`0028`): tanto os dois números do cabeçalho (Capacidade e Projetada, somando todos os épicos) quanto o QTD e o "reservado" de **cada linha** (só os itens daquele épico) são clicáveis e abrem a lista dos itens exatos que entram na soma — ID, título e situação (Backlog, Discovery, WIP ou Vazão, com a data de saída quando Vazão) — mesmo modal e mesma navegação até o item do Report F4P (`f4pItemsModal`/`f4pItemSituacao`, reaproveitados).
 - **Status**: fase do épico no time (+ coluna do item aberto mais avançado). **Flow**: Ready, Ag. Deploy e CT do épico no time; CT em vermelho acima do máximo.
 - **Ref.**: roadmap interno (ou executivo) em formato `2S/26` e Capex/Opex (coluna configurável).
 - **Dead line** = fim do semestre − "dias antes do fim do semestre" − CT máximo do time. Itens ainda fora do fluxo do CT são destacados (laranja a menos de 14 dias, vermelho após o prazo).
@@ -237,6 +239,21 @@ Gestão da entrega do time no período do roadmap selecionado. Decisões: `docs/
 - **Cor da seta de tendência** (decisão `0024`): ao contrário dos números, a seta/losango da tendência é colorida — **verde** quando Realizado ≥ Reserva, **vermelho** quando Realizado < Reserva. Como Reserva é sempre um subconjunto do Realizado (item acima), a cor vermelha não é alcançável em uso normal; a checagem existe mesmo assim, por pedido explícito do usuário, como salvaguarda visual.
 - **Transparência**: tanto o número da Reserva quanto o do Realizado são clicáveis e abrem a lista dos itens exatos que entraram em cada contagem, igual aos demais quadrantes calculados (`gotoId` para navegar até o item).
 
-### 12.7 Demais quadrantes
+### 12.7 Roadmap – Épicos (roadmap vs. roadmap entregue vs. atual)
 
-Eficiência de fluxo, Roadmap–Épicos e User Story ainda não têm regra de cálculo definida; aparecem no painel como "em definição", mantendo a mesma grade e as mesmas colunas de time dos quadrantes calculados.
+Único quadrante que opera sobre os **cards do quadro de Épicos** (`S.model.epis`, `S.model.stages.epi`, `e.st`, `e.target`), não sobre os itens operacionais dos times como os demais quadrantes calculados. "Fechado", aqui, é a **última coluna do próprio quadro de Épicos** (`e.st === S.model.stages.epi.length - 1`, função `f4pEpiClosed`) — não a categoria de fluxo (`catOf`) de nenhum time, conceito que não existe neste nível. Decisões: `docs/decisoes/0025-report-f4p-quadrante-roadmap-epicos.md` e `docs/decisoes/0026-report-f4p-roadmap-epicos-vinculo-epico-time.md` (reforço do vínculo épico↔time).
+
+- **Filtro de dados**: épicos dos **tipos configurados** para este quadrante (`CFG.f4p.epiTypes`, configuração própria — padrão **Epic** — independente de `CFG.f4p.types`, que é dos itens operacionais) com pelo menos um item operacional vinculado ao time em questão (`f4pEpiHasTeam`, mesma ideia de `S.model.teams`, aplicada por épico). **O vínculo épico↔time é sempre pelos itens filhos** (Parent → Child: `o.epicoId`/`ID_EPICO_UNICRED` no item, não uma associação direta do épico com um time) — vale para os três números (Roadmap, Roadmap entregue e Atual), nos dois roadmaps (interno e executivo). Um épico só entra na contagem de um time se **esse time** tiver pelo menos um item vinculado a ele; se todos os itens do épico forem de outro time, ele conta **só** para esse outro time, nunca para o primeiro — mesmo que o épico apareça no Roadmap do primeiro por Target Date ou por vínculo com a iniciativa (decisão `0026`).
+- **Roadmap**: todos os épicos do conjunto acima dentro do semestre selecionado no filtro, **qualquer estágio** (aberto ou fechado), sem duplicidade (por ID). O critério de "estar no semestre" muda conforme qual Roadmap está ativo (Interno tem prioridade sobre o Executivo, igual ao resto do Report F4P — `f4pSemester`):
+  | Roadmap selecionado | Critério de "estar no Roadmap" |
+  |---|---|
+  | Interno | Target Date do **próprio épico** cai no semestre selecionado (`e.interno`) — o vínculo com a iniciativa é irrelevante aqui |
+  | Executivo | Épico vinculado (via Release) a uma **Iniciativa** cujo `AnoSemestreRoadmap` é o semestre selecionado — o Target Date do próprio épico é irrelevante aqui |
+- **Roadmap entregue**: subconjunto do Roadmap acima (mesmo critério interno/executivo) que já está **fechado** (última coluna do quadro de Épicos).
+- **Atual**: épicos do conjunto de dados (tipos configurados + item do time) que estão **fechados** e cuja data de fechamento (`e.stDate`, a data da própria coluna final do quadro de Épicos) cai dentro do **período exato do semestre selecionado** (`f4pExactSemesterWindow`, mesma janela do Urgente/Technical Story/Vazão) — **independente do critério do Roadmap**: não olha o Target Date do próprio épico nem o vínculo com a iniciativa, qualquer que seja o Roadmap (interno ou executivo) selecionado. É uma contagem à parte, não um subconjunto do Roadmap.
+- **Tendência** (▲ melhora / ▼ piora / ◆ estável): mesma regra inspiracional do Vazão (§12.6, decisão `0023`), adaptada para o fluxo de Épicos — separa o Atual por mês corrido dentro do período (só os meses já decorridos, no semestre em curso) e compara o **mês corrente mais os épicos do Roadmap ainda abertos** (o "WIP" deste quadrante — épicos do Roadmap que ainda não chegaram na última coluna) contra a **média** dos meses anteriores, arredondada sempre para cima. Sem meses anteriores para comparar, fica ◆.
+- **Transparência**: os três números (Roadmap, Roadmap entregue, Atual) são clicáveis e abrem a lista dos épicos exatos que entraram em cada contagem (`gotoId` para navegar até o item). A coluna "Situação" mostra a **coluna do próprio quadro de Épicos** (não a categoria de fluxo operacional de nenhum time), com a data de saída quando o épico estiver fechado.
+
+### 12.8 Demais quadrantes
+
+Eficiência de fluxo e User Story ainda não têm regra de cálculo definida; aparecem no painel como "em definição", mantendo a mesma grade e as mesmas colunas de time dos quadrantes calculados.

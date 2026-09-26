@@ -9,7 +9,7 @@ const cfgDefaults = () => ({teams:{}, warnDays:30, alertDays:60, outlierDays:90,
   ctTypes:["user story","technical story","technical solution"], tags:TAG_DEFAULTS(),
   typeColors:{ini:{}, rel:{}, epi:{}, op:{}}, fields:{ini:[], rel:[], epi:[], op:[]}, ctCols:null, flow:{},
   anTag:"ROADMAP", anClassCol:"Classificação_Despesas_Comitê", anFreeze:0,
-  f4p:{months:6, types:["user story","technical story"], expediteTag:"urgent", teams:{}},
+  f4p:{months:6, types:["user story","technical story"], expediteTag:"urgent", epiTypes:["epic"], teams:{}},
   azure:{orgs:[], sources:[], maps:{}, fields:{epic:"ID_EPICO_UNICRED", roadmap:"AnoSemestreRoadmap"}, excludeRemoved:true}});
 /* aceita configurações antigas (ctMax + warnPct) e converte para limites por time */
 function normCfg(j){
@@ -23,6 +23,7 @@ function normCfg(j){
   c.f4p = {months: jf.months > 0 ? jf.months : f4pD.months,
     types: Array.isArray(jf.types) && jf.types.length ? jf.types : f4pD.types,
     expediteTag: typeof jf.expediteTag === "string" && jf.expediteTag ? jf.expediteTag : f4pD.expediteTag,
+    epiTypes: Array.isArray(jf.epiTypes) && jf.epiTypes.length ? jf.epiTypes : f4pD.epiTypes,
     teams: {...(jf.teams || {})}};
   const az = j.azure || {};   // tokens nunca fazem parte da configuração
   c.azure = {orgs:(az.orgs || []).map(o => ({org:o.org})), sources:az.sources || [], maps:az.maps || {},
