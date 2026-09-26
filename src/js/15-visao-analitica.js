@@ -70,8 +70,8 @@ function renderAnalytics(){
   const rows = anSorted(d.rows).map(r => {
     const m = r.m, bad = m.ct != null && d.L.max && m.ct > d.L.max;
     return `<tr>
-      <td class="c">${r.qtd}<br>${r.qtd === 1 ? "item" : "itens"}</td>
-      <td class="ev"><span class="ep">[EP][<button class="idb" data-an-go="${esc(r.e.id)}">${esc(r.e.id)}</button>] ${esc(r.e.title || "")} <span class="res" title="Itens deste épico com a tag ${esc(CFG.anTag || "ROADMAP")} (capacidade do roadmap)">${r.reservados.length} reservado${r.reservados.length === 1 ? "" : "s"}</span></span> – <span class="us">${r.qtd} US</span><br>
+      <td class="c"><button type="button" class="f4p-real" data-an-epi-items="qtd" data-an-epi="${esc(r.e.id)}" title="Ver os itens deste épico">${r.qtd}</button><br>${r.qtd === 1 ? "item" : "itens"}</td>
+      <td class="ev"><span class="ep">[EP][<button class="idb" data-an-go="${esc(r.e.id)}">${esc(r.e.id)}</button>] ${esc(r.e.title || "")} <button type="button" class="f4p-real res" data-an-epi-items="res" data-an-epi="${esc(r.e.id)}" title="Ver os itens deste épico com a tag ${esc(CFG.anTag || "ROADMAP")} (capacidade do roadmap)">${r.reservados.length} reservado${r.reservados.length === 1 ? "" : "s"}</button></span><br>
         [IN][<button class="idi" data-an-go="${esc(r.i.id)}">${esc(r.i.id)}</button>] ${esc(r.i.title)}</td>
       <td class="c">${m.phase === "fechado" ? `<span class="st-ent">Entregue</span>` : PH_TXT[m.phase]}${r.farName && m.phase !== "fechado" ? `<span class="st-sub">${esc(r.farName)}</span>` : ""}</td>
       <td class="c fl">Ready: <b>${m.ctFrom ? fmtDM(m.ctFrom) : "--"}</b><br>Ag. Deploy: <b>${m.ctTo ? fmtDM(m.ctTo) : "--"}</b><br>
@@ -79,7 +79,7 @@ function renderAnalytics(){
           return `<span class="dl ${left < 0 ? "late" : left <= 14 ? "near" : ""}" title="Itens do épico que ainda não entraram na coluna de entrada do CT">${r.pending.length} ${r.pending.length === 1 ? "item fora" : "itens fora"} do fluxo · entrar até ${fmtDM(d.dl.date)}</span>`; })() : ""}</td>
       <td class="c">${esc(semShort(r.ref))}<br>${esc(r.cls || "---")}</td></tr>`; }).join("");
   $("anBody").innerHTML = `<table class="an-table" id="anTable"><thead><tr>${th("qtd","QTD")}${th("ep","Evolução")}${th("status","Status")}${th("ct","Flow")}${th("ref","Ref.")}</tr></thead><tbody>${rows}</tbody></table>
-    <div class="an-note">Épicos com itens do time ${esc(d.team)} dentro dos filtros atuais (${esc(rm)}). QTD, Capacidade e Projetada contam itens dos tipos ${esc(ctTypesLabel())}; Capacidade só os com a tag ${esc(CFG.anTag || "ROADMAP")}. Projetada é sempre a soma do QTD de cada épico da tabela; Capacidade é sempre a soma do "reservado" de cada épico — os dois números do cabeçalho são clicáveis e abrem a lista dos itens exatos que entram em cada soma (com a situação: Backlog, Discovery, WIP ou Vazão, com a data quando entregue). Status e Flow seguem a configuração do fluxo do time; CycleTime em vermelho passa do CT máximo. Dead line = fim do semestre${CFG.anFreeze ? ` menos ${CFG.anFreeze} dias` : ""} menos o CT máximo; “itens fora do fluxo” ainda não chegaram na coluna de entrada do CT. Ref.: roadmap interno do épico (ou o executivo da iniciativa, se vazio) e ${esc(CFG.anClassCol || "classificação")} da iniciativa.</div>`;
+    <div class="an-note">Épicos com itens do time ${esc(d.team)} dentro dos filtros atuais (${esc(rm)}). QTD, Capacidade e Projetada contam itens dos tipos ${esc(ctTypesLabel())}; Capacidade só os com a tag ${esc(CFG.anTag || "ROADMAP")}. Projetada é sempre a soma do QTD de cada épico da tabela; Capacidade é sempre a soma do "reservado" de cada épico. Os números do cabeçalho (Capacidade e Projetada) e os de cada linha (QTD e "reservado") são clicáveis e abrem a lista dos itens exatos que entram em cada soma (com a situação: Backlog, Discovery, WIP ou Vazão, com a data quando entregue). Status e Flow seguem a configuração do fluxo do time; CycleTime em vermelho passa do CT máximo. Dead line = fim do semestre${CFG.anFreeze ? ` menos ${CFG.anFreeze} dias` : ""} menos o CT máximo; “itens fora do fluxo” ainda não chegaram na coluna de entrada do CT. Ref.: roadmap interno do épico (ou o executivo da iniciativa, se vazio) e ${esc(CFG.anClassCol || "classificação")} da iniciativa.</div>`;
 }
 const fmtDM = d => d ? d.toLocaleDateString("pt-BR", {day:"2-digit", month:"short"}).replace(".", "").replace(" de ", "/").toUpperCase() : "--";
 function placeAnalytics(){ const h = document.querySelector(".top").offsetHeight; $("anPanel").style.top = h + "px"; $("anPanel").style.height = `calc(100% - ${h}px)`; }
@@ -97,6 +97,14 @@ $("anPanel").addEventListener("click", e => {
     f4pItemsModal(`Roadmap ${d.team} · ${which === "cap" ? "Capacidade" : "Projetada"} · ${semLong(S.f.int || S.f.exec)}`, items);
     return;
   }
+  const btnEpi = e.target.closest("[data-an-epi-items]");
+  if (btnEpi){
+    const d = anData(), epiId = btnEpi.dataset.anEpi, which = btnEpi.dataset.anEpiItems;
+    const row = d.rows.find(r => r.e.id === epiId);
+    const items = which === "res" ? row.reservados : row.itens;
+    f4pItemsModal(`Épico ${epiId} · ${which === "res" ? "Reservado" : "QTD"} · ${semLong(S.f.int || S.f.exec)}`, items);
+    return;
+  }
   const g = e.target.closest("[data-an-go]");
   if (g){ closeAnalytics(); $("goto").value = g.dataset.anGo; gotoId(g.dataset.anGo); }
 });
@@ -105,11 +113,12 @@ $("anCopy").onclick = () => {
   const tb = $("anTable"); if (!tb) return;
   const box = document.createElement("div"); box.style.cssText = "position:fixed;left:-9999px;top:0";
   box.innerHTML = $("anTitle").querySelector("h2").outerHTML + $("anTitle").querySelector("h3").outerHTML + tb.outerHTML;
-  box.querySelectorAll("button").forEach(b => { const s = document.createElement("span"); s.textContent = b.textContent; s.style.cssText = b.classList.contains("idb") ? "background:#22C55E;padding:0 3px;font-weight:bold" : ""; b.replaceWith(s); });
+  box.querySelectorAll("button").forEach(b => { const s = document.createElement("span"); s.textContent = b.textContent;
+    s.style.cssText = b.classList.contains("idb") ? "background:#22C55E;padding:0 3px;font-weight:bold"
+      : b.classList.contains("res") ? "background:#DBEAFE;color:#1E3A8A;font-weight:bold" : "";
+    b.replaceWith(s); });
   box.querySelectorAll("th").forEach(x => x.style.cssText = "background:#111;color:#fff;padding:8px;border:1px solid #fff");
   box.querySelectorAll("td").forEach((x, i) => x.style.cssText = "background:#E8E8E8;padding:8px;border:1px solid #fff;vertical-align:middle");
-  box.querySelectorAll(".us").forEach(x => x.style.cssText = "background:#FDE047;font-weight:bold");
-  box.querySelectorAll(".res").forEach(x => x.style.cssText = "background:#DBEAFE;color:#1E3A8A;font-weight:bold");
   box.querySelectorAll(".ct-bad").forEach(x => x.style.cssText = "color:#DC2626;font-weight:bold");
   box.querySelectorAll(".ct-ok").forEach(x => x.style.cssText = "color:#1D47C9;font-weight:bold");
   document.body.appendChild(box);
