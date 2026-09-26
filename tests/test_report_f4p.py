@@ -657,6 +657,39 @@ def test_vazao_wip_conta_so_tipos_configurados_do_time(page):
     }""")
     assert r == 1
 
+# Decisão 0024: a seta de tendência (não os números) é colorida por Realizado vs. Reserva — verde
+# quando Realizado ≥ Reserva, vermelho quando Realizado < Reserva. Como Reserva é sempre um subconjunto
+# do Realizado (nunca maior, por construção — decisão 0022), a cor vermelha não é alcançável com o
+# pipeline normal; os testes cobrem os dois casos que a checagem >= realmente distingue: Realizado maior
+# e Realizado igual à Reserva (todos os itens com a tag).
+
+def test_vazao_seta_de_tendencia_fica_verde_quando_realizado_maior_que_reserva(page):
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.teamFlow.F4P_VZ10 = ["Backlog", "Vazao"];
+      CFG.flow.f4p_vz10 = {cat:{vazao:"vazao"}, ct:[]};
+      const hoje = new Date();
+      S.model.ops.set("v1", {team:"F4P_VZ10", type:"User Story", stName:"Vazao", deploy:hoje, tags:["ROADMAP"]});
+      S.model.ops.set("v2", {team:"F4P_VZ10", type:"User Story", stName:"Vazao", deploy:hoje, tags:[]});
+      S.f.exec = semestre(TODAY);
+      return f4pVazaoCell("F4P_VZ10");
+    }""")
+    assert "f4p-trend f4p-good" in r
+    assert "f4p-bad" not in r
+
+def test_vazao_seta_de_tendencia_fica_verde_quando_realizado_igual_reserva(page):
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.teamFlow.F4P_VZ11 = ["Backlog", "Vazao"];
+      CFG.flow.f4p_vz11 = {cat:{vazao:"vazao"}, ct:[]};
+      const hoje = new Date();
+      S.model.ops.set("v1", {team:"F4P_VZ11", type:"User Story", stName:"Vazao", deploy:hoje, tags:["ROADMAP"]});   // único item, com a tag: reserva == realizado
+      S.f.exec = semestre(TODAY);
+      return f4pVazaoCell("F4P_VZ11");
+    }""")
+    assert "f4p-trend f4p-good" in r
+    assert "f4p-bad" not in r
+
 def test_vazao_clique_no_realizado_abre_lista_e_permite_navegar(page):
     carregar(page, "f4p.xlsx")
     alvo_id = page.evaluate("""()=>{

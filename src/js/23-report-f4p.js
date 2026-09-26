@@ -177,10 +177,15 @@ function f4pVazaoTrend(team, st){
   const mediaAnteriores = Math.ceil(counts.slice(0, -1).reduce((a, b) => a + b, 0) / (nMonths - 1));
   return atual > mediaAnteriores ? "▲" : atual < mediaAnteriores ? "▼" : "◆";
 }
+/* A seta de tendência (não os números) é colorida por Realizado vs. Reserva (decisão 0024): Realizado ≥
+   Reserva → verde; Realizado < Reserva → vermelho. Como Reserva é sempre um subconjunto do Realizado
+   (nunca maior, por construção), a cor de alerta é mais uma checagem de sanidade visual do que um cenário
+   esperado no dia a dia. */
 function f4pVazaoCell(team){
   const st = f4pSemesterState(), reserva = f4pVazaoReservaItems(team, st), realizado = f4pVazaoRealizadoItems(team, st), trend = f4pVazaoTrend(team, st);
-  const tip = `Reserva: itens com a tag ${CFG.anTag || "ROADMAP"} · Realizado: itens dos tipos ${(CFG.f4p.types || []).join(", ") || "nenhum tipo marcado"} entregues (Vazão) em ${f4pExactSemesterLabel(st)} · tendência: mês corrente + itens em WIP vs. média (arredondada pra cima) dos meses anteriores do período · clique nos números para ver os itens`;
-  return `<span title="${esc(tip)}"><button type="button" class="f4p-real" data-f4p-vazao-reserva-team="${esc(team)}">${reserva.length}</button><span class="f4p-sep">|</span><button type="button" class="f4p-real" data-f4p-vazao-realizado-team="${esc(team)}">${realizado.length}</button> <span class="f4p-trend">${trend}</span></span>`;
+  const cls = realizado.length >= reserva.length ? "f4p-good" : "f4p-bad";
+  const tip = `Reserva: itens com a tag ${CFG.anTag || "ROADMAP"} · Realizado: itens dos tipos ${(CFG.f4p.types || []).join(", ") || "nenhum tipo marcado"} entregues (Vazão) em ${f4pExactSemesterLabel(st)} · tendência: mês corrente + itens em WIP vs. média (arredondada pra cima) dos meses anteriores do período · seta em ${cls === "f4p-good" ? "verde: Realizado ≥ Reserva" : "vermelho: Realizado < Reserva"} · clique nos números para ver os itens`;
+  return `<span title="${esc(tip)}"><button type="button" class="f4p-real" data-f4p-vazao-reserva-team="${esc(team)}">${reserva.length}</button><span class="f4p-sep">|</span><button type="button" class="f4p-real" data-f4p-vazao-realizado-team="${esc(team)}">${realizado.length}</button> <span class="f4p-trend ${cls}">${trend}</span></span>`;
 }
 /* Tendência: itens Expedite fechados nos últimos 3 meses vs. nos 3 meses antes desses — sempre a
    partir de hoje, independente do semestre selecionado no filtro. Sem margem de tolerância: mais → ▲,
