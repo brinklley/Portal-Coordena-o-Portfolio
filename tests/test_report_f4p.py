@@ -266,3 +266,122 @@ def test_urgente_meta_zero_e_valida(page):
     page.fill('input[data-f4pteam="core"][data-f4pf="urgentMeta"]', "0")
     page.click("#cfgSave"); page.wait_for_timeout(200)
     assert page.evaluate("CFG.f4p.teams.core") == {"urgentMeta": 0}
+
+# ---------------- Quadrante 4 · Technical Story (meta vs. realizado) ----------------
+# Mesmo comportamento do Urgente (docs/decisoes/0018), mas conta itens pelo tipo "Technical Story" em
+# vez de uma tag, e a meta tem padrão 6 em vez de ficar "sem meta" quando o time não cadastra a própria.
+
+def test_ts_conta_so_itens_do_tipo_technical_story(page):
+    carregar(page, "f4p.xlsx")
+    n = page.evaluate("""()=>{
+      S.model.ops.set("t1", {team:"F4P_TS1", type:"Technical Story"});
+      S.model.ops.set("t2", {team:"F4P_TS1", type:"User Story"});
+      S.model.ops.set("t3", {team:"F4P_TS1", type:"Bug"});
+      S.f.exec = semestre(TODAY);
+      return f4pTsRealizado("F4P_TS1");
+    }""")
+    assert n == 1
+
+def test_ts_semestre_atual_conta_abertos_e_fechados(page):
+    """Semestre em curso: aberto conta sempre; fechado conta se fechou dentro do período exato do
+    semestre selecionado (mesma janela do Urgente, f4pExactSemesterWindow)."""
+    carregar(page, "f4p.xlsx")
+    n = page.evaluate("""()=>{
+      S.f.exec = semestre(TODAY);
+      const inicioDoSemestre = f4pSemesterState().start;
+      S.model.ops.set("t1", {team:"F4P_TS2", type:"Technical Story", deploy:null});
+      S.model.ops.set("t2", {team:"F4P_TS2", type:"Technical Story", deploy:new Date(inicioDoSemestre.getTime() + 5 * 864e5)});
+      return f4pTsRealizado("F4P_TS2", f4pSemesterState());
+    }""")
+    assert n == 2
+
+def test_ts_semestre_atual_ignora_fechados_antes_do_inicio_do_semestre(page):
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.f.exec = semestre(TODAY);
+      const inicioDoSemestre = f4pSemesterState().start;
+      const antesDoSemestre = new Date(inicioDoSemestre.getTime() - 864e5);    // véspera do início do semestre: não conta
+      const depoisDoInicio = new Date(inicioDoSemestre.getTime() + 5 * 864e5); // dentro do semestre: conta
+      S.model.ops.set("t1", {team:"F4P_TS3", type:"Technical Story", deploy:antesDoSemestre});
+      S.model.ops.set("t2", {team:"F4P_TS3", type:"Technical Story", deploy:depoisDoInicio});
+      S.model.ops.set("t3", {team:"F4P_TS3", type:"Technical Story", deploy:null});           // aberto há qualquer tempo: conta
+      return f4pTsRealizado("F4P_TS3", f4pSemesterState());
+    }""")
+    assert r == 2
+
+def test_ts_semestre_passado_conta_so_fechados_no_periodo(page):
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      const curStart = f4pSemStart(semestre(TODAY));
+      const prevMid = new Date(curStart.getFullYear(), curStart.getMonth() - 3, 15);
+      const prevSem = semestre(prevMid);
+      S.model.ops.set("t1", {team:"F4P_TS4", type:"Technical Story", deploy:prevMid});    // fechado dentro do semestre anterior
+      S.model.ops.set("t2", {team:"F4P_TS4", type:"Technical Story", deploy:null});       // ainda aberto
+      S.model.ops.set("t3", {team:"F4P_TS4", type:"Technical Story", deploy:curStart});   // fechado, mas no semestre atual
+      S.f.int = prevSem;
+      return f4pTsRealizado("F4P_TS4", f4pSemesterState());
+    }""")
+    assert r == 1
+
+def test_ts_clique_no_numero_abre_lista_e_permite_navegar(page):
+    carregar(page, "f4p.xlsx")
+    alvo_id = page.evaluate("""()=>{
+      S.f.team='CORE'; S.f.exec=semestre(TODAY);
+      const alvo = [...S.model.ops.values()].find(o=>o.team==='CORE');
+      alvo.type = 'Technical Story';
+      alvo.deploy = new Date(f4pSemesterState().start.getTime() + 5 * 864e5);   // garante que cai dentro do semestre atual
+      render();
+      return alvo.id;
+    }""")
+    page.click("#f4pTab")
+    page.click('button[data-f4p-ts-team="CORE"]')
+    assert page.is_visible("#f4pItemsBg")
+    rows = page.locator("#f4pItemsBody tbody tr")
+    assert rows.count() == 1
+    assert alvo_id in page.inner_text("#f4pItemsBody")
+    page.click(f'button[data-f4p-go="{alvo_id}"]')
+    assert not page.is_visible("#f4pItemsBg")
+    assert not page.is_visible("#f4pPanel.open")
+    assert page.evaluate("document.getElementById('goto').value") == alvo_id
+
+def test_ts_meta_padrao_6_colore_vermelho_ou_verde(page):
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      for (let i = 1; i <= 6; i++) S.model.ops.set("m"+i, {team:"F4P_TS_META", type:"Technical Story", deploy:null});
+      S.f.exec = semestre(TODAY);
+      const naMeta = f4pTsCell("F4P_TS_META");             // 6 itens, sem meta cadastrada: usa o padrão 6 (6 <= 6)
+      S.model.ops.set("m7", {team:"F4P_TS_META", type:"Technical Story", deploy:null});
+      const acimaDaMeta = f4pTsCell("F4P_TS_META");        // 7 > 6 (padrão)
+      CFG.f4p.teams.f4p_ts_meta = {tsMeta: 10};
+      const metaPropria = f4pTsCell("F4P_TS_META");        // 7 <= 10 (meta própria do time)
+      delete CFG.f4p.teams.f4p_ts_meta;
+      return {naMeta, acimaDaMeta, metaPropria};
+    }""")
+    assert "f4p-good" in r["naMeta"] and "f4p-bad" not in r["naMeta"]
+    assert "f4p-bad" in r["acimaDaMeta"]
+    assert "f4p-good" in r["metaPropria"] and "f4p-bad" not in r["metaPropria"]
+
+def test_ts_aparece_calculado_no_painel(page):
+    carregar(page, "f4p.xlsx")
+    page.evaluate("()=>{ S.f.team='CORE'; S.f.exec=semestre(TODAY); render(); }")
+    page.click("#f4pTab")
+    assert "Technical Story (meta vs realizado)" in page.inner_text("#f4pBody")
+    assert "f4p-lo" in page.evaluate("f4pTsCell('CORE')")
+
+def test_ts_configuracao_meta_persiste_e_entra_na_exportacao(page):
+    carregar(page, "times.xlsx")
+    page.click("#btnCfg")
+    page.fill('input[data-f4pteam="core"][data-f4pf="tsMeta"]', "8")
+    with page.expect_download() as d:
+        page.click("#cfgExport")
+    txt = open(d.value.path(), encoding="utf-8").read()
+    assert '"tsMeta": 8' in txt
+    page.click("#cfgSave"); page.wait_for_timeout(200)
+    assert page.evaluate("CFG.f4p.teams.core.tsMeta") == 8
+
+def test_ts_meta_zero_e_valida(page):
+    carregar(page, "times.xlsx")
+    page.click("#btnCfg")
+    page.fill('input[data-f4pteam="core"][data-f4pf="tsMeta"]', "0")
+    page.click("#cfgSave"); page.wait_for_timeout(200)
+    assert page.evaluate("CFG.f4p.teams.core") == {"tsMeta": 0}

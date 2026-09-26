@@ -176,7 +176,7 @@ Habilitado com **Time** e **Roadmap** (interno ou executivo) no filtro, igual à
 
 ### 12.1 Janela de datas por semestre (regra geral do Report F4P)
 
-**Vale para qualquer quadrante calculado cuja amostra dependa de uma data de fechamento/saída, exceto quando o próprio quadrante documenta uma janela diferente** — hoje CycleTime e Variabilidade; qualquer quadrante novo que precise de um período deve reaproveitar esta mesma regra (função `f4pWindow` em `src/js/23-report-f4p.js`), não inventar uma variante própria (foi o que causou o bug corrigido pela decisão `0015`), a menos que tenha uma razão de negócio para divergir e documente essa divergência (é o caso do Urgente — ver §12.4 e decisão `0017`). O período depende do semestre escolhido no filtro (Roadmap interno tem prioridade sobre o executivo; `f4pSemesterState`):
+**Vale para qualquer quadrante calculado cuja amostra dependa de uma data de fechamento/saída, exceto quando o próprio quadrante documenta uma janela diferente** — hoje CycleTime e Variabilidade; qualquer quadrante novo que precise de um período deve reaproveitar esta mesma regra (função `f4pWindow` em `src/js/23-report-f4p.js`), não inventar uma variante própria (foi o que causou o bug corrigido pela decisão `0015`), a menos que tenha uma razão de negócio para divergir e documente essa divergência (é o caso de Urgente e Technical Story, cuja meta é "por semestre" — ver §12.4, §12.5 e decisões `0017`/`0018`, função `f4pExactSemesterWindow`). O período depende do semestre escolhido no filtro (Roadmap interno tem prioridade sobre o executivo; `f4pSemesterState`):
 
 | Semestre selecionado | Janela |
 |---|---|
@@ -205,7 +205,7 @@ Gestão da Classe de Serviço **Expedite**. Decisões e limitação de dados: `d
 
 - **Tag Expedite**: qualquer uma das tags cadastradas (`docs/regras-de-negocio.md` §9), escolhida em Configurações › Report F4P (`CFG.f4p.expediteTag`, padrão a tag "URGENTE"). Um item conta se `o.tagHits` inclui essa tag — **de qualquer tipo** (não usa `CFG.f4p.types`, ao contrário de CycleTime e Variabilidade).
 - **Meta**: número inteiro cadastrado por time (`CFG.f4p.teams[time].urgentMeta`), representando o teto de itens Expedite aceitável no semestre. Sem meta cadastrada, a célula mostra "--" e o Realizado fica sem cor de alerta (nem verde, nem vermelho).
-- **Realizado**: usa uma janela **própria** (`f4pUrgentWindow`), diferente da janela geral do §12.1 — o **período exato do semestre selecionado** (1/jan–30/jun ou 1/jul–31/dez), esteja ele em curso ou já encerrado, nunca a janela corrida de N meses. Motivo (decisão `0017`): a janela corrida "vazava" itens fechados ainda dentro do semestre anterior para a contagem do semestre em curso. Sem semestre reconhecido no filtro, cai na janela corrida do §12.1 por segurança. O portal não guarda histórico de quando uma tag foi aplicada (só o estado atual e a data de fechamento), então:
+- **Realizado**: usa uma janela **própria** (`f4pExactSemesterWindow`), diferente da janela geral do §12.1 — o **período exato do semestre selecionado** (1/jan–30/jun ou 1/jul–31/dez), esteja ele em curso ou já encerrado, nunca a janela corrida de N meses. Motivo (decisão `0017`): a janela corrida "vazava" itens fechados ainda dentro do semestre anterior para a contagem do semestre em curso. Sem semestre reconhecido no filtro, cai na janela corrida do §12.1 por segurança. O portal não guarda histórico de quando uma tag foi aplicada (só o estado atual e a data de fechamento), então:
   | Situação do item | Conta no Realizado? |
   |---|---|
   | Aberto (com a tag) | Sempre — não importa há quanto tempo está aberto |
@@ -214,6 +214,17 @@ Gestão da Classe de Serviço **Expedite**. Decisões e limitação de dados: `d
 - **Tendência** (▲ aumentando / ▼ reduzindo / ◆ estável): compara quantos itens com a tag **fecharam** nos últimos 3 meses (a partir de hoje) contra os 3 meses anteriores a esses — sempre essa janela corrida de 6 meses, **independente do semestre selecionado no filtro**. Sem margem de tolerância: qualquer diferença já decide ▲ ou ▼; só empate exato é ◆. A cor da seta é neutra (não segue o vermelho/verde da Meta).
 - **Transparência**: o número do Realizado é clicável e abre a lista dos itens exatos que entraram na contagem (ID, título, situação — aberto ou fechado com a data); cada ID leva direto até o item no quadro (`gotoId`).
 
-### 12.5 Demais quadrantes
+### 12.5 Technical Story (meta vs. realizado)
 
-Eficiência de fluxo, Roadmap–Épicos, Vazão, Technical Story e User Story ainda não têm regra de cálculo definida; aparecem no painel como "em definição", mantendo a mesma grade e as mesmas colunas de time dos quadrantes calculados.
+Mesmo comportamento do Urgente (§12.4), mas conta itens pelo **tipo** do item em vez de uma tag, e a meta tem um padrão numérico em vez de ficar "sem meta". Decisão: `docs/decisoes/0018-report-f4p-quadrante-technical-story.md`.
+
+- **O que conta**: itens cujo tipo é **Technical Story** (`norm(o.type) === "technical story"`) — tipo fixo, não usa `CFG.f4p.types` (que é só de CycleTime/Variabilidade) nem é configurável, ao contrário da tag do Urgente.
+- **Meta**: número inteiro cadastrado por time (`CFG.f4p.teams[time].tsMeta`). **Padrão 6** quando o time não cadastra a própria meta — diferente do Urgente, que fica sem meta (e sem cor) nesse caso.
+- **Realizado**: mesma regra do Urgente — usa `f4pExactSemesterWindow` (período exato do semestre selecionado, em curso ou encerrado); abertos contam sempre, fechados só contam se `o.deploy` cair dentro desse período.
+- Indicador de cor do número: Realizado > Meta → vermelho; Realizado ≤ Meta → verde — sempre colorido (a meta nunca fica em branco).
+- **Sem seta de tendência**: ao contrário do Urgente, este quadrante não tem indicador de tendência.
+- **Transparência**: o número do Realizado é clicável e abre a lista dos itens exatos que entraram na contagem, igual ao Urgente (`gotoId` para navegar até o item).
+
+### 12.6 Demais quadrantes
+
+Eficiência de fluxo, Roadmap–Épicos, Vazão e User Story ainda não têm regra de cálculo definida; aparecem no painel como "em definição", mantendo a mesma grade e as mesmas colunas de time dos quadrantes calculados.

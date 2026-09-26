@@ -1,6 +1,6 @@
 # Report F4P
 
-**Status**: Quadrantes 1 (CycleTime), 2 (Variabilidade) e 3 (Urgente) implementados — ver `docs/regras-de-negocio.md` §12 e `docs/decisoes/0011` a `0014`. **Próxima tarefa: escolher e especificar o próximo quadrante** entre Eficiência de fluxo, Roadmap–Épicos, Vazão, Technical Story ou User Story (seção "Quadrantes seguintes" abaixo) — mesmo processo dos anteriores: propor aqui, confirmar com o usuário, então codar.
+**Status**: Quadrantes 1 (CycleTime), 2 (Variabilidade), 3 (Urgente) e 4 (Technical Story) implementados — ver `docs/regras-de-negocio.md` §12 e `docs/decisoes/0011` a `0018`. **Próxima tarefa: escolher e especificar o próximo quadrante** entre Eficiência de fluxo, Roadmap–Épicos, Vazão ou User Story (seção "Quadrantes seguintes" abaixo) — mesmo processo dos anteriores: propor aqui, confirmar com o usuário, então codar.
 
 Tela "Report F4P" (BUSINESS OUTCOMES – PRODUCTIVITY), inspirada no slide usado pela gestão, com o mesmo comportamento da Visão analítica: **painel lateral recolhível, habilitado só quando o filtro tem um Time e um Roadmap (interno ou executivo)**, e desabilitado se o semestre selecionado ainda não começou (não há dados possíveis). O filtro só habilita o acesso; o relatório mostra **sempre todos os times carregados no momento** (`S.model.teams` — o mesmo conjunto das colunas do quadro; ver decisão `0011`, que optou por isso em vez dos times da tela de Configurações, pois esta última exclui os times dos dados de exemplo).
 
@@ -42,6 +42,19 @@ Por time: `[Meta] | [Realizado] [Tendência]`
 - Indicador de cor do Realizado: acima da meta → vermelho; na meta ou abaixo → verde.
 - **Transparência** (decisão `0016`): o número do Realizado é clicável e abre a lista dos itens exatos contados (ID, título, aberto/fechado), cada um levando direto até o item no quadro.
 
+## Quadrante 4 · TECHNICAL STORY (META VS REALIZADO) — implementado
+
+Mesmo comportamento do Quadrante 3 (Urgente), com duas diferenças de negócio. Decisão: `docs/decisoes/0018-report-f4p-quadrante-technical-story.md`. Regra completa: `docs/regras-de-negocio.md` §12.5.
+
+Por time: `[Meta] | [Realizado]`
+
+- **O que conta**: itens do **tipo Technical Story** — tipo fixo (não configurável, ao contrário dos tipos de CycleTime/Variabilidade), em vez de uma tag.
+- **Meta**: teto de itens Technical Story no semestre, configurável por time; **padrão 6** quando o time não cadastra a própria (diferente do Urgente, que fica sem meta).
+- **Realizado**: mesma janela do Urgente (`f4pExactSemesterWindow`, decisões `0017`/`0018`) — abertos contam sempre; fechados só contam se fecharam dentro do período exato do semestre selecionado.
+- Indicador de cor do Realizado: acima da meta → vermelho; na meta ou abaixo → verde. Sempre colorido (a meta nunca fica "sem valor").
+- Sem seta de tendência (o usuário não pediu uma para este quadrante).
+- **Transparência**: o número do Realizado é clicável e abre a lista dos itens exatos contados, igual ao Urgente.
+
 ## Decisões adotadas (implementadas)
 
 - Amostra CycleTime/Variabilidade: itens **concluídos** (com data de saída do CT) dos tipos configurados, de **todos** os itens do time (não filtrada por qual épico/iniciativa está no roadmap selecionado). **O período, porém, acompanha o semestre selecionado no filtro** (decisão `0013`, revisão do que este documento propunha originalmente): semestre em curso → últimos N meses a partir de hoje (janela corrida); semestre já encerrado → só as datas de saída dentro daquele semestre; semestre futuro → painel desabilitado (não há dados possíveis).
@@ -50,22 +63,23 @@ Por time: `[Meta] | [Realizado] [Tendência]`
 - P50 = 0 (ou amostra vazia) → variabilidade "--". O tamanho da amostra (n) e o P50 ficam no texto de apoio (`title`) da célula, não sempre visíveis.
 - Ilustrações: as imagens reais do slide de referência (fornecidas pelo usuário), embutidas em base64 no build — não os SVGs originais cogitados inicialmente (decisão `0012`).
 - Urgente: definição por tag configurável (não fixa em "URGENTE"), realizado sempre limitado ao período exato do semestre selecionado (abertos sempre contam; fechados só dentro do período), tendência por trimestres e cores conforme decisões `0014`, `0015` e `0017`.
+- Technical Story: mesmo comportamento do Urgente, contando pelo tipo do item em vez de uma tag e com meta padrão 6 (não fica "sem meta"); sem tendência. A janela por período exato do semestre foi generalizada de `f4pUrgentWindow` para `f4pExactSemesterWindow`, reaproveitada pelos dois quadrantes (decisão `0018`).
 
 ## Configuração implementada (seção "Report F4P" na tela de Configurações)
 
 - Período do P95/P50 em meses (padrão 6) e tipos (padrão User Story e Technical Story) — valem só para CycleTime/Variabilidade.
 - Tag da Classe de Serviço Expedite (padrão "URGENTE") — usada pelo quadrante Urgente.
-- Por time: variabilidade mínima (1.5) e máxima (3.5), com validação MIN < MAX; e meta de Urgente (inteiro ≥ 0, opcional, independente da variabilidade).
+- Por time: variabilidade mínima (1.5) e máxima (3.5), com validação MIN < MAX; meta de Urgente (inteiro ≥ 0, opcional, independente da variabilidade); e meta de Technical Story (inteiro ≥ 0, opcional, padrão efetivo 6).
 
 ## Quadrantes seguintes (regras ainda em definição)
 
-Eficiência de fluxo (MIN vs ATUAL vs MAX, meta mínima 30%), Roadmap – épicos (reserva vs roadmap entregue vs atual), Vazão (reserva vs realizado), Technical Story (meta vs realizado), User Story (planejado vs não planejado).
+Eficiência de fluxo (MIN vs ATUAL vs MAX, meta mínima 30%), Roadmap – épicos (reserva vs roadmap entregue vs atual), Vazão (reserva vs realizado), User Story (planejado vs não planejado).
 
 ## Referências no código
 
-- Painel: `src/js/23-report-f4p.js` (`f4pEnabled`, `renderF4P`, `openF4P`, `placeF4P`, `f4pSemesterState`, `f4pSample`, `f4pMetrics`, `f4pExpediteOps`, `f4pUrgentRealizado`, `f4pUrgentTrend`, `f4pUrgentCell`), aba `#f4pTab` (dentro de `.side-tabs`) e painel `#f4pPanel` em `src/index.html`.
+- Painel: `src/js/23-report-f4p.js` (`f4pEnabled`, `renderF4P`, `openF4P`, `placeF4P`, `f4pSemesterState`, `f4pSample`, `f4pMetrics`, `f4pExpediteOps`, `f4pTsOps`, `f4pExactSemesterWindow`, `f4pUrgentRealizado`, `f4pUrgentTrend`, `f4pUrgentCell`, `f4pTsRealizado`, `f4pTsCell`), aba `#f4pTab` (dentro de `.side-tabs`) e painel `#f4pPanel` em `src/index.html`.
 - Ilustrações: `src/assets/f4p/*.png`, embutidas como `F4P_ASSETS` (base64) por `scripts/build.mjs`.
-- CT de cada item: `o.ct`, `o.ready`, `o.deploy` (calculados por `recomputeCt` conforme o fluxo do time, em `src/js/01-configuracao-e-regras.js`). Limites: `limitsOf(time)`; faixa de variabilidade: `f4pRangeOf(time)`; meta de Urgente: `f4pUrgentMetaOf(time)`; tag Expedite: `f4pExpediteTag()`.
+- CT de cada item: `o.ct`, `o.ready`, `o.deploy` (calculados por `recomputeCt` conforme o fluxo do time, em `src/js/01-configuracao-e-regras.js`). Limites: `limitsOf(time)`; faixa de variabilidade: `f4pRangeOf(time)`; meta de Urgente: `f4pUrgentMetaOf(time)`; tag Expedite: `f4pExpediteTag()`; meta de Technical Story: `f4pTsMetaOf(time)`.
 - Testes: `tests/test_report_f4p.py`; fixture com CTs conhecidos: `tests/gerar_fixtures.py::f4p`.
 
 ## Critérios de aceite
@@ -75,3 +89,4 @@ Eficiência de fluxo (MIN vs ATUAL vs MAX, meta mínima 30%), Roadmap – épico
 - [x] P95/P50 conferidos contra um cálculo independente nos testes (fixture com CTs conhecidos), inclusive com a amostra ancorada num semestre já encerrado.
 - [x] Configurações novas validadas (MIN < MAX; meta de Urgente independente) e persistidas; exportação/importação incluem os novos campos.
 - [x] Urgente conta só itens com a tag configurada, de qualquer tipo; realizado ao vivo no semestre em curso e por fechamento no semestre encerrado; tendência por trimestres testada com casos de alta, queda e estabilidade.
+- [x] Technical Story conta só itens desse tipo; realizado com a mesma janela por período exato do semestre do Urgente; meta com padrão 6 testada com e sem valor próprio por time; clique no número abre a lista e navega até o item.

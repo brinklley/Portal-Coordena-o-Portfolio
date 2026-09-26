@@ -37,19 +37,20 @@ function cfgForm(err){
       <label title="Use quando o semestre operacional termina antes do último dia do calendário (ex.: congelamento de fim de ano)">Dias antes do fim do semestre<input type="number" min="0" id="cfgAnFreeze" value="${d.anFreeze || 0}" style="width:120px"></label>
     </div>
     <h4>Report F4P</h4>
-    <p class="help">Painel Report F4P (aba à esquerda, junto com a Visão analítica): mostra sempre todos os times carregados. O quadrante <b>CycleTime</b> usa o CT máximo por time (tabela “Alertas por time” acima); os campos abaixo valem para a amostra do P95/P50, para a faixa esperada de <b>Variabilidade</b> (P95 ÷ P50) e para a <b>Meta de Urgente</b> de cada time. Sem valor por time, Variabilidade usa o padrão 1.5–3.5 e Urgente fica sem meta (sem cor de alerta).</p>
+    <p class="help">Painel Report F4P (aba à esquerda, junto com a Visão analítica): mostra sempre todos os times carregados. O quadrante <b>CycleTime</b> usa o CT máximo por time (tabela “Alertas por time” acima); os campos abaixo valem para a amostra do P95/P50, para a faixa esperada de <b>Variabilidade</b> (P95 ÷ P50) e para a meta de <b>Urgente</b> e de <b>Technical Story</b> de cada time. Sem valor por time, Variabilidade usa o padrão 1.5–3.5, Urgente fica sem meta (sem cor de alerta) e Technical Story usa o padrão 6.</p>
     <div class="grid3">
       <label>Período do P95/P50 (meses)<input type="number" min="1" id="cfgF4pMonths" value="${d.f4p.months}" style="width:100px"></label>
       <label>Tag da Classe de Serviço Expedite (quadrante Urgente)<select id="cfgF4pExpedite" style="width:200px">${(d.tags || []).map(tg => `<option value="${esc(tg.id)}" ${tg.id === (d.f4p.expediteTag || "urgent") ? "selected" : ""}>${esc(tg.name)}</option>`).join("") || `<option value="">Nenhuma tag cadastrada</option>`}</select></label>
     </div>
     <div class="typelist">${typesFound().map(([ty, n]) => `<label><input type="checkbox" data-f4ptype="${esc(norm(ty))}" ${(d.f4p.types || []).includes(norm(ty)) ? "checked" : ""}> ${esc(ty)} <span class="muted">${n}</span></label>`).join("") || `<span class="muted">Carregue uma planilha para ver os tipos.</span>`}</div>
     <p class="help">Os tipos acima valem só para CycleTime e Variabilidade. O quadrante Urgente conta itens da tag Expedite acima de <b>qualquer</b> tipo.</p>
-    <table class="ctab" ${teams.length ? "" : "hidden"}><thead><tr><th>Time</th><th>Variabilidade mínima</th><th>Variabilidade máxima</th><th>Meta de Urgente (Expedite) no semestre</th></tr></thead><tbody>
+    <table class="ctab" ${teams.length ? "" : "hidden"}><thead><tr><th>Time</th><th>Variabilidade mínima</th><th>Variabilidade máxima</th><th>Meta de Urgente (Expedite) no semestre</th><th>Meta de Technical Story no semestre</th></tr></thead><tbody>
     ${teams.map(tm => { const k = norm(tm), v = d.f4p.teams[k] || {};
       return `<tr><td>${esc(tm)}</td>
         <td><input type="number" min="0.1" step="0.1" data-f4pteam="${esc(k)}" data-f4pf="min" value="${v.min ?? ""}" placeholder="1,5" aria-label="Variabilidade mínima de ${esc(tm)}"></td>
         <td><input type="number" min="0.1" step="0.1" data-f4pteam="${esc(k)}" data-f4pf="max" value="${v.max ?? ""}" placeholder="3,5" aria-label="Variabilidade máxima de ${esc(tm)}"></td>
-        <td><input type="number" min="0" step="1" data-f4pteam="${esc(k)}" data-f4pf="urgentMeta" value="${v.urgentMeta ?? ""}" placeholder="sem meta" aria-label="Meta de Urgente de ${esc(tm)}"></td></tr>`; }).join("") || `<tr><td colspan="4" class="muted">Carregue uma planilha para ver os times.</td></tr>`}
+        <td><input type="number" min="0" step="1" data-f4pteam="${esc(k)}" data-f4pf="urgentMeta" value="${v.urgentMeta ?? ""}" placeholder="sem meta" aria-label="Meta de Urgente de ${esc(tm)}"></td>
+        <td><input type="number" min="0" step="1" data-f4pteam="${esc(k)}" data-f4pf="tsMeta" value="${v.tsMeta ?? ""}" placeholder="6" aria-label="Meta de Technical Story de ${esc(tm)}"></td></tr>`; }).join("") || `<tr><td colspan="5" class="muted">Carregue uma planilha para ver os times.</td></tr>`}
     </tbody></table>
     <h4>Tipos considerados no CT do épico</h4>
     <p class="help">O CycleTime mostrado nos cards de épico usa só os itens dos tipos marcados. Os alertas de cada item continuam valendo para todos os tipos.</p>
@@ -108,7 +109,7 @@ function readForm(){
   const f4pRows = {};
   $("cfgBody").querySelectorAll("input[data-f4pteam]").forEach(inp => {
     const k = inp.dataset.f4pteam, f = inp.dataset.f4pf, raw = parseFloat(inp.value.replace(",", "."));
-    (f4pRows[k] ||= {})[f] = f === "urgentMeta" ? (raw >= 0 ? raw : undefined) : (raw > 0 ? raw : undefined);
+    (f4pRows[k] ||= {})[f] = (f === "urgentMeta" || f === "tsMeta") ? (raw >= 0 ? raw : undefined) : (raw > 0 ? raw : undefined);
   });
   d.f4p.teams = {};
   Object.entries(f4pRows).forEach(([k, r]) => {
@@ -120,6 +121,7 @@ function readForm(){
       else { entry.min = r.min; entry.max = r.max; }
     }
     if (r.urgentMeta !== undefined) entry.urgentMeta = r.urgentMeta;
+    if (r.tsMeta !== undefined) entry.tsMeta = r.tsMeta;
     if (Object.keys(entry).length) d.f4p.teams[k] = entry;
   });
   $("cfgBody").querySelectorAll("input[data-tc-lvl]").forEach(i => {
