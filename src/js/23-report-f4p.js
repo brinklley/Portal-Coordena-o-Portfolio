@@ -145,11 +145,23 @@ function f4pVazaoReservaItems(team, st){
   const tag = f4pCapacityTag();
   return f4pVazaoOps(team, st).filter(o => (o.tags || []).map(norm).includes(tag));
 }
+/* itens do time (dos tipos configurados, mesmo filtro do Vazão) atualmente na categoria de fluxo WIP —
+   contagem "ao vivo", sem filtro de período (WIP não tem uma data de saída pra filtrar por semestre;
+   é o instantâneo de agora). Usada pela tendência (decisão 0023): itens em WIP são trabalho a caminho
+   de virar Vazão em breve, então entram a favor da tendência mesmo antes de serem entregues. */
+function f4pVazaoWipCount(team){
+  const types = f4pTypes();
+  return [...S.model.ops.values()].filter(o => o.team === team && o.type && types.has(norm(o.type)) && catOf(o) === "wip").length;
+}
 /* Tendência: separa o Realizado por mês corrido dentro do período do semestre (só os meses já
    decorridos, se o semestre estiver em curso — meses futuros não têm itens possíveis, então ficam de
    fora do cálculo em vez de contarem como zero, o que enviesaria a tendência para "piora" logo no
-   início de um semestre novo) e compara o último mês contra a média dos meses anteriores do mesmo
-   período: mais que a média → ▲, menos → ▼, igual (ou sem meses anteriores para comparar) → ◆. */
+   início de um semestre novo) e compara o mês corrente (ou o último mês do semestre, se já encerrado)
+   contra a média dos meses anteriores do mesmo período, arredondada sempre para cima. Diferente de uma
+   comparação simples, o mês corrente entra na conta somado aos itens **hoje** em WIP (decisão 0023) —
+   eles ainda não viraram Vazão, mas sinalizam entrega a caminho, então contam a favor da tendência:
+   mês corrente + WIP > média → melhora (▲); < média → piora (▼); igual → estável (◆). Sem meses
+   anteriores para comparar (semestre com um único mês decorrido), fica ◆. */
 function f4pVazaoTrend(team, st){
   st = st || f4pSemesterState();
   const {from, to} = f4pExactSemesterWindow(st);
@@ -161,12 +173,13 @@ function f4pVazaoTrend(team, st){
     const idx = (o.deploy.getFullYear() - from.getFullYear()) * 12 + (o.deploy.getMonth() - from.getMonth());
     if (idx >= 0 && idx < nMonths) counts[idx]++;
   });
-  const last = counts[nMonths - 1], prevAvg = counts.slice(0, -1).reduce((a, b) => a + b, 0) / (nMonths - 1);
-  return last > prevAvg ? "▲" : last < prevAvg ? "▼" : "◆";
+  const atual = counts[nMonths - 1] + f4pVazaoWipCount(team);
+  const mediaAnteriores = Math.ceil(counts.slice(0, -1).reduce((a, b) => a + b, 0) / (nMonths - 1));
+  return atual > mediaAnteriores ? "▲" : atual < mediaAnteriores ? "▼" : "◆";
 }
 function f4pVazaoCell(team){
   const st = f4pSemesterState(), reserva = f4pVazaoReservaItems(team, st), realizado = f4pVazaoRealizadoItems(team, st), trend = f4pVazaoTrend(team, st);
-  const tip = `Reserva: itens com a tag ${CFG.anTag || "ROADMAP"} · Realizado: itens dos tipos ${(CFG.f4p.types || []).join(", ") || "nenhum tipo marcado"} entregues (Vazão) em ${f4pExactSemesterLabel(st)} · tendência: último mês vs. média dos meses anteriores do período · clique nos números para ver os itens`;
+  const tip = `Reserva: itens com a tag ${CFG.anTag || "ROADMAP"} · Realizado: itens dos tipos ${(CFG.f4p.types || []).join(", ") || "nenhum tipo marcado"} entregues (Vazão) em ${f4pExactSemesterLabel(st)} · tendência: mês corrente + itens em WIP vs. média (arredondada pra cima) dos meses anteriores do período · clique nos números para ver os itens`;
   return `<span title="${esc(tip)}"><button type="button" class="f4p-real" data-f4p-vazao-reserva-team="${esc(team)}">${reserva.length}</button><span class="f4p-sep">|</span><button type="button" class="f4p-real" data-f4p-vazao-realizado-team="${esc(team)}">${realizado.length}</button> <span class="f4p-trend">${trend}</span></span>`;
 }
 /* Tendência: itens Expedite fechados nos últimos 3 meses vs. nos 3 meses antes desses — sempre a

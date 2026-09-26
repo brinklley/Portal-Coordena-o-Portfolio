@@ -581,6 +581,82 @@ def test_vazao_tendencia_sem_meses_anteriores_fica_neutra(page):
     }""")
     assert r == "◆"
 
+# Decisão 0023: a tendência passou a somar os itens hoje em WIP ao mês corrente (trabalho a caminho de
+# virar Vazão), e a média dos meses anteriores arredonda sempre para cima. Os três casos abaixo são os
+# exemplos exatos dados pelo usuário para especificar a regra.
+
+def test_vazao_tendencia_soma_wip_ao_mes_atual_exemplo_melhora(page):
+    """Média 1, mês atual 0, 3 itens em WIP: 0+3=3 > 1 → melhora."""
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.teamFlow.F4P_VZT1 = ["Backlog", "WIP", "Vazao"];
+      CFG.flow.f4p_vzt1 = {cat:{wip:"wip", vazao:"vazao"}, ct:[]};
+      const st = {kind:"current", start:new Date(TODAY.getFullYear(), TODAY.getMonth() - 1, 1), end:new Date(TODAY.getFullYear(), TODAY.getMonth() + 6, 0)};
+      const mesAnterior = new Date(TODAY.getFullYear(), TODAY.getMonth() - 1, 15);
+      S.model.ops.set("v1", {team:"F4P_VZT1", type:"User Story", stName:"Vazao", deploy:mesAnterior, tags:[]});   // média = 1
+      for (let i = 0; i < 3; i++) S.model.ops.set("w"+i, {team:"F4P_VZT1", type:"User Story", stName:"WIP", deploy:null, tags:[]});
+      return f4pVazaoTrend("F4P_VZT1", st);
+    }""")
+    assert r == "▲"
+
+def test_vazao_tendencia_soma_wip_ao_mes_atual_exemplo_piora(page):
+    """Média 2, mês atual 0, 1 item em WIP: 0+1=1 < 2 → piora."""
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.teamFlow.F4P_VZT2 = ["Backlog", "WIP", "Vazao"];
+      CFG.flow.f4p_vzt2 = {cat:{wip:"wip", vazao:"vazao"}, ct:[]};
+      const st = {kind:"current", start:new Date(TODAY.getFullYear(), TODAY.getMonth() - 1, 1), end:new Date(TODAY.getFullYear(), TODAY.getMonth() + 6, 0)};
+      const mesAnterior = new Date(TODAY.getFullYear(), TODAY.getMonth() - 1, 10);
+      for (let i = 0; i < 2; i++) S.model.ops.set("v"+i, {team:"F4P_VZT2", type:"User Story", stName:"Vazao", deploy:mesAnterior, tags:[]});   // média = 2
+      S.model.ops.set("w0", {team:"F4P_VZT2", type:"User Story", stName:"WIP", deploy:null, tags:[]});
+      return f4pVazaoTrend("F4P_VZT2", st);
+    }""")
+    assert r == "▼"
+
+def test_vazao_tendencia_soma_wip_ao_mes_atual_exemplo_estavel(page):
+    """Média 3, mês atual 2, 1 item em WIP: 2+1=3 == 3 → estável."""
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.teamFlow.F4P_VZT3 = ["Backlog", "WIP", "Vazao"];
+      CFG.flow.f4p_vzt3 = {cat:{wip:"wip", vazao:"vazao"}, ct:[]};
+      const st = {kind:"current", start:new Date(TODAY.getFullYear(), TODAY.getMonth() - 1, 1), end:new Date(TODAY.getFullYear(), TODAY.getMonth() + 6, 0)};
+      const mesAnterior = new Date(TODAY.getFullYear(), TODAY.getMonth() - 1, 10), mesAtual = new Date(TODAY.getFullYear(), TODAY.getMonth(), 1);
+      for (let i = 0; i < 3; i++) S.model.ops.set("v"+i, {team:"F4P_VZT3", type:"User Story", stName:"Vazao", deploy:mesAnterior, tags:[]});    // média = 3
+      for (let i = 0; i < 2; i++) S.model.ops.set("c"+i, {team:"F4P_VZT3", type:"User Story", stName:"Vazao", deploy:mesAtual, tags:[]});      // mês atual = 2
+      S.model.ops.set("w0", {team:"F4P_VZT3", type:"User Story", stName:"WIP", deploy:null, tags:[]});
+      return f4pVazaoTrend("F4P_VZT3", st);
+    }""")
+    assert r == "◆"
+
+def test_vazao_tendencia_media_arredonda_sempre_pra_cima(page):
+    """Meses anteriores com 1 e 2 itens (média bruta 1,5): arredondada pra cima vira 2. Mês atual com 2
+    itens e nenhum WIP fica igual à média arredondada (estável) — sem o arredondamento, seria "melhora"
+    (2 > 1,5)."""
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.teamFlow.F4P_VZT4 = ["Backlog", "WIP", "Vazao"];
+      CFG.flow.f4p_vzt4 = {cat:{wip:"wip", vazao:"vazao"}, ct:[]};
+      const st = {kind:"current", start:new Date(TODAY.getFullYear(), TODAY.getMonth() - 2, 1), end:new Date(TODAY.getFullYear(), TODAY.getMonth() + 6, 0)};
+      const m2 = new Date(TODAY.getFullYear(), TODAY.getMonth() - 2, 10), m1 = new Date(TODAY.getFullYear(), TODAY.getMonth() - 1, 10), m0 = new Date(TODAY.getFullYear(), TODAY.getMonth(), 1);
+      S.model.ops.set("a", {team:"F4P_VZT4", type:"User Story", stName:"Vazao", deploy:m2, tags:[]});
+      for (let i = 0; i < 2; i++) S.model.ops.set("b"+i, {team:"F4P_VZT4", type:"User Story", stName:"Vazao", deploy:m1, tags:[]});
+      for (let i = 0; i < 2; i++) S.model.ops.set("c"+i, {team:"F4P_VZT4", type:"User Story", stName:"Vazao", deploy:m0, tags:[]});
+      return f4pVazaoTrend("F4P_VZT4", st);
+    }""")
+    assert r == "◆"
+
+def test_vazao_wip_conta_so_tipos_configurados_do_time(page):
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.teamFlow.F4P_VZT5 = ["Backlog", "WIP", "Vazao"];
+      CFG.flow.f4p_vzt5 = {cat:{wip:"wip", vazao:"vazao"}, ct:[]};
+      S.model.ops.set("w1", {team:"F4P_VZT5", type:"User Story", stName:"WIP", deploy:null, tags:[]});
+      S.model.ops.set("w2", {team:"F4P_VZT5", type:"Internal Bug", stName:"WIP", deploy:null, tags:[]});   // tipo não configurado: não conta
+      S.model.ops.set("w3", {team:"F4P_VZT5_OUTRO", type:"User Story", stName:"WIP", deploy:null, tags:[]});   // outro time: não conta
+      return f4pVazaoWipCount("F4P_VZT5");
+    }""")
+    assert r == 1
+
 def test_vazao_clique_no_realizado_abre_lista_e_permite_navegar(page):
     carregar(page, "f4p.xlsx")
     alvo_id = page.evaluate("""()=>{
