@@ -133,31 +133,34 @@ def test_urgente_conta_so_itens_com_a_tag_configurada(page):
     assert n == 1
 
 def test_urgente_semestre_atual_conta_abertos_e_fechados(page):
+    """Semestre em curso: aberto conta sempre; fechado conta se fechou dentro do período exato do
+    semestre selecionado (f4pUrgentWindow, decisão 0017)."""
     carregar(page, "f4p.xlsx")
     n = page.evaluate("""()=>{
+      S.f.exec = semestre(TODAY);
+      const inicioDoSemestre = f4pSemesterState().start;
       S.model.ops.set("u1", {team:"F4P_URG2", type:"Bug", tagHits:[{id:"urgent"}], deploy:null});
-      S.model.ops.set("u2", {team:"F4P_URG2", type:"Bug", tagHits:[{id:"urgent"}], deploy:TODAY});
-      return f4pUrgentRealizado("F4P_URG2", {kind:"current"});
+      S.model.ops.set("u2", {team:"F4P_URG2", type:"Bug", tagHits:[{id:"urgent"}], deploy:new Date(inicioDoSemestre.getTime() + 5 * 864e5)});
+      return f4pUrgentRealizado("F4P_URG2", f4pSemesterState());
     }""")
     assert n == 2
 
-def test_urgente_semestre_atual_ignora_fechados_fora_da_janela_de_meses(page):
+def test_urgente_semestre_atual_ignora_fechados_antes_do_inicio_do_semestre(page):
     """Regressão relatada pelo usuário: a contagem estava somando todo item que já teve a tag em
-    qualquer momento da história do time (ex.: 249 itens num time que usa a tag raramente), porque o
-    Realizado do semestre em curso não tinha corte de data para itens já fechados. A janela correta é a
-    mesma regra geral do Report F4P (f4pWindow/decisão 0013): últimos CFG.f4p.months meses corridos a
-    partir de hoje — a mesma que CycleTime/Variabilidade já usavam, não uma nova âncora no início do
-    semestre (decisão 0015)."""
+    qualquer momento da história do time (ex.: 249 itens num time que usa a tag raramente). A janela
+    corrigida (decisão 0017) não é mais os últimos N meses a partir de hoje — é o período exato do
+    semestre selecionado: um item fechado antes do primeiro dia do semestre em curso não conta, mesmo
+    estando dentro da janela rolante de N meses que CycleTime/Variabilidade usam."""
     carregar(page, "f4p.xlsx")
     r = page.evaluate("""()=>{
       S.f.exec = semestre(TODAY);
-      const meses = CFG.f4p.months || 6;
-      const foraDaJanela = new Date(TODAY.getFullYear(), TODAY.getMonth() - meses - 1, 15);   // antes da janela de N meses
-      const dentroDaJanela = new Date(TODAY.getFullYear(), TODAY.getMonth() - 1, 15);          // dentro da janela de N meses
-      S.model.ops.set("v1", {team:"F4P_URG4", tagHits:[{id:"urgent"}], deploy:foraDaJanela});   // fechado fora da janela: não conta
-      S.model.ops.set("v2", {team:"F4P_URG4", tagHits:[{id:"urgent"}], deploy:dentroDaJanela}); // fechado dentro da janela: conta
+      const inicioDoSemestre = f4pSemesterState().start;
+      const antesDoSemestre = new Date(inicioDoSemestre.getTime() - 864e5);    // véspera do início do semestre: não conta
+      const depoisDoInicio = new Date(inicioDoSemestre.getTime() + 5 * 864e5); // dentro do semestre: conta
+      S.model.ops.set("v1", {team:"F4P_URG4", tagHits:[{id:"urgent"}], deploy:antesDoSemestre});
+      S.model.ops.set("v2", {team:"F4P_URG4", tagHits:[{id:"urgent"}], deploy:depoisDoInicio});
       S.model.ops.set("v3", {team:"F4P_URG4", tagHits:[{id:"urgent"}], deploy:null});           // aberto há qualquer tempo: conta
-      return f4pUrgentRealizado("F4P_URG4");
+      return f4pUrgentRealizado("F4P_URG4", f4pSemesterState());
     }""")
     assert r == 2
 
@@ -169,6 +172,7 @@ def test_urgente_clique_no_numero_abre_lista_e_permite_navegar(page):
       S.f.team='CORE'; S.f.exec=semestre(TODAY);
       const alvo = [...S.model.ops.values()].find(o=>o.team==='CORE');
       alvo.tagHits = [...(alvo.tagHits||[]), CFG.tags.find(t=>t.id==='urgent')];
+      alvo.deploy = new Date(f4pSemesterState().start.getTime() + 5 * 864e5);   // garante que cai dentro do semestre atual
       render();
       return alvo.id;
     }""")

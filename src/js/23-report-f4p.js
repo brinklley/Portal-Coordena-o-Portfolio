@@ -83,15 +83,28 @@ function f4pExpediteOps(team){
   const tag = f4pExpediteTag();
   return [...S.model.ops.values()].filter(o => o.team === team && (o.tagHits || []).some(t => t.id === tag));
 }
+/* Diferente de f4pWindow (CycleTime/Variabilidade, janela rolante de N meses no semestre em curso), o
+   Urgente usa sempre o período EXATO do semestre selecionado — 1/jan a 30/jun ou 1/jul a 31/dez —, esteja
+   ele em curso ou já encerrado. Decisão do usuário depois de ver a janela rolante "vazar" itens fechados
+   ainda no semestre anterior ao contar os últimos 6 meses a partir de hoje (docs/decisoes/0017). Sem
+   semestre reconhecido no filtro, cai na janela rolante de f4pWindow por segurança (mesmo padrão do
+   resto do Report F4P nesse caso extremo). */
+function f4pUrgentWindow(st){
+  st = st || f4pSemesterState();
+  return (st.start && st.end) ? {from: st.start, to: st.end} : f4pWindow(st);
+}
+function f4pUrgentPeriodLabel(st){
+  const {from, to} = f4pUrgentWindow(st);
+  return `${fmtL(from)} a ${fmtL(to)}`;
+}
 /* Itens que entram no Realizado: abertos com a tag contam sempre (não importa desde quando — ainda
-   estão em aberto, logo ainda são risco agora). Fechados só contam dentro da mesma janela de f4pWindow
-   (a regra geral do Report F4P: últimos N meses corridos no semestre em curso, período exato no já
-   encerrado) — sem isso, a contagem somaria todo item que já teve a tag em qualquer momento da história
-   do time, não só a deste período (o portal não guarda histórico de quando a tag foi aplicada, só a
-   data de fechamento). Função separada da contagem para dar suporte ao "ver os itens" (clique no número). */
+   estão em aberto, logo ainda são risco agora). Fechados só contam dentro de f4pUrgentWindow — sem isso,
+   a contagem somaria todo item que já teve a tag em qualquer momento da história do time, não só a deste
+   período (o portal não guarda histórico de quando a tag foi aplicada, só a data de fechamento). Função
+   separada da contagem para dar suporte ao "ver os itens" (clique no número). */
 function f4pUrgentItems(team, st){
   st = st || f4pSemesterState();
-  const ops = f4pExpediteOps(team), {from, to} = f4pWindow(st);
+  const ops = f4pExpediteOps(team), {from, to} = f4pUrgentWindow(st);
   return ops.filter(o => (st.kind !== "past" && !o.deploy) || (o.deploy && o.deploy >= from && o.deploy <= to));
 }
 function f4pUrgentRealizado(team, st){ return f4pUrgentItems(team, st).length; }
@@ -109,7 +122,7 @@ function f4pUrgentTrend(team){
 function f4pUrgentCell(team){
   const st = f4pSemesterState(), meta = f4pUrgentMetaOf(team), items = f4pUrgentItems(team, st), realizado = items.length, trend = f4pUrgentTrend(team);
   const cls = meta == null ? "" : realizado > meta ? "f4p-bad" : "f4p-good";
-  const tip = `Tag: ${f4pTagName(f4pExpediteTag())} · itens abertos (qualquer data) + fechados em ${f4pPeriodLabel(st)} · tendência: fechados nos últimos 3 meses vs. nos 3 meses anteriores${meta == null ? " · time sem meta cadastrada" : ""} · clique no número para ver os itens`;
+  const tip = `Tag: ${f4pTagName(f4pExpediteTag())} · itens abertos (qualquer data) + fechados em ${f4pUrgentPeriodLabel(st)} · tendência: fechados nos últimos 3 meses vs. nos 3 meses anteriores${meta == null ? " · time sem meta cadastrada" : ""} · clique no número para ver os itens`;
   return `<span title="${esc(tip)}"><span class="f4p-lo">${meta ?? "--"}</span><span class="f4p-sep">|</span><button type="button" class="f4p-real ${cls}" data-f4p-urgent-team="${esc(team)}">${realizado}</button> <span class="f4p-trend">${trend}</span></span>`;
 }
 /* modal com a lista dos itens que compõem o Realizado (abre ao clicar no número) */
@@ -134,7 +147,7 @@ $("f4pBody").addEventListener("click", e => {
   const btn = e.target.closest("[data-f4p-urgent-team]");
   if (!btn) return;
   const team = btn.dataset.f4pUrgentTeam, st = f4pSemesterState();
-  f4pItemsModal(`Urgente · ${team} · ${f4pPeriodLabel(st)}`, f4pUrgentItems(team, st));
+  f4pItemsModal(`Urgente · ${team} · ${f4pUrgentPeriodLabel(st)}`, f4pUrgentItems(team, st));
 });
 const F4P_CELL = {var: f4pVarCell, ct: f4pCtCell, urg: f4pUrgentCell};
 function f4pCard(id, teams){
@@ -171,7 +184,7 @@ function renderF4P(){
       <div class="f4p-col">${left.map(g => f4pGroup(g, teams)).join("")}</div>
       <div class="f4p-col">${right.map(g => f4pGroup(g, teams)).join("")}</div>
     </div>
-    <div class="an-note">Mostra sempre todos os times carregados (${esc(teams.join(", "))}), mesmo com um time diferente selecionado no filtro — o filtro só habilita o acesso a este painel. CycleTime e Variabilidade usam itens dos tipos ${esc((CFG.f4p.types || []).join(", ") || "nenhum tipo marcado")} concluídos no período: <b>${esc(f4pPeriodLabel(st))}</b>${st.kind === "past" ? " (semestre selecionado, já encerrado)" : " (semestre selecionado ainda em curso, ou não reconhecido — usa a janela corrida)"}. Urgente conta itens com a tag <b>${esc(f4pTagName(f4pExpediteTag()))}</b>, de qualquer tipo: os ainda abertos contam sempre, e os fechados só se fecharam dentro do mesmo período acima (sem histórico de tag, não dá pra saber quem estava marcado antes disso). Os demais quadrantes aguardam a definição da regra de cálculo.</div>`;
+    <div class="an-note">Mostra sempre todos os times carregados (${esc(teams.join(", "))}), mesmo com um time diferente selecionado no filtro — o filtro só habilita o acesso a este painel. CycleTime e Variabilidade usam itens dos tipos ${esc((CFG.f4p.types || []).join(", ") || "nenhum tipo marcado")} concluídos no período: <b>${esc(f4pPeriodLabel(st))}</b>${st.kind === "past" ? " (semestre selecionado, já encerrado)" : " (semestre selecionado ainda em curso, ou não reconhecido — usa a janela corrida)"}. Urgente conta itens com a tag <b>${esc(f4pTagName(f4pExpediteTag()))}</b>, de qualquer tipo: os ainda abertos contam sempre, e os fechados só se fecharam dentro do período exato do semestre selecionado (<b>${esc(f4pUrgentPeriodLabel(st))}</b>) — sem histórico de tag, não dá pra saber quem estava marcado antes disso. Os demais quadrantes aguardam a definição da regra de cálculo.</div>`;
 }
 function placeF4P(){ const h = document.querySelector(".top").offsetHeight; $("f4pPanel").style.top = h + "px"; $("f4pPanel").style.height = `calc(100% - ${h}px)`; }
 function openF4P(){ if (!f4pEnabled()) return; if (AN.open) closeAnalytics(); F4P.open = true; placeF4P(); $("f4pPanel").classList.add("open"); $("f4pPanel").setAttribute("aria-hidden","false"); $("f4pTab").setAttribute("aria-expanded","true"); renderF4P(); $("f4pClose").focus(); }

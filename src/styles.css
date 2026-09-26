@@ -444,6 +444,11 @@ tr[data-cat="disc"] .fnb{background:var(--c-disc);color:#fff} tr[data-cat="wip"]
 .f4p-trend{color:var(--ink-3);font-weight:600}
 .f4p-real{all:unset;cursor:pointer;font-weight:700;font-variant-numeric:tabular-nums;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px}
 .f4p-real:focus-visible{outline:2px solid var(--ini);outline-offset:2px}
+/* all:unset acima também zera a cor herdada de .f4p-good/.f4p-bad/.f4p-warn no mesmo elemento (mesma
+   especificidade, .f4p-real vem depois no arquivo); repete a cor aqui, junto com .f4p-real, pra vencer. */
+.f4p-real.f4p-good{color:#1E8E3E}
+.f4p-real.f4p-bad{color:var(--alert)}
+.f4p-real.f4p-warn{color:var(--warn)}
 .f4p-items-tbl .idb{all:unset;cursor:pointer;background:#22C55E;color:#0B2B14;padding:0 3px;font-weight:600}
 .f4p-note{font-size:11.5px;color:var(--ink-2);padding:6px 12px 10px}
 .f4p-goal{font-size:12px;font-weight:650;color:var(--rel);margin:6px 12px 0}
