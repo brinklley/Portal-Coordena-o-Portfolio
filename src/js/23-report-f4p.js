@@ -102,11 +102,11 @@ function f4pExactSemesterLabel(st){
   const {from, to} = f4pExactSemesterWindow(st);
   return `${fmtL(from)} a ${fmtL(to)}`;
 }
-/* Itens que entram no Realizado de um quadrante "meta por semestre" (Urgente, Technical Story): abertos
-   contam sempre (não importa desde quando — ainda estão em aberto, logo ainda são risco/trabalho agora).
-   Fechados só contam dentro de f4pExactSemesterWindow — sem isso, a contagem somaria todo item já
-   qualificado em qualquer momento da história do time, não só o deste período (o portal não guarda
-   histórico de quando a tag foi aplicada ou o item virou Technical Story, só a data de fechamento). */
+/* Itens que entram no Realizado do Urgente (meta "por semestre"): abertos contam sempre (não importa
+   desde quando — ainda estão em aberto, logo ainda são risco agora). Fechados só contam dentro de
+   f4pExactSemesterWindow — sem isso, a contagem somaria todo item já tageado em qualquer momento da
+   história do time, não só o deste período (o portal não guarda histórico de quando a tag foi aplicada,
+   só a data de fechamento). */
 function f4pSemesterGoalItems(ops, st){
   st = st || f4pSemesterState();
   const {from, to} = f4pExactSemesterWindow(st);
@@ -114,7 +114,16 @@ function f4pSemesterGoalItems(ops, st){
 }
 function f4pUrgentItems(team, st){ return f4pSemesterGoalItems(f4pExpediteOps(team), st); }
 function f4pUrgentRealizado(team, st){ return f4pUrgentItems(team, st).length; }
-function f4pTsItems(team, st){ return f4pSemesterGoalItems(f4pTsOps(team), st); }
+/* Itens que entram no Realizado do Technical Story: diferente do Urgente, só contam itens já **entregues**
+   — categoria de fluxo "Vazão" (`catOf`, mapeada pelo usuário em Configurações, decisão 0019) — e cuja
+   saída (`o.deploy`) caiu dentro do período exato do semestre selecionado. Itens ainda em Backlog,
+   Discovery ou WIP não contam, mesmo já sendo do tipo Technical Story: a meta deste quadrante mede
+   entrega no período, não trabalho em risco/aberto como o Urgente (decisão 0020). */
+function f4pTsItems(team, st){
+  st = st || f4pSemesterState();
+  const {from, to} = f4pExactSemesterWindow(st);
+  return f4pTsOps(team).filter(o => catOf(o) === "vazao" && o.deploy && o.deploy >= from && o.deploy <= to);
+}
 function f4pTsRealizado(team, st){ return f4pTsItems(team, st).length; }
 /* Tendência: itens Expedite fechados nos últimos 3 meses vs. nos 3 meses antes desses — sempre a
    partir de hoje, independente do semestre selecionado no filtro. Sem margem de tolerância: mais → ▲,
@@ -137,11 +146,12 @@ function f4pUrgentCell(team){
    cor vermelho/verde pela meta, clique no número abre a lista dos itens), mas conta itens pelo tipo
    "Technical Story" em vez de uma tag, e a meta tem padrão (6) em vez de ficar "sem meta" quando o time
    não cadastra a própria (decisão 0018). Sem seta de tendência: o usuário não pediu uma para este
-   quadrante. */
+   quadrante. Diferente do Urgente, só conta itens já entregues (categoria de fluxo "Vazão" — decisão
+   0020); itens ainda em Backlog, Discovery ou WIP não entram no Realizado. */
 function f4pTsCell(team){
   const st = f4pSemesterState(), meta = f4pTsMetaOf(team), items = f4pTsItems(team, st), realizado = items.length;
   const cls = realizado > meta ? "f4p-bad" : "f4p-good";
-  const tip = `Tipo: Technical Story · itens abertos (qualquer data) + fechados em ${f4pExactSemesterLabel(st)} · clique no número para ver os itens`;
+  const tip = `Tipo: Technical Story · só itens entregues (Vazão) em ${f4pExactSemesterLabel(st)} · clique no número para ver os itens`;
   return `<span title="${esc(tip)}"><span class="f4p-lo">${meta}</span><span class="f4p-sep">|</span><button type="button" class="f4p-real ${cls}" data-f4p-ts-team="${esc(team)}">${realizado}</button></span>`;
 }
 /* Situação de um item na lista de itens do Report F4P: mesma categoria de coluna do resto do portal
@@ -214,7 +224,7 @@ function renderF4P(){
       <div class="f4p-col">${left.map(g => f4pGroup(g, teams)).join("")}</div>
       <div class="f4p-col">${right.map(g => f4pGroup(g, teams)).join("")}</div>
     </div>
-    <div class="an-note">Mostra sempre todos os times carregados (${esc(teams.join(", "))}), mesmo com um time diferente selecionado no filtro — o filtro só habilita o acesso a este painel. CycleTime e Variabilidade usam itens dos tipos ${esc((CFG.f4p.types || []).join(", ") || "nenhum tipo marcado")} concluídos no período: <b>${esc(f4pPeriodLabel(st))}</b>${st.kind === "past" ? " (semestre selecionado, já encerrado)" : " (semestre selecionado ainda em curso, ou não reconhecido — usa a janela corrida)"}. Urgente conta itens com a tag <b>${esc(f4pTagName(f4pExpediteTag()))}</b> e Technical Story conta itens desse tipo, de resto com a mesma regra: os ainda abertos contam sempre, e os fechados só se fecharam dentro do período exato do semestre selecionado (<b>${esc(f4pExactSemesterLabel(st))}</b>) — sem histórico de quando cada item passou a se qualificar, não dá pra saber quem estava marcado antes disso. Os demais quadrantes aguardam a definição da regra de cálculo.</div>`;
+    <div class="an-note">Mostra sempre todos os times carregados (${esc(teams.join(", "))}), mesmo com um time diferente selecionado no filtro — o filtro só habilita o acesso a este painel. CycleTime e Variabilidade usam itens dos tipos ${esc((CFG.f4p.types || []).join(", ") || "nenhum tipo marcado")} concluídos no período: <b>${esc(f4pPeriodLabel(st))}</b>${st.kind === "past" ? " (semestre selecionado, já encerrado)" : " (semestre selecionado ainda em curso, ou não reconhecido — usa a janela corrida)"}. Urgente conta itens com a tag <b>${esc(f4pTagName(f4pExpediteTag()))}</b>: os ainda abertos contam sempre, e os fechados só se fecharam dentro do período exato do semestre selecionado (<b>${esc(f4pExactSemesterLabel(st))}</b>) — sem histórico de quando cada item passou a se qualificar, não dá pra saber quem estava marcado antes disso. Technical Story conta só itens desse tipo já <b>entregues</b> (categoria de fluxo Vazão) dentro do mesmo período — itens ainda em Backlog, Discovery ou WIP não entram. Os demais quadrantes aguardam a definição da regra de cálculo.</div>`;
 }
 function placeF4P(){ const h = document.querySelector(".top").offsetHeight; $("f4pPanel").style.top = h + "px"; $("f4pPanel").style.height = `calc(100% - ${h}px)`; }
 function openF4P(){ if (!f4pEnabled()) return; if (AN.open) closeAnalytics(); F4P.open = true; placeF4P(); $("f4pPanel").classList.add("open"); $("f4pPanel").setAttribute("aria-hidden","false"); $("f4pTab").setAttribute("aria-expanded","true"); renderF4P(); $("f4pClose").focus(); }
