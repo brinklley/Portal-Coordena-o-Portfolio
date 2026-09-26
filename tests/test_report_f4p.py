@@ -980,3 +980,83 @@ def test_configuracao_epi_types_persiste_e_entra_na_exportacao(page):
         page.click("#cfgExport")
     txt = open(d.value.path(), encoding="utf-8").read()
     assert '"epiTypes"' in txt and '"feature"' in txt
+
+# Decisão 0026: reforço do vínculo épico↔time — o vínculo é sempre pelos itens filhos (Parent → Child),
+# nunca por Target Date do épico ou pelo vínculo com a iniciativa. Cenário de falha relatado pelo
+# usuário: um épico aparecer contabilizado no time errado quando todos os seus itens filhos são de
+# outro time. Investigação confirmou que a decisão 0025 já implementava a regra corretamente nos três
+# números (Roadmap, Roadmap entregue, Atual) e nos dois branches (Interno e Executivo); os testes abaixo
+# travam esse comportamento explicitamente, cobrindo os casos que ainda não tinham um teste dedicado.
+
+def test_roadmap_executivo_epico_conta_so_para_o_time_dos_itens_filhos(page):
+    """Cenário de falha do usuário: épico vinculado (via iniciativa do Roadmap Executivo) ao time CORE,
+    mas cujos itens filhos são todos do MOBILE — deve contar só para o MOBILE, nunca para o CORE."""
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.stages.epi = ["Backlog", "Fechado"];
+      const sem = semestre(TODAY);
+      S.f.exec = sem;
+      S.model.ops.set("mop1", {team:"F4P_V26_MOBILE"});
+      S.model.epis.set("emix", {id:"emix", parent:"rmix", target:null, interno:null, st:0, stDate:null, ops:["mop1"], type:"Epic"});
+      S.model.rels.set("rmix", {id:"rmix", parent:"imix", epis:["emix"]});
+      S.model.inis.set("imix", {id:"imix", exec:sem, rels:["rmix"]});
+      return {core: f4pRoadmapEpis("F4P_V26_CORE").map(e=>e.id), mobile: f4pRoadmapEpis("F4P_V26_MOBILE").map(e=>e.id)};
+    }""")
+    assert r == {"core": [], "mobile": ["emix"]}
+
+def test_roadmap_interno_epico_conta_so_para_o_time_dos_itens_filhos(page):
+    """Mesmo cenário de falha, mas no Roadmap Interno (Target Date do próprio épico): o vínculo com o
+    time continua sendo só pelos itens filhos, não pelo Target Date."""
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.stages.epi = ["Backlog", "Fechado"];
+      const sem = semestre(TODAY);
+      S.f.int = sem;
+      S.model.ops.set("mop2", {team:"F4P_V26B_MOBILE"});
+      S.model.epis.set("emix2", {id:"emix2", parent:null, target:TODAY, interno:sem, st:0, stDate:null, ops:["mop2"], type:"Epic"});
+      return {core: f4pRoadmapEpis("F4P_V26B_CORE").map(e=>e.id), mobile: f4pRoadmapEpis("F4P_V26B_MOBILE").map(e=>e.id)};
+    }""")
+    assert r == {"core": [], "mobile": ["emix2"]}
+
+def test_roadmap_entregue_epico_conta_so_para_o_time_dos_itens_filhos(page):
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.stages.epi = ["Backlog", "Fechado"];
+      const sem = semestre(TODAY);
+      S.f.int = sem;
+      S.model.ops.set("mop3", {team:"F4P_V26C_MOBILE"});
+      S.model.epis.set("emix3", {id:"emix3", parent:null, target:TODAY, interno:sem, st:1, stDate:TODAY, ops:["mop3"], type:"Epic"});   // fechado
+      return {core: f4pRoadmapEntregueEpis("F4P_V26C_CORE").map(e=>e.id), mobile: f4pRoadmapEntregueEpis("F4P_V26C_MOBILE").map(e=>e.id)};
+    }""")
+    assert r == {"core": [], "mobile": ["emix3"]}
+
+def test_atual_epico_conta_so_para_o_time_dos_itens_filhos(page):
+    """'Atual' já é independente do Target Date e do vínculo com iniciativa (decisão 0025), mas continua
+    dependendo do vínculo com o time pelos itens filhos — mesmo cenário de falha, aplicado ao Atual."""
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.stages.epi = ["Backlog", "Fechado"];
+      const sem = semestre(TODAY);
+      S.f.int = sem;
+      const st = f4pSemesterState();
+      const dentro = new Date(st.start.getTime() + 5 * 864e5);
+      S.model.ops.set("mop4", {team:"F4P_V26D_MOBILE"});
+      S.model.epis.set("emix4", {id:"emix4", parent:null, target:null, interno:null, st:1, stDate:dentro, ops:["mop4"], type:"Epic"});
+      return {core: f4pAtualEpis("F4P_V26D_CORE", st).map(e=>e.id), mobile: f4pAtualEpis("F4P_V26D_MOBILE", st).map(e=>e.id)};
+    }""")
+    assert r == {"core": [], "mobile": ["emix4"]}
+
+def test_roadmap_epico_com_itens_de_dois_times_conta_para_ambos(page):
+    """Um épico com itens filhos de mais de um time conta para cada time que efetivamente tem item
+    vinculado — não é um "dono único"; a exclusão só vale para o time que não tem nenhum item."""
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.stages.epi = ["Backlog", "Fechado"];
+      const sem = semestre(TODAY);
+      S.f.int = sem;
+      S.model.ops.set("cop1", {team:"F4P_V26E_CORE"});
+      S.model.ops.set("mop5", {team:"F4P_V26E_MOBILE"});
+      S.model.epis.set("emix5", {id:"emix5", parent:null, target:TODAY, interno:sem, st:0, stDate:null, ops:["cop1", "mop5"], type:"Epic"});
+      return {core: f4pRoadmapEpis("F4P_V26E_CORE").map(e=>e.id), mobile: f4pRoadmapEpis("F4P_V26E_MOBILE").map(e=>e.id)};
+    }""")
+    assert r == {"core": ["emix5"], "mobile": ["emix5"]}
