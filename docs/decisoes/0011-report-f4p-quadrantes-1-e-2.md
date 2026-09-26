@@ -24,6 +24,8 @@
 
 4. **Quadrantes 3–8** ("em definição"): aparecem na mesma grade e com as mesmas colunas de time dos dois primeiros, mostrando "--" e uma nota "Regra de cálculo ainda em definição.", para já fixar o layout final e não exigir retrabalho quando as regras forem definidas (`docs/backlog/pendencias.md`).
 
+> **Atualização**: o item 3 (ilustrações) foi substituído — ver `docs/decisoes/0012-report-f4p-ilustracoes-reais.md`. O usuário forneceu as imagens originais do slide de referência e pediu para usá-las; os SVGs inline descritos abaixo saíram do código.
+
 ## Consequências
 
 - `f4pTeams()` isolado em uma função (`src/js/23-report-f4p.js`) para facilitar trocar a lista de times, se necessário.

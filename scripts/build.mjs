@@ -10,7 +10,15 @@ const strip = s => s.replace(/\n$/, "");   // cada fonte termina com uma quebra 
 
 const shell = read("src/index.html");
 const css = strip(read("src/styles.css"));
-const js = readdirSync(join(root, "src/js")).filter(f => f.endsWith(".js")).sort()
+// ilustrações do Report F4P: viram data URI embutida (F4P_ASSETS), para o HTML final continuar num arquivo só
+const f4pAssetDir = join(root, "src/assets/f4p");
+const f4pAssets = Object.fromEntries(readdirSync(f4pAssetDir).filter(f => f.endsWith(".png")).map(f => {
+  const key = f.replace(/\.png$/, "").replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+  const b64 = readFileSync(join(f4pAssetDir, f)).toString("base64");
+  return [key, `data:image/png;base64,${b64}`];
+}));
+const f4pAssetsJs = `const F4P_ASSETS = ${JSON.stringify(f4pAssets)};\n`;
+const js = f4pAssetsJs + readdirSync(join(root, "src/js")).filter(f => f.endsWith(".js")).sort()
   .map(f => strip(read(join("src/js", f)))).join("\n");
 const xlsx = read("node_modules/xlsx/dist/xlsx.full.min.js");
 
