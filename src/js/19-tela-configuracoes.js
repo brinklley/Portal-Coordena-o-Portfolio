@@ -32,18 +32,18 @@ function cfgForm(err){
     <h4>Visão analítica</h4>
     <p class="help">Usada no painel analítico (abre pela aba à esquerda quando há um Time e um Roadmap no filtro). <b>Capacidade</b> conta os itens com a tag abaixo; <b>Projetada</b> e <b>QTD</b> contam todos. O <b>dead line</b> é o fim do semestre (menos os dias informados abaixo) menos o CT máximo do time. As contagens usam os mesmos tipos de item marcados em “Tipos considerados no CT do épico”.</p>
     <div class="grid3">
-      <label>Tag que marca a capacidade do roadmap<input type="text" id="cfgAnTag" value="${esc(d.anTag || "")}" style="width:200px"></label>
+      <label title="Também usada pelo quadrante Vazão do Report F4P (Reserva)">Tag que marca a capacidade do roadmap<input type="text" id="cfgAnTag" value="${esc(d.anTag || "")}" style="width:200px"></label>
       <label>Coluna da iniciativa com Capex/Opex<input type="text" id="cfgAnCol" value="${esc(d.anClassCol || "")}" style="width:240px"></label>
       <label title="Use quando o semestre operacional termina antes do último dia do calendário (ex.: congelamento de fim de ano)">Dias antes do fim do semestre<input type="number" min="0" id="cfgAnFreeze" value="${d.anFreeze || 0}" style="width:120px"></label>
     </div>
     <h4>Report F4P</h4>
-    <p class="help">Painel Report F4P (aba à esquerda, junto com a Visão analítica): mostra sempre todos os times carregados. O quadrante <b>CycleTime</b> usa o CT máximo por time (tabela “Alertas por time” acima); os campos abaixo valem para a amostra do P95/P50, para a faixa esperada de <b>Variabilidade</b> (P95 ÷ P50) e para a meta de <b>Urgente</b> e de <b>Technical Story</b> de cada time. Sem valor por time, Variabilidade usa o padrão 1.5–3.5, Urgente fica sem meta (sem cor de alerta) e Technical Story usa o padrão 6.</p>
+    <p class="help">Painel Report F4P (aba à esquerda, junto com a Visão analítica): mostra sempre todos os times carregados. O quadrante <b>CycleTime</b> usa o CT máximo por time (tabela “Alertas por time” acima); os campos abaixo valem para a amostra do P95/P50, para a faixa esperada de <b>Variabilidade</b> (P95 ÷ P50), para a meta de <b>Urgente</b> e de <b>Technical Story</b> de cada time, e para os tipos considerados pelo <b>Vazão</b> (Reserva/Realizado — a tag de capacidade é a mesma da Visão analítica, acima). Sem valor por time, Variabilidade usa o padrão 1.5–3.5, Urgente fica sem meta (sem cor de alerta) e Technical Story usa o padrão 6.</p>
     <div class="grid3">
       <label>Período do P95/P50 (meses)<input type="number" min="1" id="cfgF4pMonths" value="${d.f4p.months}" style="width:100px"></label>
       <label>Tag da Classe de Serviço Expedite (quadrante Urgente)<select id="cfgF4pExpedite" style="width:200px">${(d.tags || []).map(tg => `<option value="${esc(tg.id)}" ${tg.id === (d.f4p.expediteTag || "urgent") ? "selected" : ""}>${esc(tg.name)}</option>`).join("") || `<option value="">Nenhuma tag cadastrada</option>`}</select></label>
     </div>
     <div class="typelist">${typesFound().map(([ty, n]) => `<label><input type="checkbox" data-f4ptype="${esc(norm(ty))}" ${(d.f4p.types || []).includes(norm(ty)) ? "checked" : ""}> ${esc(ty)} <span class="muted">${n}</span></label>`).join("") || `<span class="muted">Carregue uma planilha para ver os tipos.</span>`}</div>
-    <p class="help">Os tipos acima valem só para CycleTime e Variabilidade. O quadrante Urgente conta itens da tag Expedite acima de <b>qualquer</b> tipo.</p>
+    <p class="help">Os tipos acima valem para CycleTime, Variabilidade e Vazão. O quadrante Urgente conta itens da tag Expedite acima de <b>qualquer</b> tipo; Technical Story conta só itens desse tipo, fixo.</p>
     <table class="ctab" ${teams.length ? "" : "hidden"}><thead><tr><th>Time</th><th>Variabilidade mínima</th><th>Variabilidade máxima</th><th>Meta de Urgente (Expedite) no semestre</th><th>Meta de Technical Story no semestre</th></tr></thead><tbody>
     ${teams.map(tm => { const k = norm(tm), v = d.f4p.teams[k] || {};
       return `<tr><td>${esc(tm)}</td>

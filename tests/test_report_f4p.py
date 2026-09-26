@@ -431,3 +431,197 @@ def test_situacao_dos_itens_usa_categoria_do_fluxo_do_time(page):
     assert r["vazaoSemData"] == "Vazão"
     assert r["vazaoComData"] == "Vazão · 21/07/2026"
     assert r["semColuna"] == "Backlog"   # sem coluna reconhecida no fluxo do time: mesmo padrão de catOf ("none")
+
+# ---------------- Quadrante 5 · Vazão (reserva vs. realizado) ----------------
+# Decisão 0022. Mesmo critério de "entregue" do Technical Story (categoria de fluxo Vazão), mas usa os
+# tipos configurados para o CT (CFG.f4p.types, padrão User Story e Technical Story) em vez de um tipo
+# fixo. Reserva é o subconjunto do Realizado com a tag de capacidade do roadmap (CFG.anTag, já usada na
+# Visão analítica); Realizado é todo o conjunto, com ou sem a tag.
+
+def test_vazao_conta_so_tipos_configurados_e_entregues(page):
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.teamFlow.F4P_VZ1 = ["Backlog", "Vazao"];
+      CFG.flow.f4p_vz1 = {cat:{vazao:"vazao"}, ct:[]};
+      const hoje = new Date();
+      S.model.ops.set("v1", {team:"F4P_VZ1", type:"User Story", stName:"Vazao", deploy:hoje, tags:[]});
+      S.model.ops.set("v2", {team:"F4P_VZ1", type:"Technical Story", stName:"Vazao", deploy:hoje, tags:[]});
+      S.model.ops.set("v3", {team:"F4P_VZ1", type:"Internal Bug", stName:"Vazao", deploy:hoje, tags:[]});   // tipo não configurado: não conta
+      S.model.ops.set("v4", {team:"F4P_VZ1", type:"User Story", stName:"Backlog", deploy:null, tags:[]});   // não entregue: não conta
+      S.f.exec = semestre(TODAY);
+      return f4pVazaoRealizadoItems("F4P_VZ1", f4pSemesterState()).length;
+    }""")
+    assert r == 2
+
+def test_vazao_reserva_e_subconjunto_com_a_tag_de_capacidade(page):
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.teamFlow.F4P_VZ2 = ["Backlog", "Vazao"];
+      CFG.flow.f4p_vz2 = {cat:{vazao:"vazao"}, ct:[]};
+      const hoje = new Date();
+      S.model.ops.set("v1", {team:"F4P_VZ2", type:"User Story", stName:"Vazao", deploy:hoje, tags:["ROADMAP"]});
+      S.model.ops.set("v2", {team:"F4P_VZ2", type:"User Story", stName:"Vazao", deploy:hoje, tags:["Roadmap"]});   // mesma tag, outra caixa
+      S.model.ops.set("v3", {team:"F4P_VZ2", type:"User Story", stName:"Vazao", deploy:hoje, tags:[]});
+      S.f.exec = semestre(TODAY);
+      const st = f4pSemesterState();
+      return {reserva: f4pVazaoReservaItems("F4P_VZ2", st).length, realizado: f4pVazaoRealizadoItems("F4P_VZ2", st).length};
+    }""")
+    assert r == {"reserva": 2, "realizado": 3}
+
+def test_vazao_usa_tag_de_capacidade_configuravel(page):
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.teamFlow.F4P_VZ3 = ["Backlog", "Vazao"];
+      CFG.flow.f4p_vz3 = {cat:{vazao:"vazao"}, ct:[]};
+      CFG.anTag = "CAPACIDADE";
+      const hoje = new Date();
+      S.model.ops.set("v1", {team:"F4P_VZ3", type:"User Story", stName:"Vazao", deploy:hoje, tags:["CAPACIDADE"]});
+      S.model.ops.set("v2", {team:"F4P_VZ3", type:"User Story", stName:"Vazao", deploy:hoje, tags:["ROADMAP"]});   // tag antiga: não conta mais
+      S.f.exec = semestre(TODAY);
+      const n = f4pVazaoReservaItems("F4P_VZ3", f4pSemesterState()).length;
+      CFG.anTag = "ROADMAP";
+      return n;
+    }""")
+    assert r == 1
+
+def test_vazao_ignora_itens_em_backlog_discovery_ou_wip(page):
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.teamFlow.F4P_VZ4 = ["Backlog", "Discovery", "WIP", "Vazao"];
+      CFG.flow.f4p_vz4 = {cat:{discovery:"disc", wip:"wip", vazao:"vazao"}, ct:[]};
+      S.f.exec = semestre(TODAY);
+      const hoje = new Date();
+      S.model.ops.set("b1", {team:"F4P_VZ4", type:"User Story", stName:"Backlog", deploy:null, tags:[]});
+      S.model.ops.set("d1", {team:"F4P_VZ4", type:"User Story", stName:"Discovery", deploy:null, tags:[]});
+      S.model.ops.set("w1", {team:"F4P_VZ4", type:"User Story", stName:"WIP", deploy:null, tags:[]});
+      S.model.ops.set("v1", {team:"F4P_VZ4", type:"User Story", stName:"Vazao", deploy:hoje, tags:[]});
+      return f4pVazaoRealizadoItems("F4P_VZ4", f4pSemesterState()).length;
+    }""")
+    assert r == 1
+
+def test_vazao_semestre_atual_ignora_entregues_antes_do_inicio_do_semestre(page):
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.teamFlow.F4P_VZ5 = ["Backlog", "Vazao"];
+      CFG.flow.f4p_vz5 = {cat:{vazao:"vazao"}, ct:[]};
+      S.f.exec = semestre(TODAY);
+      const inicioDoSemestre = f4pSemesterState().start;
+      const antesDoSemestre = new Date(inicioDoSemestre.getTime() - 864e5);
+      const depoisDoInicio = new Date(inicioDoSemestre.getTime() + 5 * 864e5);
+      S.model.ops.set("v1", {team:"F4P_VZ5", type:"User Story", stName:"Vazao", deploy:antesDoSemestre, tags:[]});
+      S.model.ops.set("v2", {team:"F4P_VZ5", type:"User Story", stName:"Vazao", deploy:depoisDoInicio, tags:[]});
+      return f4pVazaoRealizadoItems("F4P_VZ5", f4pSemesterState()).length;
+    }""")
+    assert r == 1
+
+def test_vazao_semestre_passado_conta_so_entregues_no_periodo(page):
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.teamFlow.F4P_VZ6 = ["Backlog", "Vazao"];
+      CFG.flow.f4p_vz6 = {cat:{vazao:"vazao"}, ct:[]};
+      const curStart = f4pSemStart(semestre(TODAY));
+      const prevMid = new Date(curStart.getFullYear(), curStart.getMonth() - 3, 15);
+      const prevSem = semestre(prevMid);
+      S.model.ops.set("v1", {team:"F4P_VZ6", type:"User Story", stName:"Vazao", deploy:prevMid, tags:[]});    // entregue dentro do semestre anterior
+      S.model.ops.set("v2", {team:"F4P_VZ6", type:"User Story", stName:"Backlog", deploy:null, tags:[]});     // ainda aberto
+      S.model.ops.set("v3", {team:"F4P_VZ6", type:"User Story", stName:"Vazao", deploy:curStart, tags:[]});   // entregue, mas no semestre atual
+      S.f.int = prevSem;
+      return f4pVazaoRealizadoItems("F4P_VZ6", f4pSemesterState()).length;
+    }""")
+    assert r == 1
+
+def test_vazao_tendencia_ultimo_mes_acima_da_media_melhora(page):
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.teamFlow.F4P_VZ7 = ["Backlog", "Vazao"];
+      CFG.flow.f4p_vz7 = {cat:{vazao:"vazao"}, ct:[]};
+      const st = {kind:"current", start:new Date(TODAY.getFullYear(), TODAY.getMonth() - 2, 1), end:new Date(TODAY.getFullYear(), TODAY.getMonth() + 6, 0)};
+      const m2 = new Date(TODAY.getFullYear(), TODAY.getMonth() - 2, 15), m1 = new Date(TODAY.getFullYear(), TODAY.getMonth() - 1, 15), m0 = new Date(TODAY.getFullYear(), TODAY.getMonth(), 1);
+      S.model.ops.set("a1", {team:"F4P_VZ7", type:"User Story", stName:"Vazao", deploy:m2, tags:[]});
+      S.model.ops.set("a2", {team:"F4P_VZ7", type:"User Story", stName:"Vazao", deploy:m1, tags:[]});
+      for (let i = 0; i < 5; i++) S.model.ops.set("a3_"+i, {team:"F4P_VZ7", type:"User Story", stName:"Vazao", deploy:m0, tags:[]});
+      return f4pVazaoTrend("F4P_VZ7", st);
+    }""")
+    assert r == "▲"
+
+def test_vazao_tendencia_ultimo_mes_abaixo_da_media_piora(page):
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.teamFlow.F4P_VZ8 = ["Backlog", "Vazao"];
+      CFG.flow.f4p_vz8 = {cat:{vazao:"vazao"}, ct:[]};
+      const st = {kind:"current", start:new Date(TODAY.getFullYear(), TODAY.getMonth() - 2, 1), end:new Date(TODAY.getFullYear(), TODAY.getMonth() + 6, 0)};
+      const m2 = new Date(TODAY.getFullYear(), TODAY.getMonth() - 2, 15), m1 = new Date(TODAY.getFullYear(), TODAY.getMonth() - 1, 15), m0 = new Date(TODAY.getFullYear(), TODAY.getMonth(), 1);
+      for (let i = 0; i < 5; i++) S.model.ops.set("b2_"+i, {team:"F4P_VZ8", type:"User Story", stName:"Vazao", deploy:m2, tags:[]});
+      for (let i = 0; i < 5; i++) S.model.ops.set("b1_"+i, {team:"F4P_VZ8", type:"User Story", stName:"Vazao", deploy:m1, tags:[]});
+      S.model.ops.set("b0", {team:"F4P_VZ8", type:"User Story", stName:"Vazao", deploy:m0, tags:[]});
+      return f4pVazaoTrend("F4P_VZ8", st);
+    }""")
+    assert r == "▼"
+
+def test_vazao_tendencia_igual_aos_meses_anteriores_fica_neutra(page):
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.teamFlow.F4P_VZ9 = ["Backlog", "Vazao"];
+      CFG.flow.f4p_vz9 = {cat:{vazao:"vazao"}, ct:[]};
+      const st = {kind:"current", start:new Date(TODAY.getFullYear(), TODAY.getMonth() - 2, 1), end:new Date(TODAY.getFullYear(), TODAY.getMonth() + 6, 0)};
+      const m2 = new Date(TODAY.getFullYear(), TODAY.getMonth() - 2, 15), m1 = new Date(TODAY.getFullYear(), TODAY.getMonth() - 1, 15), m0 = new Date(TODAY.getFullYear(), TODAY.getMonth(), 1);
+      for (let i = 0; i < 2; i++) S.model.ops.set("c2_"+i, {team:"F4P_VZ9", type:"User Story", stName:"Vazao", deploy:m2, tags:[]});
+      for (let i = 0; i < 2; i++) S.model.ops.set("c1_"+i, {team:"F4P_VZ9", type:"User Story", stName:"Vazao", deploy:m1, tags:[]});
+      for (let i = 0; i < 2; i++) S.model.ops.set("c0_"+i, {team:"F4P_VZ9", type:"User Story", stName:"Vazao", deploy:m0, tags:[]});
+      return f4pVazaoTrend("F4P_VZ9", st);
+    }""")
+    assert r == "◆"
+
+def test_vazao_tendencia_sem_meses_anteriores_fica_neutra(page):
+    """Semestre com só um mês decorrido (acabou de começar): não há meses anteriores para comparar."""
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      const st = {kind:"current", start:new Date(TODAY.getFullYear(), TODAY.getMonth(), 1), end:new Date(TODAY.getFullYear(), TODAY.getMonth() + 6, 0)};
+      return f4pVazaoTrend("F4P_VZ_VAZIO", st);
+    }""")
+    assert r == "◆"
+
+def test_vazao_clique_no_realizado_abre_lista_e_permite_navegar(page):
+    carregar(page, "f4p.xlsx")
+    alvo_id = page.evaluate("""()=>{
+      S.f.team='CORE'; S.f.exec=semestre(TODAY);
+      [...S.model.ops.values()].filter(o=>o.team==='CORE').forEach(o => { o.deploy = null; });
+      const alvo = [...S.model.ops.values()].find(o=>o.team==='CORE');
+      alvo.type = 'User Story';
+      alvo.deploy = new Date(f4pSemesterState().start.getTime() + 5 * 864e5);   // garante que cai dentro do semestre atual
+      render();
+      return alvo.id;
+    }""")
+    page.click("#f4pTab")
+    page.click('button[data-f4p-vazao-realizado-team="CORE"]')
+    assert page.is_visible("#f4pItemsBg")
+    rows = page.locator("#f4pItemsBody tbody tr")
+    assert rows.count() == 1
+    assert alvo_id in page.inner_text("#f4pItemsBody")
+    page.click(f'button[data-f4p-go="{alvo_id}"]')
+    assert not page.is_visible("#f4pItemsBg")
+    assert not page.is_visible("#f4pPanel.open")
+    assert page.evaluate("document.getElementById('goto').value") == alvo_id
+
+def test_vazao_clique_na_reserva_mostra_so_os_com_a_tag(page):
+    carregar(page, "f4p.xlsx")
+    page.evaluate("""()=>{
+      S.f.team='CORE'; S.f.exec=semestre(TODAY);
+      [...S.model.ops.values()].filter(o=>o.team==='CORE').forEach(o => { o.deploy = null; });
+      const dentro = new Date(f4pSemesterState().start.getTime() + 5 * 864e5);
+      const ops = [...S.model.ops.values()].filter(o=>o.team==='CORE').slice(0, 2);
+      ops[0].type = 'User Story'; ops[0].deploy = dentro; ops[0].tags = ['ROADMAP'];
+      ops[1].type = 'User Story'; ops[1].deploy = dentro; ops[1].tags = [];
+      render();
+    }""")
+    page.click("#f4pTab")
+    page.click('button[data-f4p-vazao-reserva-team="CORE"]')
+    assert page.is_visible("#f4pItemsBg")
+    assert page.locator("#f4pItemsBody tbody tr").count() == 1
+
+def test_vazao_aparece_calculado_no_painel(page):
+    carregar(page, "f4p.xlsx")
+    page.evaluate("()=>{ S.f.team='CORE'; S.f.exec=semestre(TODAY); render(); }")
+    page.click("#f4pTab")
+    assert "Vazão (reserva vs realizado)" in page.inner_text("#f4pBody")
+    assert "f4p-sep" in page.evaluate("f4pVazaoCell('CORE')")
