@@ -331,7 +331,9 @@ $("f4pItemsBg").addEventListener("pointerdown", e => { if (e.target === $("f4pIt
 $("f4pItemsBg").addEventListener("keydown", e => { if (e.key === "Escape"){ e.stopPropagation(); closeF4PItems(); } });
 $("f4pItemsBody").addEventListener("click", e => {
   const g = e.target.closest("[data-f4p-go]");
-  if (g){ closeF4PItems(); closeF4P(); $("goto").value = g.dataset.f4pGo; gotoId(g.dataset.f4pGo); }
+  // o modal de itens é reaproveitado pela Visão analítica (Capacidade/Projetada), então fecha
+  // qualquer um dos dois painéis que esteja aberto, não só o Report F4P.
+  if (g){ closeF4PItems(); if (F4P.open) closeF4P(); if (AN.open) closeAnalytics(); $("goto").value = g.dataset.f4pGo; gotoId(g.dataset.f4pGo); }
 });
 $("f4pBody").addEventListener("click", e => {
   const st = f4pSemesterState();

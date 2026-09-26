@@ -13,11 +13,13 @@ function anDeadline(sem, max){
   return {end, opEnd, date:new Date(opEnd.getFullYear(), opEnd.getMonth(), opEnd.getDate() - max)};
 }
 function anTypes(){ return new Set((CFG.ctTypes || []).map(norm)); }
+/* Projetada e Capacidade são sempre a SOMA dos itens contados em cada linha de épico (não uma contagem
+   à parte sobre S.V.visOp): garante que os dois números batem exatamente com o que a tabela mostra por
+   épico, sem risco de divergência entre o cabeçalho e as linhas (decisão 0027). */
 function anData(){
   const M = S.model, V = S.V, team = S.f.team, types = anTypes(), tag = norm(CFG.anTag || "ROADMAP");
   const isType = o => o.type && (!types.size || types.has(norm(o.type)));
-  const ops = [...V.visOp].map(k => M.ops.get(k)).filter(o => o.team === team && isType(o));
-  const cap = ops.filter(o => o.tags.map(norm).includes(tag)).length;
+  const hasTag = o => o.tags.map(norm).includes(tag);
   const L = limitsOf(team);
   const classKey = norm(CFG.anClassCol || "");
   const rows = [...V.visEpi].map(id => M.epis.get(id)).map(e => {
@@ -26,13 +28,16 @@ function anData(){
     const flow = (M.teamFlow[team] || []).map(norm); let far = -1, farName = "";
     // item aberto mais avançado (os já concluídos não indicam onde o trabalho está)
     m.recs.filter(o => catOf(o) !== "vazao").forEach(o => { const k = flow.indexOf(norm(o.stName)); if (k > far){ far = k; farName = o.stName; } });
-    const qtd = m.recs.filter(isType).length;
+    const itens = m.recs.filter(isType);          // itens do épico que entram na Projetada
+    const reservados = itens.filter(hasTag);       // subconjunto com a tag de capacidade (entram na Capacidade)
     const pending = m.recs.filter(o => isType(o) && !o.ready);   // ainda não entraram no fluxo do CT
     const cls = classKey && i.x ? fmtField(classKey, i.x[classKey]) : "--";
-    return {e, i, m, qtd, farName, pending, ref: e.interno || i.exec, cls: cls === "--" ? "" : cls};
+    return {e, i, m, itens, qtd: itens.length, reservados, farName, pending, ref: e.interno || i.exec, cls: cls === "--" ? "" : cls};
   });
+  const projItems = rows.flatMap(r => r.itens);
+  const capItems = rows.flatMap(r => r.reservados);
   const dl = anDeadline(S.f.int || S.f.exec, L.max);
-  return {team, ops, cap, proj: ops.length, L, rows, dl};
+  return {team, projItems, capItems, cap: capItems.length, proj: projItems.length, L, rows, dl};
 }
 function anSorted(rows){
   const k = AN.sort, d = AN.dir;
@@ -50,7 +55,7 @@ function renderAnalytics(){
   const d = anData(), rm = [S.f.int && `roadmap interno ${semLong(S.f.int)}`, S.f.exec && `roadmap executivo ${semLong(S.f.exec)}`].filter(Boolean).join(" · ");
   const over = d.proj > d.cap;
   $("anTitle").innerHTML = `<h2>Roadmap ${esc(d.team)} ${esc(semLong(S.f.int || S.f.exec))}</h2>
-    <h3>Entregas previstas: Capacidade ${d.cap} US / Projetada ${over ? `<mark>${d.proj}</mark>` : d.proj} US</h3>
+    <h3>Entregas previstas: Capacidade <button type="button" class="f4p-real" data-an-items="cap" title="Ver os itens que compõem a Capacidade">${d.cap}</button> US / Projetada ${over ? `<mark><button type="button" class="f4p-real" data-an-items="proj" title="Ver os itens que compõem a Projetada">${d.proj}</button></mark>` : `<button type="button" class="f4p-real" data-an-items="proj" title="Ver os itens que compõem a Projetada">${d.proj}</button>`} US</h3>
     <div class="an-kpis">
       <div class="an-kpi"><b>${d.L.max ? d.L.max + " DIAS" : "--"}</b><span>CycleTime máximo${d.L.planned ? "" : " (regra geral; o time não tem CT planejado)"}</span></div>
       ${d.dl ? (() => { const left = days(TODAY, d.dl.date);
@@ -66,7 +71,7 @@ function renderAnalytics(){
     const m = r.m, bad = m.ct != null && d.L.max && m.ct > d.L.max;
     return `<tr>
       <td class="c">${r.qtd}<br>${r.qtd === 1 ? "item" : "itens"}</td>
-      <td class="ev"><span class="ep">[EP][<button class="idb" data-an-go="${esc(r.e.id)}">${esc(r.e.id)}</button>] ${esc(r.e.title || "")}</span> – <span class="us">${r.qtd} US</span><br>
+      <td class="ev"><span class="ep">[EP][<button class="idb" data-an-go="${esc(r.e.id)}">${esc(r.e.id)}</button>] ${esc(r.e.title || "")} <span class="res" title="Itens deste épico com a tag ${esc(CFG.anTag || "ROADMAP")} (capacidade do roadmap)">${r.reservados.length} reservado${r.reservados.length === 1 ? "" : "s"}</span></span> – <span class="us">${r.qtd} US</span><br>
         [IN][<button class="idi" data-an-go="${esc(r.i.id)}">${esc(r.i.id)}</button>] ${esc(r.i.title)}</td>
       <td class="c">${m.phase === "fechado" ? `<span class="st-ent">Entregue</span>` : PH_TXT[m.phase]}${r.farName && m.phase !== "fechado" ? `<span class="st-sub">${esc(r.farName)}</span>` : ""}</td>
       <td class="c fl">Ready: <b>${m.ctFrom ? fmtDM(m.ctFrom) : "--"}</b><br>Ag. Deploy: <b>${m.ctTo ? fmtDM(m.ctTo) : "--"}</b><br>
@@ -74,7 +79,7 @@ function renderAnalytics(){
           return `<span class="dl ${left < 0 ? "late" : left <= 14 ? "near" : ""}" title="Itens do épico que ainda não entraram na coluna de entrada do CT">${r.pending.length} ${r.pending.length === 1 ? "item fora" : "itens fora"} do fluxo · entrar até ${fmtDM(d.dl.date)}</span>`; })() : ""}</td>
       <td class="c">${esc(semShort(r.ref))}<br>${esc(r.cls || "---")}</td></tr>`; }).join("");
   $("anBody").innerHTML = `<table class="an-table" id="anTable"><thead><tr>${th("qtd","QTD")}${th("ep","Evolução")}${th("status","Status")}${th("ct","Flow")}${th("ref","Ref.")}</tr></thead><tbody>${rows}</tbody></table>
-    <div class="an-note">Épicos com itens do time ${esc(d.team)} dentro dos filtros atuais (${esc(rm)}). QTD, Capacidade e Projetada contam itens dos tipos ${esc(ctTypesLabel())}; Capacidade só os com a tag ${esc(CFG.anTag || "ROADMAP")}. Status e Flow seguem a configuração do fluxo do time; CycleTime em vermelho passa do CT máximo. Dead line = fim do semestre${CFG.anFreeze ? ` menos ${CFG.anFreeze} dias` : ""} menos o CT máximo; “itens fora do fluxo” ainda não chegaram na coluna de entrada do CT. Ref.: roadmap interno do épico (ou o executivo da iniciativa, se vazio) e ${esc(CFG.anClassCol || "classificação")} da iniciativa.</div>`;
+    <div class="an-note">Épicos com itens do time ${esc(d.team)} dentro dos filtros atuais (${esc(rm)}). QTD, Capacidade e Projetada contam itens dos tipos ${esc(ctTypesLabel())}; Capacidade só os com a tag ${esc(CFG.anTag || "ROADMAP")}. Projetada é sempre a soma do QTD de cada épico da tabela; Capacidade é sempre a soma do "reservado" de cada épico — os dois números do cabeçalho são clicáveis e abrem a lista dos itens exatos que entram em cada soma (com a situação: Backlog, Discovery, WIP ou Vazão, com a data quando entregue). Status e Flow seguem a configuração do fluxo do time; CycleTime em vermelho passa do CT máximo. Dead line = fim do semestre${CFG.anFreeze ? ` menos ${CFG.anFreeze} dias` : ""} menos o CT máximo; “itens fora do fluxo” ainda não chegaram na coluna de entrada do CT. Ref.: roadmap interno do épico (ou o executivo da iniciativa, se vazio) e ${esc(CFG.anClassCol || "classificação")} da iniciativa.</div>`;
 }
 const fmtDM = d => d ? d.toLocaleDateString("pt-BR", {day:"2-digit", month:"short"}).replace(".", "").replace(" de ", "/").toUpperCase() : "--";
 function placeAnalytics(){ const h = document.querySelector(".top").offsetHeight; $("anPanel").style.top = h + "px"; $("anPanel").style.height = `calc(100% - ${h}px)`; }
@@ -86,6 +91,12 @@ window.addEventListener("resize", () => { if (AN.open) placeAnalytics(); });
 $("anPanel").addEventListener("click", e => {
   const th = e.target.closest("th[data-sort]");
   if (th){ const k = th.dataset.sort; AN.dir = AN.sort === k ? -AN.dir : 1; AN.sort = k; renderAnalytics(); return; }
+  const btn = e.target.closest("[data-an-items]");
+  if (btn){
+    const d = anData(), which = btn.dataset.anItems, items = which === "cap" ? d.capItems : d.projItems;
+    f4pItemsModal(`Roadmap ${d.team} · ${which === "cap" ? "Capacidade" : "Projetada"} · ${semLong(S.f.int || S.f.exec)}`, items);
+    return;
+  }
   const g = e.target.closest("[data-an-go]");
   if (g){ closeAnalytics(); $("goto").value = g.dataset.anGo; gotoId(g.dataset.anGo); }
 });
@@ -98,6 +109,7 @@ $("anCopy").onclick = () => {
   box.querySelectorAll("th").forEach(x => x.style.cssText = "background:#111;color:#fff;padding:8px;border:1px solid #fff");
   box.querySelectorAll("td").forEach((x, i) => x.style.cssText = "background:#E8E8E8;padding:8px;border:1px solid #fff;vertical-align:middle");
   box.querySelectorAll(".us").forEach(x => x.style.cssText = "background:#FDE047;font-weight:bold");
+  box.querySelectorAll(".res").forEach(x => x.style.cssText = "background:#DBEAFE;color:#1E3A8A;font-weight:bold");
   box.querySelectorAll(".ct-bad").forEach(x => x.style.cssText = "color:#DC2626;font-weight:bold");
   box.querySelectorAll(".ct-ok").forEach(x => x.style.cssText = "color:#1D47C9;font-weight:bold");
   document.body.appendChild(box);

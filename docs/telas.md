@@ -26,7 +26,7 @@ Alertas com diagnóstico, medidor e "O que fazer"; resumo nos pais; campos; "Com
 
 ## Visão analítica
 
-Painel lateral (aba "Visão analítica") habilitado com Time + Roadmap. Tabela no formato do slide de roadmap do time, ordenável, com "Copiar tabela". Regras em `docs/regras-de-negocio.md` §10.
+Painel lateral (aba "Visão analítica") habilitado com Time + Roadmap. Tabela no formato do slide de roadmap do time, ordenável, com "Copiar tabela". Capacidade e Projetada, no cabeçalho, são sempre a soma dos números mostrados nas linhas dos épicos (nunca uma contagem à parte) e são clicáveis: abrem a lista dos itens exatos que compõem cada soma (ID, título, situação — Backlog, Discovery, WIP ou Vazão, com a data quando Vazão), cada um levando direto até o item no quadro. A linha do épico mostra, logo após a descrição, quantos dos seus itens estão reservados (tag de capacidade do roadmap). Regras em `docs/regras-de-negocio.md` §10; decisão `0027`.
 
 ## Report F4P
 
