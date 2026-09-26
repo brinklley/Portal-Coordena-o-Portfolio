@@ -164,3 +164,46 @@ def test_clique_no_reservado_da_linha_abre_so_os_itens_reservados_daquele_epico(
     ids = page.locator("#f4pItemsBody .idb").all_inner_texts()
     assert set(ids) == {"AN_RES_e1_op0"}   # só o item com a tag, do Épico 1 (não o WIP do Épico 1 nem o do Épico 2)
     assert "Reservado" in page.inner_text("#f4pItemsTitle")
+
+# Decisão 0029: a coluna Status ganha uma nova linha com o mesmo agrupador (Backlog/Discovery/WIP/
+# Vazão, com quadradinho colorido e contagem) já usado no card do épico no quadro — reaproveitando
+# `distGroup(m)` (extraído do card do épico, src/js/06-renderizacao.js, para src/js/
+# 05-estado-e-calculos.js) em vez de duplicar a lógica de contagem por categoria.
+
+def test_status_mostra_o_agrupador_por_categoria_do_card_do_epico(page):
+    carregar(page, "f4p.xlsx")
+    sem = page.evaluate("semestre(TODAY)")
+    _setup_epico(page, team="AN_DIST", sem=sem, itens=[
+        {"stName": "Backlog"}, {"stName": "Backlog"},
+        {"stName": "WIP"},
+        {"stName": "Vazao", "deploy": "2026-01-05"}, {"stName": "Vazao", "deploy": "2026-01-06"}, {"stName": "Vazao", "deploy": "2026-01-07"},
+    ])
+    page.click("#anTab")
+    txt = page.inner_text("#anBody")
+    assert "Backlog 2" in txt
+    assert "Discovery 0" in txt   # mostra a categoria mesmo com contagem zero, igual ao card do épico
+    assert "WIP 1" in txt
+    assert "Vazão 3" in txt
+
+def test_status_agrupador_conta_so_os_itens_do_time_filtrado(page):
+    """epiMetrics(e, team) já filtra por time (mesma fonte usada pelo QTD/Capacidade/Projetada), então
+    o agrupador da coluna Status só conta os itens do time em análise, não os de outros times."""
+    carregar(page, "f4p.xlsx")
+    sem = page.evaluate("semestre(TODAY)")
+    page.evaluate("""(sem)=>{
+      S.model.teamFlow.AN_DIST_A = ["Backlog", "WIP", "Vazao"];
+      S.model.teamFlow.AN_DIST_B = ["Backlog", "WIP", "Vazao"];
+      CFG.flow.an_dist_a = {cat:{wip:"wip", vazao:"vazao"}, ct:[]};
+      CFG.flow.an_dist_b = {cat:{wip:"wip", vazao:"vazao"}, ct:[]};
+      S.model.ops.set("da1", {id:"da1", title:"A1", team:"AN_DIST_A", type:"User Story", stName:"WIP", deploy:null, ready:null, tags:[]});
+      S.model.ops.set("db1", {id:"db1", title:"B1", team:"AN_DIST_B", type:"User Story", stName:"Vazao", deploy:new Date(2026,0,5), ready:new Date(2026,0,1), tags:[]});
+      S.model.inis.set("INI_D", {id:"INI_D", valid:true, title:"Iniciativa", exec:sem, owner:null, rels:["REL_D"]});
+      S.model.rels.set("REL_D", {id:"REL_D", valid:true, title:"Release", parent:"INI_D", epis:["EPI_D"]});
+      S.model.epis.set("EPI_D", {id:"EPI_D", valid:true, title:"Épico compartilhado", parent:"REL_D", target:null, interno:null, st:0, ops:["da1", "db1"], type:"Epic"});
+      S.f.team = "AN_DIST_A"; S.f.exec = sem;
+      render();
+    }""", sem)
+    page.click("#anTab")
+    txt = page.inner_text("#anBody")
+    assert "WIP 1" in txt
+    assert "Vazão 0" in txt   # o item Vazão é do outro time (AN_DIST_B): não entra na contagem do AN_DIST_A

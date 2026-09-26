@@ -13,6 +13,11 @@ function phaseOf(m){
   return "backlog";
 }
 const PHASE_LABEL = {vazio:"sem itens", backlog:"Backlog", discovery:"Discovery", wip:"WIP", fechado:"Fechado"};
+/* legenda com a contagem por categoria (Backlog/Discovery/WIP/Vazão) do épico — o "agrupador" do card
+   do épico no quadro (kids/c-meta); reaproveitado também pela Visão analítica (coluna Status). */
+function distGroup(m){
+  return `<span title="Itens vinculados em colunas configuradas como Nenhum (ainda não iniciados)"><i class="sq none"></i>Backlog <b>${m.none}</b></span><span title="Itens vinculados que já começaram, nas colunas configuradas como Discovery"><i class="sq disc"></i>Discovery <b>${m.disc}</b></span><span title="Itens vinculados nas colunas configuradas como WIP"><i class="sq wip"></i>WIP <b>${m.wip}</b></span><span title="Itens vinculados nas colunas configuradas como Vazão"><i class="sq vaz"></i>Vazão <b>${m.vaz}</b></span>`;
+}
 function distBar(m){
   if (!m.n) return `<span class="dist"></span>`;
   const parts = [["none", m.none, "Backlog/outras"], ["disc", m.disc, "Discovery"], ["wip", m.wip, "WIP"], ["vaz", m.vaz, "Vazão"]];
