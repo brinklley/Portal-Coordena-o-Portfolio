@@ -413,6 +413,8 @@ tr[data-cat="disc"] .fnb{background:var(--c-disc);color:#fff} tr[data-cat="wip"]
 .an-table .res{background:#DBEAFE;color:#1E3A8A;padding:0 3px;font-weight:600;white-space:nowrap;font-size:11.5px}
 .an-table .st-ent{background:#22C55E;padding:1px 5px;font-weight:600}
 .an-table .st-sub{display:block;font-size:11.5px;color:var(--ink-2)}
+.an-table .an-dist{display:flex;flex-wrap:wrap;justify-content:center;gap:2px 8px;font-size:11px;color:var(--ink-2);margin-top:5px}
+.an-table .an-dist b{color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
 .an-table .fl{line-height:1.45;white-space:nowrap}
 .an-table .ct-ok{color:#1D47C9;font-weight:700} .an-table .ct-bad{color:#DC2626;font-weight:700}
 .an-table .dl{display:block;margin-top:3px;font-size:11.5px;font-weight:600;color:#475569;white-space:normal}
