@@ -1,9 +1,9 @@
 /* ---------- Report F4P (Business Outcomes – Productivity) ---------- */
 /* Painel lateral com o mesmo comportamento da Visão analítica (docs/backlog/report-f4p.md).
-   Quadrantes 1 (CycleTime) e 2 (Variabilidade) têm regra fechada; os demais aguardam definição
-   e aparecem como "em definição". As ilustrações (selo de cada grupo e o logo do cabeçalho) são
-   as imagens fornecidas pelo usuário a partir do slide de referência, embutidas em base64 pelo
-   build (F4P_ASSETS, gerado por scripts/build.mjs a partir de src/assets/f4p/*.png). */
+   Quadrantes 1 (CycleTime), 2 (Variabilidade) e 3 (Urgente) têm regra fechada; os demais aguardam
+   definição e aparecem como "em definição". As ilustrações (selo de cada grupo e o logo do
+   cabeçalho) são as imagens fornecidas pelo usuário a partir do slide de referência, embutidas em
+   base64 pelo build (F4P_ASSETS, gerado por scripts/build.mjs a partir de src/assets/f4p/*.png). */
 const F4P = {open:false};
 const F4P_QUADS = {
   var:   {title:"Variabilidade (min vs atual vs max)", side:"l", done:true},
@@ -11,7 +11,7 @@ const F4P_QUADS = {
   road:  {title:"Roadmap – Épicos (reserva vs roadmap entregue vs atual)", side:"l", done:false},
   vazao: {title:"Vazão (reserva vs realizado)", side:"l", done:false},
   ct:    {title:"CycleTime (reserva vs atual)", side:"r", done:true},
-  urg:   {title:"Urgente (meta vs realizado)", side:"r", done:false},
+  urg:   {title:"Urgente (meta vs realizado)", side:"r", done:true},
   ts:    {title:"Technical Story (meta vs realizado)", side:"r", done:false},
   us:    {title:"User Story (planejado vs não planejado)", side:"r", done:false}};
 /* selo (imagem) por grupo de quadrantes, na ordem de exibição de cada coluna */
@@ -69,7 +69,38 @@ function f4pVarCell(team){
   const bad = m.varr > R.max, low = m.varr < R.min, cls = bad ? "f4p-bad" : low ? "f4p-warn" : "f4p-good", arrow = (bad || low) ? "▼" : "▲";
   return `<span title="${esc(tip)}"><span class="f4p-lo">${dec1(R.min)}</span><span class="f4p-sep">|</span><b class="${cls}">${dec1(m.varr)} ${arrow}</b><span class="f4p-sep">|</span><span class="f4p-hi">${dec1(R.max)}</span></span>`;
 }
-const F4P_CELL = {var: f4pVarCell, ct: f4pCtCell};
+/* itens do time com a tag Expedite/Urgente configurada, de qualquer tipo */
+function f4pExpediteOps(team){
+  const tag = f4pExpediteTag();
+  return [...S.model.ops.values()].filter(o => o.team === team && (o.tagHits || []).some(t => t.id === tag));
+}
+/* Realizado: semestre em curso (ou nenhum reconhecido) conta ao vivo, aberto ou fechado; semestre já
+   encerrado só pode contar o que tem data de fechamento (o.deploy) — o portal não guarda histórico de
+   quando a tag foi aplicada, então só dá pra reconstruir com precisão o que já fechou naquele período. */
+function f4pUrgentRealizado(team, st){
+  st = st || f4pSemesterState();
+  const ops = f4pExpediteOps(team);
+  if (st.kind === "past") return ops.filter(o => o.deploy && o.deploy >= st.start && o.deploy <= st.end).length;
+  return ops.length;
+}
+/* Tendência: itens Expedite fechados nos últimos 3 meses vs. nos 3 meses antes desses — sempre a
+   partir de hoje, independente do semestre selecionado no filtro. Sem margem de tolerância: mais → ▲,
+   menos → ▼, igual → ◆. */
+function f4pUrgentTrend(team){
+  const d3 = new Date(TODAY.getFullYear(), TODAY.getMonth() - 3, TODAY.getDate());
+  const d6 = new Date(TODAY.getFullYear(), TODAY.getMonth() - 6, TODAY.getDate());
+  const fechados = f4pExpediteOps(team).filter(o => o.deploy);
+  const recente = fechados.filter(o => o.deploy > d3 && o.deploy <= TODAY).length;
+  const anterior = fechados.filter(o => o.deploy > d6 && o.deploy <= d3).length;
+  return recente > anterior ? "▲" : recente < anterior ? "▼" : "◆";
+}
+function f4pUrgentCell(team){
+  const st = f4pSemesterState(), meta = f4pUrgentMetaOf(team), realizado = f4pUrgentRealizado(team, st), trend = f4pUrgentTrend(team);
+  const cls = meta == null ? "" : realizado > meta ? "f4p-bad" : "f4p-good";
+  const tip = `Tag: ${f4pTagName(f4pExpediteTag())} · ${st.kind === "past" ? `itens fechados em ${f4pPeriodLabel(st)}` : "contagem atual (abertos e fechados)"} · tendência: fechados nos últimos 3 meses vs. nos 3 meses anteriores${meta == null ? " · time sem meta cadastrada" : ""}`;
+  return `<span title="${esc(tip)}"><span class="f4p-lo">${meta ?? "--"}</span><span class="f4p-sep">|</span><b class="${cls}">${realizado}</b> <span class="f4p-trend">${trend}</span></span>`;
+}
+const F4P_CELL = {var: f4pVarCell, ct: f4pCtCell, urg: f4pUrgentCell};
 function f4pCard(id, teams){
   const q = F4P_QUADS[id];
   const head = `<div class="f4p-card-h">${esc(q.title)}</div>${q.goal ? `<div class="f4p-goal">${esc(q.goal)}</div>` : ""}`;
@@ -104,7 +135,7 @@ function renderF4P(){
       <div class="f4p-col">${left.map(g => f4pGroup(g, teams)).join("")}</div>
       <div class="f4p-col">${right.map(g => f4pGroup(g, teams)).join("")}</div>
     </div>
-    <div class="an-note">Mostra sempre todos os times carregados (${esc(teams.join(", "))}), mesmo com um time diferente selecionado no filtro — o filtro só habilita o acesso a este painel. CycleTime e Variabilidade usam itens dos tipos ${esc((CFG.f4p.types || []).join(", ") || "nenhum tipo marcado")} concluídos no período: <b>${esc(f4pPeriodLabel(st))}</b>${st.kind === "past" ? " (semestre selecionado, já encerrado)" : " (semestre selecionado ainda em curso, ou não reconhecido — usa a janela corrida)"}. Os demais quadrantes aguardam a definição da regra de cálculo.</div>`;
+    <div class="an-note">Mostra sempre todos os times carregados (${esc(teams.join(", "))}), mesmo com um time diferente selecionado no filtro — o filtro só habilita o acesso a este painel. CycleTime e Variabilidade usam itens dos tipos ${esc((CFG.f4p.types || []).join(", ") || "nenhum tipo marcado")} concluídos no período: <b>${esc(f4pPeriodLabel(st))}</b>${st.kind === "past" ? " (semestre selecionado, já encerrado)" : " (semestre selecionado ainda em curso, ou não reconhecido — usa a janela corrida)"}. Urgente conta itens com a tag <b>${esc(f4pTagName(f4pExpediteTag()))}</b>, de qualquer tipo${st.kind === "past" ? ", só os já fechados dentro do período acima (sem histórico de tag, não dá pra saber quem estava marcado antes disso)" : ", abertos ou fechados (contagem atual)"}. Os demais quadrantes aguardam a definição da regra de cálculo.</div>`;
 }
 function placeF4P(){ const h = document.querySelector(".top").offsetHeight; $("f4pPanel").style.top = h + "px"; $("f4pPanel").style.height = `calc(100% - ${h}px)`; }
 function openF4P(){ if (!f4pEnabled()) return; if (AN.open) closeAnalytics(); F4P.open = true; placeF4P(); $("f4pPanel").classList.add("open"); $("f4pPanel").setAttribute("aria-hidden","false"); $("f4pTab").setAttribute("aria-expanded","true"); renderF4P(); $("f4pClose").focus(); }

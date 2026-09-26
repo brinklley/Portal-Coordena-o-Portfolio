@@ -116,5 +116,107 @@ def test_configuracao_f4p_persiste_e_entra_na_exportacao(page):
     assert page.evaluate("CFG.f4p.teams.core") == {"min": 2, "max": 4}
 
 def test_importar_configuracao_antiga_sem_f4p_usa_padrao(page):
-    padrao = page.evaluate("()=>{ const c = normCfg({}); return {months:c.f4p.months, types:c.f4p.types, teams:c.f4p.teams}; }")
-    assert padrao == {"months": 6, "types": ["user story", "technical story"], "teams": {}}
+    padrao = page.evaluate("()=>{ const c = normCfg({}); return {months:c.f4p.months, types:c.f4p.types, expediteTag:c.f4p.expediteTag, teams:c.f4p.teams}; }")
+    assert padrao == {"months": 6, "types": ["user story", "technical story"], "expediteTag": "urgent", "teams": {}}
+
+# ---------------- Quadrante 3 · Urgente (meta vs. realizado) ----------------
+
+def test_urgente_conta_so_itens_com_a_tag_configurada(page):
+    carregar(page, "f4p.xlsx")
+    n = page.evaluate("""()=>{
+      S.model.ops.set("u1", {team:"F4P_URG1", type:"Bug", tagHits:[{id:"urgent"}]});
+      S.model.ops.set("u2", {team:"F4P_URG1", type:"Bug", tagHits:[]});
+      S.model.ops.set("u3", {team:"F4P_URG1", type:"Bug", tagHits:[{id:"paused"}]});
+      S.f.exec = semestre(TODAY);
+      return f4pUrgentRealizado("F4P_URG1");
+    }""")
+    assert n == 1
+
+def test_urgente_semestre_atual_conta_abertos_e_fechados(page):
+    carregar(page, "f4p.xlsx")
+    n = page.evaluate("""()=>{
+      S.model.ops.set("u1", {team:"F4P_URG2", type:"Bug", tagHits:[{id:"urgent"}], deploy:null});
+      S.model.ops.set("u2", {team:"F4P_URG2", type:"Bug", tagHits:[{id:"urgent"}], deploy:TODAY});
+      return f4pUrgentRealizado("F4P_URG2", {kind:"current"});
+    }""")
+    assert n == 2
+
+def test_urgente_semestre_passado_conta_so_fechados_no_periodo(page):
+    """Sem histórico de quando a tag foi aplicada, um semestre já encerrado só pode contar o que fechou
+    (tem o.deploy) dentro daquele período — itens ainda abertos, ou fechados fora do período, ficam de fora."""
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      const curStart = f4pSemStart(semestre(TODAY));
+      const prevMid = new Date(curStart.getFullYear(), curStart.getMonth() - 3, 15);
+      const prevSem = semestre(prevMid);
+      S.model.ops.set("u1", {team:"F4P_URG3", type:"Bug", tagHits:[{id:"urgent"}], deploy:prevMid});    // fechado dentro do semestre anterior
+      S.model.ops.set("u2", {team:"F4P_URG3", type:"Bug", tagHits:[{id:"urgent"}], deploy:null});       // ainda aberto
+      S.model.ops.set("u3", {team:"F4P_URG3", type:"Bug", tagHits:[{id:"urgent"}], deploy:curStart});   // fechado, mas no semestre atual
+      S.f.int = prevSem;
+      return f4pUrgentRealizado("F4P_URG3");
+    }""")
+    assert r == 1
+
+def test_urgente_tendencia_compara_trimestres(page):
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      const recente = new Date(TODAY.getFullYear(), TODAY.getMonth() - 1, 15);   // dentro dos últimos 3 meses
+      const antigo = new Date(TODAY.getFullYear(), TODAY.getMonth() - 5, 15);    // entre 3 e 6 meses atrás
+      S.model.ops.set("a1", {team:"F4P_TREND_UP", tagHits:[{id:"urgent"}], deploy:recente});
+      S.model.ops.set("a2", {team:"F4P_TREND_UP", tagHits:[{id:"urgent"}], deploy:recente});
+      S.model.ops.set("a3", {team:"F4P_TREND_UP", tagHits:[{id:"urgent"}], deploy:antigo});
+      S.model.ops.set("b1", {team:"F4P_TREND_DOWN", tagHits:[{id:"urgent"}], deploy:recente});
+      S.model.ops.set("b2", {team:"F4P_TREND_DOWN", tagHits:[{id:"urgent"}], deploy:antigo});
+      S.model.ops.set("b3", {team:"F4P_TREND_DOWN", tagHits:[{id:"urgent"}], deploy:antigo});
+      S.model.ops.set("c1", {team:"F4P_TREND_FLAT", tagHits:[{id:"urgent"}], deploy:recente});
+      S.model.ops.set("c2", {team:"F4P_TREND_FLAT", tagHits:[{id:"urgent"}], deploy:antigo});
+      return {up: f4pUrgentTrend("F4P_TREND_UP"), down: f4pUrgentTrend("F4P_TREND_DOWN"), flat: f4pUrgentTrend("F4P_TREND_FLAT")};
+    }""")
+    assert r == {"up": "▲", "down": "▼", "flat": "◆"}
+
+def test_urgente_meta_colore_vermelho_verde_ou_neutro(page):
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.ops.set("m1", {team:"F4P_META", tagHits:[{id:"urgent"}], deploy:null});
+      S.model.ops.set("m2", {team:"F4P_META", tagHits:[{id:"urgent"}], deploy:null});
+      S.model.ops.set("m3", {team:"F4P_META", tagHits:[{id:"urgent"}], deploy:null});   // 3 itens ao vivo
+      S.f.exec = semestre(TODAY);
+      CFG.f4p.teams.f4p_meta = {urgentMeta: 5};
+      const dentroDaMeta = f4pUrgentCell("F4P_META");           // 3 <= 5
+      CFG.f4p.teams.f4p_meta = {urgentMeta: 2};
+      const acimaDaMeta = f4pUrgentCell("F4P_META");            // 3 > 2
+      delete CFG.f4p.teams.f4p_meta;
+      const semMeta = f4pUrgentCell("F4P_META");
+      return {dentroDaMeta, acimaDaMeta, semMeta};
+    }""")
+    assert "f4p-good" in r["dentroDaMeta"] and "f4p-bad" not in r["dentroDaMeta"]
+    assert "f4p-bad" in r["acimaDaMeta"]
+    assert "f4p-good" not in r["semMeta"] and "f4p-bad" not in r["semMeta"]
+
+def test_urgente_aparece_calculado_no_painel(page):
+    carregar(page, "f4p.xlsx")
+    page.evaluate("()=>{ S.f.team='CORE'; S.f.exec=semestre(TODAY); render(); }")
+    page.click("#f4pTab")
+    assert "Urgente (meta vs realizado)" in page.inner_text("#f4pBody")
+    assert "f4p-lo" in page.evaluate("f4pUrgentCell('CORE')")
+
+def test_urgente_configuracao_tag_e_meta_persistem_e_entram_na_exportacao(page):
+    carregar(page, "times.xlsx")
+    page.click("#btnCfg")
+    assert page.eval_on_selector("#cfgF4pExpedite", "el => el.value") == "urgent"
+    page.select_option("#cfgF4pExpedite", "paused")
+    page.fill('input[data-f4pteam="core"][data-f4pf="urgentMeta"]', "5")
+    with page.expect_download() as d:
+        page.click("#cfgExport")
+    txt = open(d.value.path(), encoding="utf-8").read()
+    assert '"expediteTag": "paused"' in txt and '"urgentMeta": 5' in txt
+    page.click("#cfgSave"); page.wait_for_timeout(200)
+    assert page.evaluate("CFG.f4p.expediteTag") == "paused"
+    assert page.evaluate("CFG.f4p.teams.core.urgentMeta") == 5
+
+def test_urgente_meta_zero_e_valida(page):
+    carregar(page, "times.xlsx")
+    page.click("#btnCfg")
+    page.fill('input[data-f4pteam="core"][data-f4pf="urgentMeta"]', "0")
+    page.click("#cfgSave"); page.wait_for_timeout(200)
+    assert page.evaluate("CFG.f4p.teams.core") == {"urgentMeta": 0}

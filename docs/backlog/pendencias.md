@@ -2,7 +2,7 @@
 
 | # | Tema | Situação |
 |---|---|---|
-| 1 | **Report F4P** | Quadrantes 1 e 2 implementados. Próximo: especificar e implementar o Quadrante Urgente (meta vs. realizado); faltam mais 5 depois dele. Ver `report-f4p.md`. |
+| 1 | **Report F4P** | Quadrantes 1, 2 e 3 (CycleTime, Variabilidade, Urgente) implementados; faltam 5 (regra de cálculo ainda em definição). Ver `report-f4p.md`. |
 | 2 | Carga incremental do Azure | Cada atualização recarrega tudo. Ideia: filtrar o histórico por `ChangedDate` desde a última carga (o Analytics aceita). |
 | 3 | IDs repetidos entre organizações | Hoje os itens são identificados só pelo número. Relevante se houver épicos em mais de uma organização. |
 | 4 | Política de colunas antigas | Padrão "ignorar" (igual à ActionableAgile). Decidir se o portal oferece "mapear" como política da organização. |
