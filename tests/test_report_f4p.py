@@ -141,6 +141,26 @@ def test_urgente_semestre_atual_conta_abertos_e_fechados(page):
     }""")
     assert n == 2
 
+def test_urgente_semestre_atual_ignora_fechados_fora_da_janela_de_meses(page):
+    """Regressão relatada pelo usuário: a contagem estava somando todo item que já teve a tag em
+    qualquer momento da história do time (ex.: 249 itens num time que usa a tag raramente), porque o
+    Realizado do semestre em curso não tinha corte de data para itens já fechados. A janela correta é a
+    mesma regra geral do Report F4P (f4pWindow/decisão 0013): últimos CFG.f4p.months meses corridos a
+    partir de hoje — a mesma que CycleTime/Variabilidade já usavam, não uma nova âncora no início do
+    semestre (decisão 0015)."""
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.f.exec = semestre(TODAY);
+      const meses = CFG.f4p.months || 6;
+      const foraDaJanela = new Date(TODAY.getFullYear(), TODAY.getMonth() - meses - 1, 15);   // antes da janela de N meses
+      const dentroDaJanela = new Date(TODAY.getFullYear(), TODAY.getMonth() - 1, 15);          // dentro da janela de N meses
+      S.model.ops.set("v1", {team:"F4P_URG4", tagHits:[{id:"urgent"}], deploy:foraDaJanela});   // fechado fora da janela: não conta
+      S.model.ops.set("v2", {team:"F4P_URG4", tagHits:[{id:"urgent"}], deploy:dentroDaJanela}); // fechado dentro da janela: conta
+      S.model.ops.set("v3", {team:"F4P_URG4", tagHits:[{id:"urgent"}], deploy:null});           // aberto há qualquer tempo: conta
+      return f4pUrgentRealizado("F4P_URG4");
+    }""")
+    assert r == 2
+
 def test_urgente_semestre_passado_conta_so_fechados_no_periodo(page):
     """Sem histórico de quando a tag foi aplicada, um semestre já encerrado só pode contar o que fechou
     (tem o.deploy) dentro daquele período — itens ainda abertos, ou fechados fora do período, ficam de fora."""
