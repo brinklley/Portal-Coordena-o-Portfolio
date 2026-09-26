@@ -15,6 +15,8 @@
    - Semestre já encerrado: só os itens com a tag cujo `o.deploy` caiu dentro do período do semestre.
    - Semestre futuro: painel inteiro desabilitado (regra já existente, decisão `0013`).
 
+   > **Atualização (bug encontrado em produção)**: a regra do semestre em curso acima estava errada e foi corrigida — ver `docs/decisoes/0015-report-f4p-urgente-limite-de-data.md`. "Sem filtro de data" fazia a contagem somar todo item que já teve a tag em qualquer momento da história do time (não só a do semestre atual).
+
 4. **Cor do Realizado**: vermelho quando ultrapassa a Meta, verde quando está na meta ou abaixo — confirmado como o usuário descreveu ("a meta é ficar abaixo da meta").
 
 5. **Tendência (▲/▼/◆)**: o usuário pediu uma seta baseada nos "últimos 6 meses", sempre relativa a hoje — **independente do semestre selecionado no filtro** para a Meta/Realizado (esses dois sinais respondem a perguntas diferentes: "estamos dentro do teto deste semestre?" vs. "a tendência recente é de alta ou baixa?"). Adotado: comparar itens Expedite **fechados** nos últimos 3 meses contra os 3 meses anteriores a esses (mesma restrição de dados do item 3 — só dá pra comparar histórico usando datas de fechamento, itens ainda abertos não entram nessa conta). Sem margem de tolerância: mais no trimestre recente → ▲; menos → ▼; exatamente igual → ◆.

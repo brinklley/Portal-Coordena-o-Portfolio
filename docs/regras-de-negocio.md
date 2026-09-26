@@ -174,15 +174,17 @@ Especificação completa: `docs/backlog/report-f4p.md`. Decisões de implementa�
 
 Habilitado com **Time** e **Roadmap** (interno ou executivo) no filtro, igual à Visão analítica — mas o filtro só libera o acesso ao painel: o relatório sempre mostra **todos os times carregados no momento** (`S.model.teams`, o mesmo conjunto das colunas do quadro), independente de qual time está selecionado. Semestre **futuro** (ainda não começou): a aba fica desabilitada (não há dados possíveis) e, se o painel já estiver aberto, recolhe sozinho.
 
-### 12.1 Amostra do CycleTime (quadrantes CycleTime e Variabilidade)
+### 12.1 Janela de datas por semestre (regra geral do Report F4P)
 
-Itens **concluídos** (com `o.deploy` preenchido, isto é, já saíram do CT) dos **tipos configurados** (`CFG.f4p.types`, padrão User Story e Technical Story), de **todos** os itens do time (não filtrada por qual épico/iniciativa está no roadmap selecionado). O **período** da amostra depende do semestre escolhido no filtro (Roadmap interno tem prioridade sobre o executivo; `f4pSemesterState` em `src/js/23-report-f4p.js`):
+**Vale para qualquer quadrante calculado cuja amostra dependa de uma data de fechamento/saída** — hoje CycleTime, Variabilidade e Urgente; qualquer quadrante novo que precise de um período deve reaproveitar esta mesma regra (função `f4pWindow` em `src/js/23-report-f4p.js`), não inventar uma variante própria (foi o que causou o bug corrigido pela decisão `0015`). O período depende do semestre escolhido no filtro (Roadmap interno tem prioridade sobre o executivo; `f4pSemesterState`):
 
-| Semestre selecionado | Período da amostra |
+| Semestre selecionado | Janela |
 |---|---|
-| Em curso (contém hoje), ou nenhum semestre reconhecido no filtro | Últimos **N meses** a partir de hoje (`CFG.f4p.months`, padrão 6) — janela corrida |
-| Já encerrado (terminou antes de hoje) | Só as datas de saída **dentro daquele semestre** (1/jan–30/jun ou 1/jul–31/dez) |
+| Em curso (contém hoje), ou nenhum semestre reconhecido no filtro | Últimos **N meses** a partir de hoje (`CFG.f4p.months`, padrão 6) — janela corrida, **não** o início do semestre |
+| Já encerrado (terminou antes de hoje) | Só as datas **dentro daquele semestre** (1/jan–30/jun ou 1/jul–31/dez) |
 | Ainda não começou | Painel desabilitado (ver acima) |
+
+Uso em CycleTime/Variabilidade: itens **concluídos** (com `o.deploy` preenchido) dos **tipos configurados** (`CFG.f4p.types`, padrão User Story e Technical Story), de **todos** os itens do time (não filtrada por qual épico/iniciativa está no roadmap selecionado), cuja data de saída cai dentro da janela acima.
 
 ### 12.2 CycleTime (reserva vs. atual)
 
@@ -199,17 +201,18 @@ Itens **concluídos** (com `o.deploy` preenchido, isto é, já saíram do CT) do
 
 ### 12.4 Urgente (meta vs. realizado)
 
-Gestão da Classe de Serviço **Expedite**. Decisões e limitação de dados: `docs/decisoes/0014-report-f4p-quadrante-urgente.md`.
+Gestão da Classe de Serviço **Expedite**. Decisões e limitação de dados: `docs/decisoes/0014-report-f4p-quadrante-urgente.md` e `docs/decisoes/0015-report-f4p-urgente-limite-de-data.md` (correção de um bug de contagem).
 
 - **Tag Expedite**: qualquer uma das tags cadastradas (`docs/regras-de-negocio.md` §9), escolhida em Configurações › Report F4P (`CFG.f4p.expediteTag`, padrão a tag "URGENTE"). Um item conta se `o.tagHits` inclui essa tag — **de qualquer tipo** (não usa `CFG.f4p.types`, ao contrário de CycleTime e Variabilidade).
 - **Meta**: número inteiro cadastrado por time (`CFG.f4p.teams[time].urgentMeta`), representando o teto de itens Expedite aceitável no semestre. Sem meta cadastrada, a célula mostra "--" e o Realizado fica sem cor de alerta (nem verde, nem vermelho).
-- **Realizado**: depende do semestre selecionado no filtro, pela mesma razão de §12.1 (o portal não guarda histórico de quando uma tag foi aplicada — só o estado atual):
-  | Semestre selecionado | Realizado conta |
+- **Realizado**: usa a **mesma janela do §12.1** (`f4pWindow`) — não uma janela própria. O portal não guarda histórico de quando uma tag foi aplicada (só o estado atual e a data de fechamento), então:
+  | Situação do item | Conta no Realizado? |
   |---|---|
-  | Em curso, ou nenhum reconhecido | Todos os itens do time com a tag, **abertos ou fechados** (contagem ao vivo) |
-  | Já encerrado | Só os itens com a tag que **fecharam** (`o.deploy` preenchido) dentro do período daquele semestre |
+  | Aberto (com a tag) | Sempre — não importa há quanto tempo está aberto |
+  | Fechado (com a tag) | Só se a data de fechamento (`o.deploy`) cair dentro da janela do §12.1 (últimos N meses no semestre em curso; período exato no semestre encerrado) |
 - Indicador de cor do número: Realizado > Meta → vermelho; Realizado ≤ Meta → verde; sem meta cadastrada → sem cor.
 - **Tendência** (▲ aumentando / ▼ reduzindo / ◆ estável): compara quantos itens com a tag **fecharam** nos últimos 3 meses (a partir de hoje) contra os 3 meses anteriores a esses — sempre essa janela corrida de 6 meses, **independente do semestre selecionado no filtro**. Sem margem de tolerância: qualquer diferença já decide ▲ ou ▼; só empate exato é ◆. A cor da seta é neutra (não segue o vermelho/verde da Meta).
+- **Transparência**: o número do Realizado é clicável e abre a lista dos itens exatos que entraram na contagem (ID, título, situação — aberto ou fechado com a data); cada ID leva direto até o item no quadro (`gotoId`).
 
 ### 12.5 Demais quadrantes
 

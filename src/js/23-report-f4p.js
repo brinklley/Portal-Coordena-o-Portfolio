@@ -36,13 +36,22 @@ function f4pSemesterState(){
   if (end < TODAY) return {kind:"past", start, end};
   return {kind:"current", start, end};
 }
-/* amostra: itens concluídos (com data de saída do CT) dos tipos configurados, de todos os itens do time.
-   Semestre em curso ou sem semestre reconhecido: últimos N meses a partir de hoje. Semestre já fechado: só o período dele. */
-function f4pSample(team, st){
+/* Janela de datas padrão de qualquer amostra do Report F4P que dependa do semestre selecionado (regra
+   geral, decisão 0013 — vale para todo quadrante calculado, não só CycleTime/Variabilidade; reaproveite
+   esta função em vez de recriar a janela). Semestre em curso ou nenhum reconhecido: últimos N meses
+   corridos a partir de hoje. Semestre já encerrado: o período exato daquele semestre. */
+function f4pWindow(st){
   st = st || f4pSemesterState();
-  const types = f4pTypes(), months = CFG.f4p.months || 6;
+  const months = CFG.f4p.months || 6;
   const from = st.kind === "past" ? st.start : new Date(TODAY.getFullYear(), TODAY.getMonth() - months, TODAY.getDate());
   const to = st.kind === "past" ? st.end : TODAY;
+  return {from, to};
+}
+/* amostra: itens concluídos (com data de saída do CT) dos tipos configurados, de todos os itens do time,
+   dentro da janela de f4pWindow. */
+function f4pSample(team, st){
+  st = st || f4pSemesterState();
+  const types = f4pTypes(), {from, to} = f4pWindow(st);
   return [...S.model.ops.values()].filter(o => o.team === team && o.type && types.has(norm(o.type)) && o.deploy && o.ct != null && o.deploy >= from && o.deploy <= to);
 }
 function f4pPeriodLabel(st){
@@ -74,15 +83,18 @@ function f4pExpediteOps(team){
   const tag = f4pExpediteTag();
   return [...S.model.ops.values()].filter(o => o.team === team && (o.tagHits || []).some(t => t.id === tag));
 }
-/* Realizado: semestre em curso (ou nenhum reconhecido) conta ao vivo, aberto ou fechado; semestre já
-   encerrado só pode contar o que tem data de fechamento (o.deploy) — o portal não guarda histórico de
-   quando a tag foi aplicada, então só dá pra reconstruir com precisão o que já fechou naquele período. */
-function f4pUrgentRealizado(team, st){
+/* Itens que entram no Realizado: abertos com a tag contam sempre (não importa desde quando — ainda
+   estão em aberto, logo ainda são risco agora). Fechados só contam dentro da mesma janela de f4pWindow
+   (a regra geral do Report F4P: últimos N meses corridos no semestre em curso, período exato no já
+   encerrado) — sem isso, a contagem somaria todo item que já teve a tag em qualquer momento da história
+   do time, não só a deste período (o portal não guarda histórico de quando a tag foi aplicada, só a
+   data de fechamento). Função separada da contagem para dar suporte ao "ver os itens" (clique no número). */
+function f4pUrgentItems(team, st){
   st = st || f4pSemesterState();
-  const ops = f4pExpediteOps(team);
-  if (st.kind === "past") return ops.filter(o => o.deploy && o.deploy >= st.start && o.deploy <= st.end).length;
-  return ops.length;
+  const ops = f4pExpediteOps(team), {from, to} = f4pWindow(st);
+  return ops.filter(o => (st.kind !== "past" && !o.deploy) || (o.deploy && o.deploy >= from && o.deploy <= to));
 }
+function f4pUrgentRealizado(team, st){ return f4pUrgentItems(team, st).length; }
 /* Tendência: itens Expedite fechados nos últimos 3 meses vs. nos 3 meses antes desses — sempre a
    partir de hoje, independente do semestre selecionado no filtro. Sem margem de tolerância: mais → ▲,
    menos → ▼, igual → ◆. */
@@ -95,11 +107,35 @@ function f4pUrgentTrend(team){
   return recente > anterior ? "▲" : recente < anterior ? "▼" : "◆";
 }
 function f4pUrgentCell(team){
-  const st = f4pSemesterState(), meta = f4pUrgentMetaOf(team), realizado = f4pUrgentRealizado(team, st), trend = f4pUrgentTrend(team);
+  const st = f4pSemesterState(), meta = f4pUrgentMetaOf(team), items = f4pUrgentItems(team, st), realizado = items.length, trend = f4pUrgentTrend(team);
   const cls = meta == null ? "" : realizado > meta ? "f4p-bad" : "f4p-good";
-  const tip = `Tag: ${f4pTagName(f4pExpediteTag())} · ${st.kind === "past" ? `itens fechados em ${f4pPeriodLabel(st)}` : "contagem atual (abertos e fechados)"} · tendência: fechados nos últimos 3 meses vs. nos 3 meses anteriores${meta == null ? " · time sem meta cadastrada" : ""}`;
-  return `<span title="${esc(tip)}"><span class="f4p-lo">${meta ?? "--"}</span><span class="f4p-sep">|</span><b class="${cls}">${realizado}</b> <span class="f4p-trend">${trend}</span></span>`;
+  const tip = `Tag: ${f4pTagName(f4pExpediteTag())} · itens abertos (qualquer data) + fechados em ${f4pPeriodLabel(st)} · tendência: fechados nos últimos 3 meses vs. nos 3 meses anteriores${meta == null ? " · time sem meta cadastrada" : ""} · clique no número para ver os itens`;
+  return `<span title="${esc(tip)}"><span class="f4p-lo">${meta ?? "--"}</span><span class="f4p-sep">|</span><button type="button" class="f4p-real ${cls}" data-f4p-urgent-team="${esc(team)}">${realizado}</button> <span class="f4p-trend">${trend}</span></span>`;
 }
+/* modal com a lista dos itens que compõem o Realizado (abre ao clicar no número) */
+function f4pItemsModal(title, items){
+  const rows = items.length ? items.map(o => `<tr><td><button type="button" class="idb" data-f4p-go="${esc(o.id)}">${esc(o.id)}</button></td>
+      <td>${esc(o.title || "(sem título)")}</td>
+      <td class="c">${o.deploy ? `Fechado · ${fmtL(o.deploy)}` : "Aberto"}</td></tr>`).join("")
+    : `<tr><td colspan="3" class="muted">Nenhum item nesta contagem.</td></tr>`;
+  $("f4pItemsTitle").textContent = title;
+  $("f4pItemsBody").innerHTML = `<table class="ctab f4p-items-tbl"><thead><tr><th>ID</th><th>Título</th><th>Situação</th></tr></thead><tbody>${rows}</tbody></table>`;
+  $("f4pItemsBg").hidden = false;
+}
+function closeF4PItems(){ $("f4pItemsBg").hidden = true; }
+$("f4pItemsClose").onclick = closeF4PItems;
+$("f4pItemsBg").addEventListener("pointerdown", e => { if (e.target === $("f4pItemsBg")) closeF4PItems(); });
+$("f4pItemsBg").addEventListener("keydown", e => { if (e.key === "Escape"){ e.stopPropagation(); closeF4PItems(); } });
+$("f4pItemsBody").addEventListener("click", e => {
+  const g = e.target.closest("[data-f4p-go]");
+  if (g){ closeF4PItems(); closeF4P(); $("goto").value = g.dataset.f4pGo; gotoId(g.dataset.f4pGo); }
+});
+$("f4pBody").addEventListener("click", e => {
+  const btn = e.target.closest("[data-f4p-urgent-team]");
+  if (!btn) return;
+  const team = btn.dataset.f4pUrgentTeam, st = f4pSemesterState();
+  f4pItemsModal(`Urgente · ${team} · ${f4pPeriodLabel(st)}`, f4pUrgentItems(team, st));
+});
 const F4P_CELL = {var: f4pVarCell, ct: f4pCtCell, urg: f4pUrgentCell};
 function f4pCard(id, teams){
   const q = F4P_QUADS[id];
@@ -135,7 +171,7 @@ function renderF4P(){
       <div class="f4p-col">${left.map(g => f4pGroup(g, teams)).join("")}</div>
       <div class="f4p-col">${right.map(g => f4pGroup(g, teams)).join("")}</div>
     </div>
-    <div class="an-note">Mostra sempre todos os times carregados (${esc(teams.join(", "))}), mesmo com um time diferente selecionado no filtro — o filtro só habilita o acesso a este painel. CycleTime e Variabilidade usam itens dos tipos ${esc((CFG.f4p.types || []).join(", ") || "nenhum tipo marcado")} concluídos no período: <b>${esc(f4pPeriodLabel(st))}</b>${st.kind === "past" ? " (semestre selecionado, já encerrado)" : " (semestre selecionado ainda em curso, ou não reconhecido — usa a janela corrida)"}. Urgente conta itens com a tag <b>${esc(f4pTagName(f4pExpediteTag()))}</b>, de qualquer tipo${st.kind === "past" ? ", só os já fechados dentro do período acima (sem histórico de tag, não dá pra saber quem estava marcado antes disso)" : ", abertos ou fechados (contagem atual)"}. Os demais quadrantes aguardam a definição da regra de cálculo.</div>`;
+    <div class="an-note">Mostra sempre todos os times carregados (${esc(teams.join(", "))}), mesmo com um time diferente selecionado no filtro — o filtro só habilita o acesso a este painel. CycleTime e Variabilidade usam itens dos tipos ${esc((CFG.f4p.types || []).join(", ") || "nenhum tipo marcado")} concluídos no período: <b>${esc(f4pPeriodLabel(st))}</b>${st.kind === "past" ? " (semestre selecionado, já encerrado)" : " (semestre selecionado ainda em curso, ou não reconhecido — usa a janela corrida)"}. Urgente conta itens com a tag <b>${esc(f4pTagName(f4pExpediteTag()))}</b>, de qualquer tipo: os ainda abertos contam sempre, e os fechados só se fecharam dentro do mesmo período acima (sem histórico de tag, não dá pra saber quem estava marcado antes disso). Os demais quadrantes aguardam a definição da regra de cálculo.</div>`;
 }
 function placeF4P(){ const h = document.querySelector(".top").offsetHeight; $("f4pPanel").style.top = h + "px"; $("f4pPanel").style.height = `calc(100% - ${h}px)`; }
 function openF4P(){ if (!f4pEnabled()) return; if (AN.open) closeAnalytics(); F4P.open = true; placeF4P(); $("f4pPanel").classList.add("open"); $("f4pPanel").setAttribute("aria-hidden","false"); $("f4pTab").setAttribute("aria-expanded","true"); renderF4P(); $("f4pClose").focus(); }
