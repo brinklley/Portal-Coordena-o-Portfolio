@@ -34,11 +34,12 @@ Todas as chamadas usam `api-version=6.0`, lotes de 200 IDs e até 4 chamadas sim
 | 1 | Área do time | `GET {org}/{projeto}/{time}/_apis/work/teamsettings/teamfieldvalues` |
 | 2 | Níveis e tipos | `GET {org}/{projeto}/{time}/_apis/work/backlogs` |
 | 3 | Colunas do quadro | `GET {org}/{projeto}/{time}/_apis/work/boards/{nível}/columns` |
-| 4 | Campos personalizados | `GET {org}/_apis/wit/fields` (resolve nomes como `ID_EPICO_UNICRED` → `Custom.ID_EPICO_UNICRED`; a Classificação pode ter nome técnico em GUID) |
-| 5 | Lista de itens | `POST {org}/{projeto}/_apis/wit/wiql?$top=20000` (Area Path da equipe + tipos do nível) |
-| 6 | Campos atuais | `POST {org}/{projeto}/_apis/wit/workitemsbatch` |
-| 7 | Links (só itens de time sem o campo e sem Parent) | `POST …/workitemsbatch` com `$expand: Relations` |
-| 8 | Histórico do quadro | `GET analytics.dev.azure.com/{org}/{projeto}/_odata/v4.0-preview/WorkItemRevisions?$filter=WorkItemId in (…)&$expand=BoardLocations(…)` (segue `@odata.nextLink`) |
+| 4 | Id do próprio board | `GET {org}/{projeto}/{time}/_apis/work/boards/{nível}` (usado só para filtrar o histórico — ver "Datas das colunas" abaixo; se falhar, a carga segue sem o filtro) |
+| 5 | Campos personalizados | `GET {org}/_apis/wit/fields` (resolve nomes como `ID_EPICO_UNICRED` → `Custom.ID_EPICO_UNICRED`; a Classificação pode ter nome técnico em GUID) |
+| 6 | Lista de itens | `POST {org}/{projeto}/_apis/wit/wiql?$top=20000` (Area Path da equipe + tipos do nível) |
+| 7 | Campos atuais | `POST {org}/{projeto}/_apis/wit/workitemsbatch` |
+| 8 | Links (só itens de time sem o campo e sem Parent) | `POST …/workitemsbatch` com `$expand: Relations` |
+| 9 | Histórico do quadro | `GET analytics.dev.azure.com/{org}/{projeto}/_odata/v4.0-preview/WorkItemRevisions?$filter=WorkItemId in (…)&$expand=BoardLocations($select=ColumnId,ColumnName,Done,LaneName,BoardId)` (segue `@odata.nextLink`) |
 
 A tela de carga mostra o plano completo em formato de terminal: `[✓]` concluída (resultado e tempo), `[⠋]` em andamento (lote), `[ ]` pendente, `[✗]` erro, `[–]` pulada.
 
@@ -52,9 +53,14 @@ Validada contra a exportação da ActionableAgile (CORE, 2.469 itens): 100% nos 
 4. Colunas puladas herdam a data da **próxima** coluna em que o item entrou.
 5. Quando o item **volta** para uma coluna anterior, as datas das colunas à frente são apagadas (recebem novas datas ao avançar de novo).
 6. A parte **Done** de uma coluna que deixou de ser dividida vai, por padrão, para a coluna seguinte (ex.: "Teste Done" → "Pronto para Deploy").
-7. Colunas de quadros antigos ficam **ignoradas** por padrão. Na primeira carga de cada fonte, o usuário pode mapeá-las; o mapeamento fica em `CFG.azure.maps[fonte]`.
+7. Colunas de quadros antigos ficam **ignoradas** por padrão. Na primeira carga de cada fonte, o usuário pode mapeá-las; o mapeamento fica em `CFG.azure.maps[fonte]`. Pode ser revisto e ajustado depois em Configurações › Azure DevOps, sem precisar de uma nova carga (ver "Revisão do mapeamento" abaixo).
+8. **BoardLocations só do board da própria fonte** (decisão `0033`): a mesma Area Path pode estar incluída no quadro de mais de um time, então o histórico de um item às vezes traz `BoardLocations` de boards de **outros** times. Essas entradas são descartadas pelo `BoardId` (etapa 4 acima) antes de alimentar tanto o diálogo de mapeamento quanto o cálculo das datas — sem isso, colunas "fantasma" de outros quadros apareciam para mapear (normalmente nomes padrão sem customização, tipo "New"/"Active"/"Closed", repetidos várias vezes com contagens grandes) e podiam corromper as datas se o usuário mapeasse uma delas por engano. Sem o id do board (chamada 4 falhou), a carga não filtra nada — mesmo comportamento de antes da decisão `0033`.
 
 Diferenças residuais conhecidas: itens que saíram do quadro e voltaram ao Backlog; mapeamentos manuais de colunas antigas diferentes dos da ActionableAgile.
+
+## Revisão do mapeamento
+
+Em Configurações › Azure DevOps, cada fonte com mapeamento salvo mostra um botão "Mapeamento de colunas (N)". Ele expande uma tabela com a(s) coluna(s) do histórico (nome e quantas vezes apareceram na última carga, guardados em `CFG.azure.mapMeta[fonte]`), um seletor para reassociar a uma coluna atual do quadro (ou "Ignorar") e um botão para remover o mapeamento. As mudanças só valem depois de clicar em Salvar, como o resto da tela.
 
 ## Montagem dos dados
 

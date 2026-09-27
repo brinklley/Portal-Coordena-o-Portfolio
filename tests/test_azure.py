@@ -64,6 +64,53 @@ def test_mapeamento_de_colunas_renomeadas(page):
     page.wait_for_function('document.getElementById("srcLabel").textContent.includes("Azure DevOps")', timeout=60000)
     assert page.evaluate("!!S.model")
 
+def test_board_leak_e_filtrado_por_boardid(page):
+    """Vazamento de BoardLocations de outro board no histórico de um item (mesma Area Path incluída
+    em mais de um time — decisão 0033): a entrada vazada não deve contar como coluna a mapear nem
+    entrar no cálculo das datas do CT. `carregar()` já travaria esperando o diálogo de mapeamento
+    (#azMapOk) se o filtro por BoardId estivesse quebrado ou ausente."""
+    carregar(page, "times.xlsx", board_leak=True)
+    assert page.evaluate("!!S.model")
+    r = page.evaluate("""() => {
+      const L = AZ.raw.find(x => x.src.role === 'op' && x.src.team === 'CORE');
+      const id = [...L.items.keys()][0];
+      const v = L.revs.get(id)[0];
+      return {boardId: L.boardId, total: (v.BoardLocations || []).length, own: azOwnLocs(L, v).length,
+              unk: Object.keys(azUnknown(L))};
+    }""")
+    assert r["boardId"], "o id do próprio board não foi lido — o filtro fica inativo"
+    assert r["total"] == 2 and r["own"] == 1
+    assert "outro-time-new" not in r["unk"]
+
+def test_revisao_de_mapeamento_de_colunas(page):
+    """Depois da 1ª carga, o mapeamento salvo (caso extremo `coluna_antiga`) pode ser revisto e
+    ajustado em Configurações › Azure DevOps, sem precisar de uma nova carga (decisão 0033) — hoje
+    não existia nenhum jeito de voltar nessa escolha depois de fechar o diálogo de mapeamento.
+    Não usa `carregar()` (trava esperando o diálogo de mapeamento) — dirige a UI direto, como em
+    test_mapeamento_de_colunas_renomeadas."""
+    sim = AzureSimulado("times.xlsx", coluna_antiga=True)
+    page.route(re.compile(r"https://(analytics\.)?dev\.azure\.com/.*"), sim.rota)
+    fontes = fontes_de(sim); orgs = sorted({f["org"] for f in fontes})
+    page.evaluate("""([orgs, fontes])=>{
+      CFG.azure.orgs = orgs.map(o=>({org:o})); CFG.azure.sources = fontes; saveCfg();
+      orgs.forEach(o => AZ.tokens[o] = 'token-bom');
+    }""", [orgs, fontes])
+    page.evaluate("openAzureLoadModal()"); page.wait_for_timeout(200); page.click("#azGo")
+    page.wait_for_selector("#azMapOk", timeout=60000); page.click("#azMapOk")
+    page.wait_for_function('document.getElementById("srcLabel").textContent.includes("Azure DevOps")', timeout=60000)
+    src_id = page.evaluate("Object.keys(azCfgOf(CFG).maps).find(k => Object.keys(azCfgOf(CFG).maps[k]).length)")
+    assert src_id and page.evaluate(f"azCfgOf(CFG).maps[{src_id!r}]['coluna-antiga']") == ""
+    page.click("#btnCfg"); page.click('[data-cfgtab2="az"]')
+    btn = page.locator("[data-az-mapview]").first
+    assert "Mapeamento de colunas (1)" in btn.inner_text()
+    btn.click(); page.wait_for_timeout(300)
+    assert "Coluna Antiga" in page.inner_text("#azSec")
+    sel = page.locator("#azSec select[data-azmap2]").first
+    sel.select_option(index=1)
+    valor = sel.input_value(); assert valor
+    page.click("#cfgSave"); page.wait_for_timeout(200)
+    assert page.evaluate(f"azCfgOf(CFG).maps[{src_id!r}]['coluna-antiga']") == valor
+
 def test_tokens_nao_sobrevivem_a_reabertura(page):
     sim = azure(page)
     fonte_core = next(f for f in fontes_de(sim) if f["team"] == "CORE" and f["role"] == "op")

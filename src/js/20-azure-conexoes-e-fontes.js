@@ -11,7 +11,7 @@ const AZ_ROLES = [
   {id:"rel", name:"Release", multi:false, sheet:"RELEASE"},
   {id:"epi", name:"Coordenação de Épico", multi:true, sheet:"EPICO"},
   {id:"op", name:"Times operacionais", multi:true, sheet:null}];
-const azCfgOf = c => (c.azure = c.azure || {orgs:[], sources:[], maps:{}, fields:{epic:"ID_EPICO_UNICRED", roadmap:"AnoSemestreRoadmap"}, excludeRemoved:true});
+const azCfgOf = c => (c.azure = c.azure || {orgs:[], sources:[], maps:{}, mapMeta:{}, fields:{epic:"ID_EPICO_UNICRED", roadmap:"AnoSemestreRoadmap"}, excludeRemoved:true});
 const azSeg = s => encodeURIComponent(s);
 const azDev = org => `https://dev.azure.com/${azSeg(org)}`;
 const azConnected = org => !!AZ.tokens[org];
@@ -76,9 +76,11 @@ function azRender(){
     const list = A.sources.map((s, i) => [s, i]).filter(([s]) => s.role === role.id);
     h += `<div class="az-role"><div class="az-role-h">${role.name} <span class="muted">${role.multi ? "uma ou mais fontes" : "uma fonte"}</span></div>`;
     list.forEach(([s, i]) => {
-      const on = azConnected(s.org);
+      const on = azConnected(s.org), mapCount = Object.keys(A.maps[s.id] || {}).length;
       h += `<div class="az-src ${on ? "" : "locked"}">${on ? "" : `<span class="az-wait">Aguardando token</span> `}<b>${esc(s.org)}</b> / ${esc(s.project)} / ${esc(s.team)} / ${esc(s.level)}${s.alias ? ` <span class="muted">(aparece como <b>${esc(s.alias)}</b>)</span>` : ""}
+        ${mapCount ? `<button type="button" class="btn" data-az-mapview="${esc(s.id)}">Mapeamento de colunas (${mapCount})</button>` : ""}
         ${on ? `<button type="button" class="x" data-az-delsrc="${i}" aria-label="Remover fonte">×</button>` : ""}</div>`;
+      if (mapCount && AZ.mapOpen && AZ.mapOpen[s.id]) h += azMapEditHtml(s);
     });
     const canAdd = role.multi || !list.length;
     if (AZ.form && AZ.form.role === role.id) h += azFormHtml(role);
@@ -108,6 +110,23 @@ function azFormHtml(role){
     ${F.err ? `<div class="az-msg bad">${esc(F.err)}</div>` : ""}
   </div>`;
 }
+/* tabela de revisão do mapeamento salvo de uma fonte: nome(s)/contagem (mapMeta) + destino atual (maps),
+   editável sem precisar recarregar (decisão 0033) */
+function azMapEditHtml(s){
+  const A = azCfgOf(DRAFT), map = A.maps[s.id] || {}, meta = A.mapMeta[s.id] || {}, stages = s.stages || [];
+  const opt = cur => `<option value="" ${cur ? "" : "selected"}>Ignorar</option>` + stages.map(k => `<option value="${esc(k)}" ${k === cur ? "selected" : ""}>${esc(k)}</option>`).join("");
+  const rows = Object.keys(map).map(id => {
+    const m = meta[id];
+    const label = m ? `${esc(m.names.join(" / "))} <span class="muted">(${m.n} ocorrência${m.n === 1 ? "" : "s"} na última carga)</span>` : `<span class="muted">coluna ${esc(id)} — sem detalhes ainda (aparecem após a próxima carga)</span>`;
+    return `<tr><td>${label}</td><td><select data-azmap2="${esc(id)}">${opt(map[id])}</select></td>
+      <td><button type="button" class="x" data-az-mapdel="${esc(id)}" aria-label="Remover mapeamento">×</button></td></tr>`;
+  }).join("");
+  return `<div class="az-mapedit" data-azmap-src="${esc(s.id)}">
+    <p class="help">Colunas do histórico deste quadro que não existem mais no board atual (ou vieram de outro board) e para onde cada uma foi mapeada. Ajuste ou remova e clique em Salvar, no fim da tela, para aplicar na próxima carga.${stages.length ? "" : " Conecte a organização e reabra para atualizar as opções de destino."}</p>
+    <table class="ctab"><thead><tr><th>Coluna no histórico</th><th>Associar a</th><th></th></tr></thead>
+    <tbody>${rows || `<tr><td colspan="3" class="muted">Nenhum mapeamento salvo.</td></tr>`}</tbody></table>
+  </div>`;
+}
 function azMsg(txt, bad){ const m = $("azMsg"); if (m){ m.textContent = txt; m.className = "az-msg" + (bad ? " bad" : ""); } }
 $("cfgBody").addEventListener("click", async e => {
   const A = DRAFT && azCfgOf(DRAFT); if (!A) return;
@@ -135,6 +154,19 @@ $("cfgBody").addEventListener("click", async e => {
     A.orgs.splice(+b.dataset.azDelorg, 1); A.sources = A.sources.filter(s => s.org !== o.org); delete AZ.tokens[o.org]; azRender(); return;
   }
   if (b.dataset.azDelsrc !== undefined){ const s = A.sources.splice(+b.dataset.azDelsrc, 1)[0]; azRefreshTeams(s && s.role === "op" ? `Fonte ${s.alias || s.team} removida.` : ""); return; }
+  if (b.dataset.azMapview !== undefined){
+    const id = b.dataset.azMapview; AZ.mapOpen = AZ.mapOpen || {};
+    const abrindo = !AZ.mapOpen[id]; AZ.mapOpen[id] = abrindo;
+    if (abrindo){ const s = A.sources.find(x => x.id === id); if (s && !(s.stages && s.stages.length) && azConnected(s.org)){ try { s.stages = await azStages(s); } catch(err){} } }
+    azRender(); return;
+  }
+  if (b.dataset.azMapdel !== undefined){
+    const host = b.closest("[data-azmap-src]"); if (!host) return;
+    const srcId = host.dataset.azmapSrc, id = b.dataset.azMapdel;
+    if (A.maps[srcId]) delete A.maps[srcId][id];
+    if (A.mapMeta[srcId]) delete A.mapMeta[srcId][id];
+    azRender(); return;
+  }
   if (b.id === "azGateLoad"){
     // pré-carga: salva o rascunho direto (sem o botão "Salvar" da aba Geral, que nem existe ainda)
     const err = readForm();
@@ -185,6 +217,12 @@ $("cfgBody").addEventListener("change", async e => {
     }
     if (e.target.id === "azFAlias") F.alias = e.target.value;
   } catch(err){ F.err = err.message; azRender(); }
+});
+$("cfgBody").addEventListener("change", e => {
+  const sel = e.target.closest("select[data-azmap2]"); if (!sel || !DRAFT) return;
+  const host = sel.closest("[data-azmap-src]"); if (!host) return;
+  const A = azCfgOf(DRAFT), srcId = host.dataset.azmapSrc;
+  if (A.maps[srcId]) A.maps[srcId][sel.dataset.azmap2] = sel.value;
 });
 
 /* colunas do quadro de uma fonte, já com as divisões Doing/Done (mesmos nomes da carga) */
