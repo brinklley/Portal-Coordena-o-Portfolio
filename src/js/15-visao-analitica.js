@@ -106,7 +106,7 @@ $("anPanel").addEventListener("click", e => {
     return;
   }
   const g = e.target.closest("[data-an-go]");
-  if (g){ closeAnalytics(); $("goto").value = g.dataset.anGo; gotoId(g.dataset.anGo); }
+  if (g){ closeAnalytics(); gotoId(g.dataset.anGo); }
 });
 $("anPanel").addEventListener("keydown", e => { if (e.key === "Escape"){ e.stopPropagation(); closeAnalytics(); $("anTab").focus(); } });
 $("anCopy").onclick = () => {

@@ -74,23 +74,49 @@ function showInvestigation(q){
 }
 document.addEventListener("click", e => { const b = e.target.closest("[data-investigate]"); if (b){ hideFmsg(); showInvestigation(b.dataset.investigate); } });
 
+/* localiza um ID em qualquer nível (iniciativa, release, épico ou item de time) — decisão 0034 */
+function findAny(id){
+  const M = S.model;
+  if (M.inis.has(id)) return {lvl:"ini", item:M.inis.get(id)};
+  if (M.rels.has(id)) return {lvl:"rel", item:M.rels.get(id)};
+  if (M.epis.has(id)) return {lvl:"epi", item:M.epis.get(id)};
+  const op = [...M.ops.values()].find(o => o.id === id);
+  return op ? {lvl:"op", item:op} : null;
+}
+/* monta o "target" (chave do card) e o "path" (cadeia até a iniciativa) de um achado de findAny();
+   path fica null quando a cadeia está incompleta/inválida (ex.: release sem iniciativa) */
+function resolvePath(found){
+  const M = S.model, {lvl, item} = found;
+  if (lvl === "ini") return {target:"ini:"+item.id, path:{ini:item.id}};
+  if (lvl === "rel") return {target:"rel:"+item.id, path: (item.valid && M.inis.has(item.parent)) ? {ini:item.parent, rel:item.id} : null};
+  if (lvl === "epi") return {target:"epi:"+item.id, path: item.valid ? {ini:M.rels.get(item.parent).parent, rel:item.parent, epi:item.id} : null};
+  const e = M.epis.get(item.epicoId);
+  return {target:item.key, path: (e && e.valid) ? {ini:M.rels.get(e.parent).parent, rel:e.parent, epi:e.id} : null};
+}
+/* aplica a busca como o filtro único (persistente, aparece em "filtros ativos") e, quando ela é
+   um ID, também tenta rolar/abrir o item — decisão 0034. Texto livre (sem ID) só filtra: o
+   diagnóstico de "nenhum resultado" (diagnoseEmpty) já cobre esse caso sem precisar navegar.
+   Se o quadro inteiro ficar vazio, quem explica é o diagnóstico automático do render() (evita dois
+   avisos disputando o mesmo #fmsg — um deles, agendado por requestAnimationFrame, sempre venceria). */
 function gotoId(q){
-  if (!q || !S.model) return;
-  const M = S.model, V = S.V; const id = nid(q);
-  let target = null, path = null;
-  const opHit = [...M.ops.values()].find(o => o.id === id);
-  if (M.inis.has(id)){ if (M.inis.get(id).valid) path = {ini:id}; target = "ini:"+id; }
-  else if (M.rels.has(id)){ const r = M.rels.get(id); if (r.valid && M.inis.has(r.parent)) path = {ini:r.parent, rel:id}; target = "rel:"+id; }
-  else if (M.epis.has(id)){ const e = M.epis.get(id); if (e.valid){ path = {ini:M.rels.get(e.parent).parent, rel:e.parent, epi:id}; } target = "epi:"+id; }
-  else if (opHit){ const e = M.epis.get(opHit.epicoId); if (e && e.valid) path = {ini:M.rels.get(e.parent).parent, rel:e.parent, epi:e.id}; target = opHit.key; }
-  const anchor = $("goto");
+  if (!S.model) return;
+  q = (q || "").trim();
+  setQueryFilter(q);
+  if (!q) return;
+  const id = nid(q);
+  if (!id || !/^\d+$/.test(id)) return;
+  const V = S.V;
+  if (!V.visIni.size) return;
+  const found = findAny(id);
+  const anchor = $("fBusca");
   const inv = `<div class="acts"><button class="btn primary" data-investigate="${esc(id)}">Investigar por que não aparece</button></div>`;
-  if (!target) return showFmsg(anchor, `<b>ID ${esc(q)} não encontrado</b> nos dados carregados.${inv}`, "info");
+  if (!found) return showFmsg(anchor, `<b>ID ${esc(q)} não encontrado</b> nos dados carregados.${inv}`, "info");
+  const {target, path} = resolvePath(found);
   if (!path) return showFmsg(anchor, `<b>O ID ${esc(q)} existe, mas está fora da cadeia válida</b> (falta o vínculo com épico, release ou iniciativa), por isso não aparece no quadro.${inv}`, "info");
   const opKey = target.startsWith("op:") ? target : null;
   if (!pathVisible(V, path, opKey)){
     const act = activeFilters(), blk = blockingFilters(path, opKey);
-    if (!blk.length && !pathVisible(withFilters({exec:"", owners:new Set(), int:"", team:"", ini:""}, () => computeVisible()), path, opKey))
+    if (!blk.length && !pathVisible(withFilters({exec:"", owners:new Set(), int:"", team:"", q:""}, () => computeVisible()), path, opKey))
       return showFmsg(anchor, `<b>O ID ${esc(q)} existe, mas não aparece no quadro</b> por uma regra de exibição, e não por filtro.${inv}`, "info");
     const lines = (blk.length ? act.filter(([k]) => blk.includes(k)) : act).map(([k, v]) => `<li>${FILTER_LABEL[k]}: <b>${esc(v)}</b></li>`).join("");
     showFmsg(anchor, `<b>O ID ${esc(q)} está escondido pelos filtros ativos.</b> ${blk.length ? (blk.length === 1 ? "Este filtro esconde o item:" : "Estes filtros escondem o item:") : "A combinação destes filtros esconde o item:"}<ul>${lines}</ul>
@@ -98,7 +124,7 @@ function gotoId(q){
     $("fmGo").onclick = () => { hideFmsg(); clearFilters(); gotoId(q); };
     $("fmNo").onclick = hideFmsg;
     // destaca os filtros responsáveis
-    (blk.length ? blk : act.map(a => a[0])).forEach(k => { const el = {exec:"fExec", owners:"fOwner", int:"fInt", team:"fTeam", ini:"fIni"}[k]; const n = $(el); n.classList.remove("pulse"); void n.offsetWidth; n.classList.add("pulse"); });
+    (blk.length ? blk : act.map(a => a[0])).forEach(k => { const el = FILTER_EL[k]; const n = $(el); n.classList.remove("pulse"); void n.offsetWidth; n.classList.add("pulse"); });
     return;
   }
   hideFmsg();

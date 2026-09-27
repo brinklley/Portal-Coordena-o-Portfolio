@@ -1,5 +1,5 @@
 /* ---------------- estado ---------------- */
-const S = {model:null, f:{exec:"",owners:new Set(),int:"",team:"",ini:""}, path:{}, expand:false, focus:null, links:[], animateLevel:null, showEmpty:true, showBare:true, anchored:true, offsets:{}};
+const S = {model:null, f:{exec:"",owners:new Set(),int:"",team:"",q:""}, path:{}, expand:false, focus:null, links:[], animateLevel:null, showEmpty:true, showBare:true, anchored:true, offsets:{}};
 
 /* Fase do épico pelos itens vinculados:
    Fechado = todos em Vazão; WIP = algum em WIP (ou já entregou parte e o resto ainda não começou);
@@ -76,12 +76,16 @@ const bareRel = r => r.valid && !r.epis.length && r.st !== lastStage("rel");    
 const bareIni = i => !i.rels.length && i.st !== lastStage("ini");                 // iniciativa sem release, não concluída
 /* pode aparecer no quadro (com a opção ligada)? usado nas listas dos filtros */
 const iniCanAppear = i => i.rels.some(id => { const r = S.model.rels.get(id); return r.epis.length || bareRel(r); }) || bareIni(i);
+/* filtro único "ID ou descrição" (decisão 0034): substitui os antigos campos separados de
+   Iniciativa (ID ou nome) e "Ir para qualquer ID". Casa por ID exato OU por texto no título,
+   em qualquer nível (iniciativa, release, épico ou item de time) — quem casar revela a cadeia
+   inteira até a iniciativa; quando só um item de time casa, só ele aparece na lista do épico. */
 function computeVisible(){
   const M = S.model, f = S.f;
-  const q = norm(f.ini);
+  const q = norm(f.q), qId = f.q ? nid(f.q) : null;
   const visEpi = new Set(), visRel = new Set(), visIni = new Set(), visOp = new Set();
-  const passIni = i => !(f.exec && norm(i.exec) !== norm(f.exec)) && !(f.owners.size && !f.owners.has(i.owner ? norm(i.owner) : "__none__"))
-    && !(q && !(i.id === f.ini.trim() || norm(i.title).includes(q)));
+  const qHit = (id, title) => !q || id === qId || norm(title).includes(q);
+  const passIni = i => !(f.exec && norm(i.exec) !== norm(f.exec)) && !(f.owners.size && !f.owners.has(i.owner ? norm(i.owner) : "__none__"));
   M.epis.forEach(e=>{
     if (!e.valid) return;
     const r = M.rels.get(e.parent); if (!r.valid) return;
@@ -89,14 +93,24 @@ function computeVisible(){
     if (!passIni(i)) return;
     if (f.int && norm(e.interno) !== norm(f.int)) return;
     if (f.team && !e.ops.some(k => M.ops.get(k).team === f.team)) return;
+    const iniHit = qHit(i.id, i.title), relHit = qHit(r.id, r.title), epiHit = qHit(e.id, e.title);
+    const opHits = e.ops.filter(k => qHit(M.ops.get(k).id, M.ops.get(k).title));
+    if (!iniHit && !relHit && !epiHit && !opHits.length) return;
     visEpi.add(e.id); visRel.add(r.id); visIni.add(i.id);
-    e.ops.forEach(k => { if (!f.team || M.ops.get(k).team === f.team) visOp.add(k); });
+    const showAll = iniHit || relHit || epiHit;
+    e.ops.forEach(k => {
+      if (f.team && M.ops.get(k).team !== f.team) return;
+      if (!showAll && !opHits.includes(k)) return;
+      visOp.add(k);
+    });
   });
   // itens sem desdobramento: releases sem épico e iniciativas sem release (não concluídas);
   // os filtros de Time e Roadmap interno dependem dos épicos, então esses itens ficam de fora com eles
   if (S.showBare && !f.int && !f.team){
-    M.rels.forEach(r => { if (!bareRel(r)) return; const i = M.inis.get(r.parent); if (passIni(i)){ visRel.add(r.id); visIni.add(i.id); } });
-    M.inis.forEach(i => { if (bareIni(i) && passIni(i)) visIni.add(i.id); });
+    M.rels.forEach(r => { if (!bareRel(r)) return; const i = M.inis.get(r.parent); if (!passIni(i)) return;
+      if (!qHit(i.id, i.title) && !qHit(r.id, r.title)) return;
+      visRel.add(r.id); visIni.add(i.id); });
+    M.inis.forEach(i => { if (!bareIni(i) || !passIni(i)) return; if (!qHit(i.id, i.title)) return; visIni.add(i.id); });
   }
   return {visEpi, visRel, visIni, visOp};
 }
