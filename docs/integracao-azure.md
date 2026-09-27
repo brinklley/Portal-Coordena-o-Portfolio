@@ -5,6 +5,7 @@ Testes: `tests/test_azure.py` (contra `tests/azure_simulado.py`).
 
 ## Princípios
 
+- **Única fonte de dados do portal** (decisão `0032`) — não há mais carga por planilha/CSV. Sem nenhuma carga guardada neste navegador, o portal abre forçado na tela de conexão (ver `docs/telas.md` § Primeiro acesso).
 - **Sem servidor.** O navegador chama as APIs do Azure DevOps diretamente. `dev.azure.com` e `analytics.dev.azure.com` respondem com `Access-Control-Allow-Origin: *` e aceitam o cabeçalho `Authorization`, inclusive com a página aberta como arquivo local (origem `null`). Confirmado com HAR de uso real.
 - **Token nunca é salvo** (ver `docs/decisoes/0007-token-nunca-salvo.md`): fica em `AZ.tokens`, só em memória. É pedido a cada abertura do portal, na hora de carregar. A exportação da configuração nunca leva tokens.
 - **Escopos do PAT**, só leitura: *Work Items (Read)* e *Analytics (Read)*.
@@ -57,7 +58,7 @@ Diferenças residuais conhecidas: itens que saíram do quadro e voltaram ao Back
 
 ## Montagem dos dados
 
-- Cada fonte vira uma "aba" no mesmo formato da planilha (`azSheet`), com o fluxo real (`flow: {start, end, keys}`). O restante do portal não distingue planilha de Azure.
+- Cada fonte vira uma "aba" no formato interno usado por `buildModel` (`azSheet`), com o fluxo real (`flow: {start, end, keys}`).
 - Itens no estado **Removed** são excluídos (opção configurável); os IDs ficam em `importNotes.azure.removedIds` para a investigação por ID.
 - Vínculo do item de time com o épico: campo → Parent (se for épico carregado) → Remote Related.
 - `Blocked` vem da tag Blocked; `Blocked Days` é contado pelo histórico de tags.

@@ -1,5 +1,14 @@
 # Telas e funcionalidades
 
+## Primeiro acesso
+
+Sem nenhuma carga guardada neste navegador (`IndexedDB "mapaPortfolioAzure"` vazio), o portal abre
+direto na tela de Configurações › Azure DevOps, forçada e sem opção de fechar — todo o resto da
+interface (barra de ferramentas, quadro, painéis) fica escondido até terminar a primeira carga.
+Cadastre a organização (token), as fontes de Iniciativa/Release/Épico/Times e clique em "Carregar
+dados do Azure DevOps" dentro da própria tela. Depois da primeira carga, o portal libera o resto da
+interface e a aba "Configurações gerais" (ver `docs/configuracoes.md`). Ver decisão `0032`.
+
 ## Quadro (whiteboard)
 
 - Níveis empilhados e centralizados: Iniciativas → Releases → Épicos → Operacional dos times. Clicar num card abre o nível abaixo; "Abrir cadeia completa" abre tudo.
@@ -34,12 +43,12 @@ Painel lateral (aba "Report F4P", ao lado da Visão analítica) habilitado com T
 
 ## Higiene de dados
 
-Relatório de importação, carga do Azure, órfãos, épicos inválidos, releases sem iniciativa.
+Relatório da carga do Azure (itens Removidos excluídos, vínculos divergentes), órfãos, épicos inválidos, releases sem iniciativa.
 
 ## Configurações
 
-Ver `docs/configuracoes.md`.
+Duas abas — Azure DevOps (sempre acessível) e Configurações gerais (travada até a 1ª carga). Ver `docs/configuracoes.md`.
 
 ## Carga do Azure DevOps
 
-Botão "Azure DevOps": pede tokens das organizações usadas, mostra o plano de execução (terminal), pede mapeamento de colunas antigas na primeira carga. Ver `docs/integracao-azure.md`.
+Botão "Azure DevOps" (barra de ferramentas, ou o botão equivalente dentro da tela de primeiro acesso): pede tokens das organizações usadas, mostra o plano de execução (terminal), pede mapeamento de colunas antigas na primeira carga. Única forma de carregar dados no portal — ver `docs/integracao-azure.md` e a decisão `0032`.

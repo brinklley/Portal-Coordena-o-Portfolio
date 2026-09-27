@@ -10,6 +10,16 @@ Testes: `tests/test_configuracoes.py`.
 - Tokens: somente em memória (`AZ.tokens`).
 - **Exportar/Importar**: arquivo `.json` com o `CFG` (sem tokens). Importar converte formatos antigos (`normCfg`).
 
+## Duas abas (decisão `0032`)
+
+A tela tem duas abas: **Azure DevOps** (conexões, organizações e cadastro das fontes de Iniciativa/
+Release/Épico/Times — sempre acessível, mesmo sem nenhuma carga) e **Configurações gerais** (todo o
+resto — alertas por time, fluxo, tags, cores, campos adicionais, Report F4P). A aba Geral fica
+**desabilitada** até a primeira carga bem-sucedida (`!!S.model`), pois antes disso não há times,
+tipos nem colunas de fluxo para configurar. Sem nenhuma carga (nem cache no IndexedDB), a própria
+tela de Configurações abre sozinha, forçada na aba Azure DevOps, e não pode ser fechada — é a tela
+de primeiro acesso do portal (ver `docs/arquitetura.md`).
+
 ## Estrutura do `CFG` e padrões
 
 | Chave | Padrão | Uso |
@@ -46,9 +56,9 @@ Testes: `tests/test_configuracoes.py`.
 
 ## Times listados na configuração
 
-União dos times com dados carregados (planilha ou Azure) e dos cadastrados como fontes do Azure. **Times dos dados de exemplo não entram** (servem só ao quadro de demonstração).
+União dos times com dados carregados e dos cadastrados como fontes do Azure (estes aparecem mesmo antes da primeira carga).
 
 ## Botões do rodapé
 
 - **Restaurar padrão**: volta regras (alertas, fluxo, tags, cores…) ao padrão; mantém conexões, fontes e dados.
-- **Limpar tudo e reiniciar**: apaga configuração, conexões, fontes, mapeamentos, cache do Azure e tokens da sessão; recarrega como primeiro acesso. Oferece exportar antes.
+- **Limpar tudo e reiniciar**: apaga configuração, conexões, fontes, mapeamentos, cache do Azure e tokens da sessão; recarrega no estado de primeiro acesso (gate ativo, tela de conexão forçada). Oferece exportar antes.

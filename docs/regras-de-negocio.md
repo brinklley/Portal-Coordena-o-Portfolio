@@ -12,7 +12,7 @@ Código principal: `src/js/01-configuracao-e-regras.js`, `src/js/04-modelo.js`, 
 Iniciativa  ←(Parent)─  Release  ←(Parent)─  Épico  ←(vínculo)─  Item de time
 ```
 
-| Nível | Aba na planilha | Vínculo com o nível acima |
+| Nível | Aba (formato interno) | Vínculo com o nível acima |
 |---|---|---|
 | Iniciativa | `Iniciativa` / `INICIATIVA` | — |
 | Release | `Release` / `RELEASE` | coluna `Parent` = ID da iniciativa |
@@ -31,7 +31,7 @@ Quando o campo e o Remote Related apontam para épicos diferentes, vale o campo 
 
 ### 1.2 Abas de time
 
-Na planilha, uma aba é de time se o nome começa com `TIME ` (o time é o restante do nome) **ou** se ela tem a coluna `ID_EPICO_UNICRED` (o time é o nome da aba). Na carga do Azure, o nome do time é o "nome no portal" definido na fonte.
+Internamente, cada fonte de dados do Azure vira uma "aba" (mesmo formato de tabela usado por `buildModel`); uma aba é de time se o nome começa com `TIME ` (o time é o restante do nome) **ou** se ela tem a coluna `ID_EPICO_UNICRED` (o time é o nome da aba) — mas na prática o nome do time vem do "nome no portal" (alias) definido na fonte, na tela Configurações › Azure DevOps.
 
 ## 2. Validade (o item existe no portal?)
 
