@@ -10,7 +10,7 @@ const cfgDefaults = () => ({teams:{}, warnDays:30, alertDays:60, outlierDays:90,
   typeColors:{ini:{}, rel:{}, epi:{}, op:{}}, fields:{ini:[], rel:[], epi:[], op:[]}, ctCols:null, flow:{},
   anTag:"ROADMAP", anClassCol:"Classificação_Despesas_Comitê", anFreeze:0,
   f4p:{months:6, types:["user story","technical story"], expediteTag:"urgent", epiTypes:["epic"], usTypes:["user story"], effTypes:[], teams:{}},
-  azure:{orgs:[], sources:[], maps:{}, fields:{epic:"ID_EPICO_UNICRED", roadmap:"AnoSemestreRoadmap"}, excludeRemoved:true}});
+  azure:{orgs:[], sources:[], maps:{}, mapMeta:{}, fields:{epic:"ID_EPICO_UNICRED", roadmap:"AnoSemestreRoadmap"}, excludeRemoved:true}});
 /* aceita configurações antigas (ctMax + warnPct) e converte para limites por time */
 function normCfg(j){
   const c = {...cfgDefaults(), ...j, teams:{...(j.teams || {})}};
@@ -30,7 +30,7 @@ function normCfg(j){
     effTypes: Array.isArray(jf.effTypes) ? jf.effTypes : f4pD.effTypes,
     teams: {...(jf.teams || {})}};
   const az = j.azure || {};   // tokens nunca fazem parte da configuração
-  c.azure = {orgs:(az.orgs || []).map(o => ({org:o.org})), sources:az.sources || [], maps:az.maps || {},
+  c.azure = {orgs:(az.orgs || []).map(o => ({org:o.org})), sources:az.sources || [], maps:az.maps || {}, mapMeta:az.mapMeta || {},
     fields:{epic:"ID_EPICO_UNICRED", roadmap:"AnoSemestreRoadmap", ...(az.fields || {})}, excludeRemoved: az.excludeRemoved !== false};
   if (j.ctMax) Object.entries(j.ctMax).forEach(([k, v]) => { if (!c.teams[k] && v > 0) c.teams[k] = {max:v, warn:Math.round(v * (j.warnPct || 80) / 100)}; });
   delete c.ctMax; delete c.warnPct;

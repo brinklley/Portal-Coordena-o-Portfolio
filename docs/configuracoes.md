@@ -42,7 +42,8 @@ de primeiro acesso do portal (ver `docs/arquitetura.md`).
 | `f4p.teams[time]` | `{}` | por time: `min`/`max` da variabilidade esperada (padrão efetivo 1.5/3.5), `urgentMeta` (teto de itens Expedite no semestre; sem padrão), `tsMeta` (teto de itens Technical Story no semestre; padrão efetivo 6) e `effMin`/`effMax` da faixa de Eficiência de fluxo (padrão efetivo 30/55) |
 | `azure.orgs` | `[]` | organizações (sem token) |
 | `azure.sources` | `[]` | fontes: `id, role, org, project, team, level, alias, stages` |
-| `azure.maps[fonte]` | `{}` | mapeamento de colunas antigas (`colunaId` ou `colunaId|Done` → coluna atual) |
+| `azure.maps[fonte]` | `{}` | mapeamento de colunas antigas (`colunaId` ou `colunaId|Done` → coluna atual); revisável depois na aba Azure DevOps (ver abaixo), sem precisar de nova carga |
+| `azure.mapMeta[fonte]` | `{}` | nome(s) e contagem de cada coluna de `azure.maps`, atualizado a cada carga — só para exibição na revisão do mapeamento |
 | `azure.fields` | epic: ID_EPICO_UNICRED, roadmap: AnoSemestreRoadmap | nomes dos campos personalizados |
 | `azure.excludeRemoved` | `true` | excluir itens no estado Removed |
 
@@ -53,6 +54,14 @@ de primeiro acesso do portal (ver `docs/arquitetura.md`).
 - Fluxo de cada time: pelo menos **duas** colunas em "Entra no CT"; as abas com problema ficam em vermelho.
 - Report F4P: `min` e `max` da variabilidade de um time só valem preenchidos os dois juntos, e `min` < `max`. `urgentMeta` e `tsMeta` são independentes (podem ser preenchidos sem `min`/`max` nem um do outro), aceitam zero. `effMin`/`effMax` seguem a mesma regra da variabilidade: só valem preenchidos os dois juntos, com `effMin` < `effMax`.
 - Com erro, nada é salvo e os valores digitados são preservados no formulário.
+
+## Revisão do mapeamento de colunas (decisão `0033`)
+
+Na aba Azure DevOps, cada fonte com mapeamento salvo mostra um botão "Mapeamento de colunas (N)" que
+expande uma tabela editável: coluna do histórico (nome e contagem da última carga), seletor para
+reassociar a uma coluna atual do quadro (ou "Ignorar") e um botão para remover a entrada. Antes disso
+não havia como voltar nessa escolha depois de fechar o diálogo mostrado na carga — ver
+`docs/integracao-azure.md` § Revisão do mapeamento.
 
 ## Times listados na configuração
 

@@ -7,6 +7,11 @@ async function azLoadSource(src, st){
   const bl = await azFetch(org, `${tbase}/_apis/work/backlogs?${AZ_API}`), lvl = bl.value.find(l => l.name === src.level);
   if (!lvl) throw new Error(`o nível de backlog "${src.level}" não existe mais no time ${src.team}`);
   const cols = (await azFetch(org, `${tbase}/_apis/work/boards/${azSeg(src.level)}/columns?${AZ_API}`)).value, keys = azKeys(cols);
+  // id do próprio board (não só das colunas): usado para não confundir o histórico deste board com o
+  // de outro time que também enxerga o mesmo item (mesma Area Path incluída em mais de um board) — ver
+  // decisão 0033. Se a chamada falhar por algum motivo, a carga segue sem o filtro (mais tolerante que
+  // travar a fonte inteira por causa disto).
+  const boardId = await azFetch(org, `${tbase}/_apis/work/boards/${azSeg(src.level)}?${AZ_API}`).then(b => b.id, () => null);
   const F = await azFields(org), fEpic = F.find(A.fields.epic), fRoad = F.find(A.fields.roadmap), fClass = F.find(CFG.anClassCol || "");
   st.done("disc", `${tfv.values.length} área(s), ${cols.length} colunas, ${(lvl.workItemTypes || []).length} tipos`);
   st.begin("wiql");
@@ -36,17 +41,20 @@ async function azLoadSource(src, st){
   st.begin("hist");
   const an = `https://analytics.dev.azure.com/${azSeg(org)}/${azSeg(src.project)}/_odata/v4.0-preview/WorkItemRevisions`, revs = new Map(); let nrev = 0;
   await azPool(chunks.map(ch => async () => {
-    let url = `${an}?$filter=${encodeURIComponent(`WorkItemId in (${ch.join(",")})`)}&$select=WorkItemId,Revision,ChangedDate,CreatedDate,State,TagNames&$expand=${encodeURIComponent("BoardLocations($select=ColumnId,ColumnName,Done,LaneName)")}&$orderby=WorkItemId`;
+    let url = `${an}?$filter=${encodeURIComponent(`WorkItemId in (${ch.join(",")})`)}&$select=WorkItemId,Revision,ChangedDate,CreatedDate,State,TagNames&$expand=${encodeURIComponent("BoardLocations($select=ColumnId,ColumnName,Done,LaneName,BoardId)")}&$orderby=WorkItemId`;
     while (url){ const r = await azFetch(org, url); r.value.forEach(v => { if (!revs.has(v.WorkItemId)) revs.set(v.WorkItemId, []); revs.get(v.WorkItemId).push(v); nrev++; }); url = r["@odata.nextLink"] || null; }
   }), 4, (d, n) => st.prog("hist", `lote ${d} de ${n} · ${nrev.toLocaleString("pt-BR")} revisões`, d / n));
   st.done("hist", `${nrev.toLocaleString("pt-BR")} revisões`);
   revs.forEach(l => l.sort((a, b) => a.ChangedDate < b.ChangedDate ? -1 : a.ChangedDate > b.ChangedDate ? 1 : (a.Revision || 0) - (b.Revision || 0)));
-  return {src, cols, keys, items, revs, refs:{epic:fEpic, road:fRoad, cls:fClass}, nrev};
+  return {src, cols, keys, items, revs, refs:{epic:fEpic, road:fRoad, cls:fClass}, nrev, boardId};
 }
+/* só os BoardLocations do board desta fonte — descarta os de outro time que também enxerga o item
+   (ver decisão 0033). Sem L.boardId (chamada nova falhou), não filtra nada — comportamento anterior. */
+function azOwnLocs(L, v){ return (v.BoardLocations || []).filter(b => !L.boardId || b.BoardId === L.boardId); }
 /* colunas do histórico que não existem no quadro atual (e partes Done de colunas que deixaram de ser divididas) */
 function azUnknown(L){
   const cur = new Map(L.cols.map(c => [c.id, c])), unk = {};
-  L.revs.forEach(list => list.forEach(v => (v.BoardLocations || []).forEach(b => {
+  L.revs.forEach(list => list.forEach(v => azOwnLocs(L, v).forEach(b => {
     const c = cur.get(b.ColumnId); if (c && (c.isSplit || b.Done !== "Done")) return;
     const id = c ? `${b.ColumnId}|Done` : b.ColumnId, name = c ? `${c.name} (parte Done, de quando a coluna era dividida)` : b.ColumnName;
     const u = unk[id] || (unk[id] = {names:new Set(), n:0, splitDone:!!c}); u.names.add(name); u.n++;
@@ -55,7 +63,11 @@ function azUnknown(L){
 }
 function azMapFor(L){
   const A = azCfgOf(CFG), m = A.maps[L.src.id] = A.maps[L.src.id] || {}, unk = azUnknown(L), fresh = [];
-  Object.entries(unk).forEach(([id, u]) => { if (id in m) return; fresh.push(id);
+  // guarda nome(s) e contagem de cada coluna vista, pra tela de revisão do mapeamento em Configurações
+  // conseguir mostrar algo legível mesmo sem uma carga recente (o valor salvo em A.maps é só a chave
+  // da coluna atual escolhida, sem nome nem contagem) — ver decisão 0033.
+  const meta = A.mapMeta[L.src.id] = A.mapMeta[L.src.id] || {};
+  Object.entries(unk).forEach(([id, u]) => { meta[id] = {names:[...u.names], n:u.n}; if (id in m) return; fresh.push(id);
     if (u.splitDone){ const j = L.keys.findIndex(k => k.id === id.split("|")[0]); m[id] = L.keys[j + 1] ? L.keys[j + 1].key : ""; } else m[id] = ""; });
   return {map:m, unk, fresh};
 }
@@ -68,7 +80,7 @@ function azDates(L, map, id, created){
     return k ? k.key : (map[b.ColumnId] || null); };
   const first = {}; let prev = null;
   (L.revs.get(id) || []).forEach(v => {
-    const k = (v.BoardLocations || []).map(keyOf).find(Boolean); if (!k || k === prev) return;
+    const k = azOwnLocs(L, v).map(keyOf).find(Boolean); if (!k || k === prev) return;
     if (prev !== null && idx[k] < idx[prev]) Object.keys(first).forEach(x => { if (idx[x] > idx[k]) delete first[x]; });
     if (!(k in first)) first[k] = String(v.ChangedDate).slice(0, 10); prev = k;
   });

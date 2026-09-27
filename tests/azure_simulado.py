@@ -6,10 +6,12 @@ cenários reais encontrados na integração:
 - times ligados ao épico pelo campo ID_EPICO_UNICRED (org-times) e pelo Parent (DADOS, na org-portfolio);
 - quadros com fluxos próprios (o de épicos termina em 'Fechado'; o do DADOS em 'Pronto');
 - o token 'token-errado' (401);
-- opcionalmente (flags `item_removido`/`coluna_antiga`, exigem um time CORE na fixture, ex.
-  times.xlsx): um item no estado Removed (deve ser excluído) e uma coluna antiga no histórico
-  (ignorada por padrão, exercita o diálogo de mapeamento) — desligadas por padrão, para não travar
-  as cargas genéricas de `conftest.carregar()` esperando um diálogo que ninguém confirma."""
+- opcionalmente (flags `item_removido`/`coluna_antiga`/`board_leak`, exigem um time CORE na fixture,
+  ex. times.xlsx): um item no estado Removed (deve ser excluído), uma coluna antiga no histórico
+  (ignorada por padrão, exercita o diálogo de mapeamento) e uma entrada de BoardLocations "vazada" de
+  outro board (mesma Area Path incluída em mais de um time — decisão 0033) — desligadas por padrão,
+  para não travar as cargas genéricas de `conftest.carregar()` esperando um diálogo que ninguém
+  confirma."""
 import json, re, base64, datetime as dt
 from urllib.parse import urlsplit, parse_qs, unquote
 import openpyxl
@@ -38,7 +40,7 @@ def _colunas(nomes, prefixo):
             cid = f"{prefixo}-{i}"; cols.append({"id": cid, "name": n, "isSplit": False}); keys.append((n, cid, "Unknown")); i += 1
     return cols, keys
 
-def _revisoes(iid, datas, keys):
+def _revisoes(iid, datas, keys, board_id):
     """uma revisão por mudança de coluna: grupo de datas iguais = entrou na última coluna do grupo"""
     rv, n = [], 0
     criado = next((d for d in datas if d), "2026-01-01")
@@ -48,11 +50,11 @@ def _revisoes(iid, datas, keys):
             nome, cid, done = keys[j]
             rv.append({"WorkItemId": iid, "Revision": n, "ChangedDate": f"{d}T12:{n:02d}:00-03:00", "CreatedDate": f"{criado}T09:00:00-03:00",
                        "State": "Active", "TagNames": None,
-                       "BoardLocations": [{"ColumnId": cid, "ColumnName": nome.replace(" Doing", "").replace(" Done", ""), "Done": done, "LaneName": "Default Lane"}]})
+                       "BoardLocations": [{"ColumnId": cid, "ColumnName": nome.replace(" Doing", "").replace(" Done", ""), "Done": done, "LaneName": "Default Lane", "BoardId": board_id}]})
     return rv
 
 class AzureSimulado:
-    def __init__(self, arquivo="times.xlsx", *, coluna_antiga=False, item_removido=False):
+    def __init__(self, arquivo="times.xlsx", *, coluna_antiga=False, item_removido=False, board_leak=False):
         wb = openpyxl.load_workbook(FIX / arquivo)
         self.quadros = {}   # (org, projeto, time, nível) -> dados do quadro
         self.itens, self.revs, self.rels = {}, {}, {}
@@ -61,13 +63,14 @@ class AzureSimulado:
         def quadro(org, proj, time, nivel, cab, linhas, ini, fim, tipos, campos):
             fl = cab[cab.index(ini):cab.index(fim) + 1]
             cols, keys = _colunas(fl, f"{time}-{nivel}")
+            board_id = f"board::{org}::{proj}::{time}::{nivel}"
             ids = []
             for r in linhas:
                 iid = int(r["ID"]); ids.append(iid)
-                self.revs[(org, iid)] = _revisoes(iid, [_dia(r.get(k)) for k in fl], keys)
+                self.revs[(org, iid)] = _revisoes(iid, [_dia(r.get(k)) for k in fl], keys, board_id)
                 f = {"System.Id": iid, "System.Title": r["Title"], "System.WorkItemType": r.get("Work Item Type") or tipos[0], "System.State": "Active"}
                 f.update(campos(r)); self.itens[(org, iid)] = f
-            self.quadros[(org, proj, time, nivel)] = {"cols": cols, "ids": ids, "tipos": tipos, "area": f"{proj}\\{time}"}
+            self.quadros[(org, proj, time, nivel)] = {"cols": cols, "ids": ids, "tipos": tipos, "area": f"{proj}\\{time}", "board_id": board_id}
         c, l = ler(wb["Iniciativa"]); quadro("org-portfolio", "Portfolio", "Portfolio UBR", "Iniciativas", c, l, "Materialização da Oportunidade ou Solicitação", "Concluído", ["Initiative"],
             lambda r: {"Custom.AnoSemestreRoadmap": r["AnoSemestreRoadmap"], "System.AssignedTo": _pessoa(r.get("Assigned To"))})
         c, l = ler(wb["Release"]); quadro("org-portfolio", "Portfolio", "Portfolio UBR", "Releases", c, l, "Inventário de Opções de Valor", "Entregue", ["Product Release"],
@@ -84,18 +87,25 @@ class AzureSimulado:
             else:
                 quadro("org-times", "Times", time, "Stories", c, l, "Backlog", "Fechado", ["User Story", "Technical Story", "Internal Bug"],
                        lambda r: {"Custom.ID_EPICO_UNICRED": r["ID_EPICO_UNICRED"], "System.Tags": (r.get("Tags") or "").strip("[]")})
-        # casos extremos, opcionais: item removido (só existe no Azure) e coluna antiga no
-        # histórico de um item do CORE — exigem uma fixture com "TIME CORE" (ex.: times.xlsx)
-        if item_removido or coluna_antiga:
+        # casos extremos, opcionais: item removido (só existe no Azure), coluna antiga no
+        # histórico de um item do CORE, e vazamento de BoardLocations de outro board — exigem
+        # uma fixture com "TIME CORE" (ex.: times.xlsx)
+        if item_removido or coluna_antiga or board_leak:
             core = self.quadros.get(("org-times", "Times", "CORE", "Stories"))
-            if not core: raise ValueError("item_removido/coluna_antiga exigem uma fixture com TIME CORE")
+            if not core: raise ValueError("item_removido/coluna_antiga/board_leak exigem uma fixture com TIME CORE")
         if item_removido:
             self.itens[("org-times", 99999)] = {"System.Id": 99999, "System.Title": "Removido", "System.WorkItemType": "User Story", "System.State": "Removed"}
             self.revs[("org-times", 99999)] = []; core["ids"].append(99999)
         if coluna_antiga:
             primeiro = core["ids"][0]
             self.revs[("org-times", primeiro)].insert(0, {"WorkItemId": primeiro, "Revision": 0, "ChangedDate": "2025-01-01T10:00:00-03:00", "CreatedDate": "2025-01-01T09:00:00-03:00",
-                "State": "New", "TagNames": None, "BoardLocations": [{"ColumnId": "coluna-antiga", "ColumnName": "Coluna Antiga", "Done": "Unknown", "LaneName": "x"}]})
+                "State": "New", "TagNames": None, "BoardLocations": [{"ColumnId": "coluna-antiga", "ColumnName": "Coluna Antiga", "Done": "Unknown", "LaneName": "x", "BoardId": core["board_id"]}]})
+        if board_leak:
+            # entrada "vazada" de outro time (mesma Area Path incluída em mais de um board — decisão
+            # 0033): BoardId diferente do board do CORE, nome genérico de board sem customização
+            primeiro = core["ids"][0]
+            self.revs[("org-times", primeiro)][0]["BoardLocations"].append(
+                {"ColumnId": "outro-time-new", "ColumnName": "New", "Done": "Unknown", "LaneName": "Default Lane", "BoardId": "board::org-times::Times::OUTRO::Stories"})
         self.chamadas = 0
 
     def rota(self, route):
@@ -120,7 +130,11 @@ class AzureSimulado:
             qs = {k[3]: v for k, v in self.quadros.items() if k[:3] == (org, proj, time)}
             if path.endswith("/work/backlogs"): return js({"value": [{"name": n, "rank": 5 - i, "workItemTypes": [{"name": t} for t in q["tipos"]]} for i, (n, q) in enumerate(qs.items())]})
             if path.endswith("teamfieldvalues"): return js({"values": [{"value": next(iter(qs.values()))["area"], "includeChildren": False}]})
-            if "/work/boards/" in path: return js({"value": qs[path.split("/work/boards/")[1].split("/")[0]]["cols"]})
+            if "/work/boards/" in path:
+                resto = path.split("/work/boards/")[1].split("/")
+                q = qs[resto[0]]
+                if len(resto) > 1 and resto[1] == "columns": return js({"value": q["cols"]})
+                return js({"id": q["board_id"], "name": resto[0]})
         if path.endswith("/wit/wiql"):
             q = json.loads(req.post_data)["query"]
             alvo = next(v for k, v in self.quadros.items() if k[0] == org and f"'{v['area']}'" in q and f"'{v['tipos'][0]}'" in q)
