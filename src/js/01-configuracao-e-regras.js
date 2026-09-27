@@ -94,9 +94,8 @@ function resolveSets(c, stages){
    Ordem de prioridade: configuração do próprio time > configuração antiga (única) > padrão. */
 /* Times conhecidos: os que têm dados carregados e os cadastrados como fontes operacionais do Azure
    (estes aparecem na configuração mesmo antes da primeira carga). */
-function cfgTeams(c, withDemo){
-  // os times dos dados de exemplo só servem ao quadro de demonstração (filtro); não entram na configuração
-  const list = S.model && (withDemo || !S.isDemo) ? [...S.model.teams] : [];
+function cfgTeams(c){
+  const list = S.model ? [...S.model.teams] : [];
   ((c || CFG).azure && (c || CFG).azure.sources || []).filter(s => s.role === "op").forEach(s => {
     const name = s.alias || s.team; if (!list.some(x => norm(x) === norm(name))) list.push(name);
   });

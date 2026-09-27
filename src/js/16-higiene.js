@@ -1,18 +1,10 @@
 /* ---------------- higiene de dados ---------------- */
-function hygieneCount(){ const w = S.model.warn; return ((S.importNotes || {}).azure ? S.importNotes.azure.divergent.length : 0) + w.orphans.length + w.badEpi.length + w.relNoEpi.length + ((S.importNotes || {}).dropped || []).length; }
+function hygieneCount(){ const w = S.model.warn; return ((S.importNotes || {}).azure ? S.importNotes.azure.divergent.length : 0) + w.orphans.length + w.badEpi.length + w.relNoEpi.length; }
 function importHygiene(){
   const n = S.importNotes;
-  if (n && n.azure){
-    const a = n.azure; let h = `<div class="hy-group"><h4>Carga do Azure DevOps</h4><p>${a.removed} ${a.removed === 1 ? "item no estado Removed foi excluído" : "itens no estado Removed foram excluídos"}.</p>`;
-    if (a.divergent.length) h += `<p><b>${a.divergent.length} ${a.divergent.length === 1 ? "item com vínculo divergente" : "itens com vínculo divergente"}</b>: o campo ID_EPICO_UNICRED e o link Remote Related apontam para épicos diferentes (valeu o campo):</p><ul>${a.divergent.map(x => `<li>${esc(x.team)} #${esc(x.id)}: campo ${esc(x.campo)}, Remote Related ${esc(x.remoto)}</li>`).join("")}</ul>`;
-    return h + `</div>`;
-  }
-  if (!n || (!n.csvSheets.length && !n.dropped.length && !n.replaced.length)) return "";
-  let h = `<div class="hy-group"><h4>Importação da planilha</h4>`;
-  if (n.csvSheets.length) h += `<p>Formato CSV detectado e convertido automaticamente em: ${n.csvSheets.map(c => `<b>${esc(c.sheet)}</b> (${c.rows} registros)`).join(", ")}.</p>`;
-  if (n.fixed.length) h += `<p>${n.fixed.length} ${n.fixed.length === 1 ? "registro tinha" : "registros tinham"} aspas quebradas (por exemplo, título com quebra de linha) e ${n.fixed.length === 1 ? "foi reparado" : "foram reparados"}:</p><ul>${n.fixed.map(x => `<li>${esc(x.sheet)} #${esc(x.id)} ${esc(x.title)}</li>`).join("")}</ul>`;
-  if (n.dropped.length) h += `<p style="margin-top:8px"><b>${n.dropped.length} ${n.dropped.length === 1 ? "registro ignorado" : "registros ignorados"}</b> por estarem danificados; exporte de novo da ferramenta de origem para recuperá-${n.dropped.length === 1 ? "lo" : "los"}:</p><ul>${n.dropped.map(x => `<li>${esc(x.sheet)} #${esc(x.id)} ${esc(x.title)} <span style="color:var(--ink-3)">(${esc(x.why)})</span></li>`).join("")}</ul>`;
-  if (n.replaced.length) h += `<p style="margin-top:8px">Abas repetidas entre os arquivos (valeu a última): ${n.replaced.map(x => esc(x.sheet)).join(", ")}.</p>`;
+  if (!n || !n.azure) return "";
+  const a = n.azure; let h = `<div class="hy-group"><h4>Carga do Azure DevOps</h4><p>${a.removed} ${a.removed === 1 ? "item no estado Removed foi excluído" : "itens no estado Removed foram excluídos"}.</p>`;
+  if (a.divergent.length) h += `<p><b>${a.divergent.length} ${a.divergent.length === 1 ? "item com vínculo divergente" : "itens com vínculo divergente"}</b>: o campo ID_EPICO_UNICRED e o link Remote Related apontam para épicos diferentes (valeu o campo):</p><ul>${a.divergent.map(x => `<li>${esc(x.team)} #${esc(x.id)}: campo ${esc(x.campo)}, Remote Related ${esc(x.remoto)}</li>`).join("")}</ul>`;
   return h + `</div>`;
 }
 $("btnHygiene").onclick = () => {

@@ -1,8 +1,8 @@
 # Mapa do Portfólio
 
-Portal para visualizar e gerir o portfólio em cadeia: **Iniciativas → Releases → Épicos → itens dos times**, num whiteboard com kanbans por nível, alertas de CycleTime, visão analítica por time e carga de dados por **planilha** ou direto do **Azure DevOps**.
+Portal para visualizar e gerir o portfólio em cadeia: **Iniciativas → Releases → Épicos → itens dos times**, num whiteboard com kanbans por nível, alertas de CycleTime, visão analítica por time e carga de dados direto do **Azure DevOps**.
 
-É um **único arquivo HTML**: abra com dois cliques no Chrome ou Edge. Não precisa de servidor, e nenhum dado sai do computador (exceto as chamadas que você faz ao Azure DevOps).
+É um **único arquivo HTML**: abra com dois cliques no Chrome ou Edge. Não precisa de servidor, mas o primeiro acesso e toda atualização de dados exigem internet e uma conexão com o Azure DevOps — nenhum dado sai do computador além dessas chamadas.
 
 ## Para usar
 

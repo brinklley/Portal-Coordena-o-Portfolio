@@ -1,13 +1,13 @@
 # Mapa do Portfólio
 
-Visualizador encadeado Iniciativa → Release → Épico → itens dos times, com carga por planilha ou direto do Azure DevOps. Entregue como **um único HTML**, sem servidor. Interface e documentação em **português do Brasil**.
+Visualizador encadeado Iniciativa → Release → Épico → itens dos times, com carga direto do Azure DevOps (única fonte de dados — ver decisão `0032`). Entregue como **um único HTML**, sem servidor. Interface e documentação em **português do Brasil**.
 
 ## Comandos
 
-- `npm install` (baixa a biblioteca SheetJS usada no build)
+- `npm install`
 - `npm run build` → gera `dist/mapa_portfolio.html` (o arquivo entregue aos usuários)
 - `npm run check` → sintaxe do código juntado
-- `python3 tests/gerar_fixtures.py` → planilhas fictícias em `fixtures/`
+- `python3 tests/gerar_fixtures.py` → planilhas fictícias em `fixtures/`, usadas para alimentar o Azure simulado dos testes (não há mais upload de planilha no app)
 - `npm test` → build + testes (`pytest`, Playwright/Chromium). Primeira vez: `pip install -r requirements-dev.txt` e `python3 -m playwright install chromium`
 
 ## Regras de trabalho
@@ -22,9 +22,8 @@ Visualizador encadeado Iniciativa → Release → Épico → itens dos times, co
 ## Onde está cada coisa
 
 - Regras de negócio: `docs/regras-de-negocio.md`
-- Integração Azure DevOps: `docs/integracao-azure.md`
-- Importação de planilha/CSV: `docs/importacao-planilha.md`
-- Configurações (estrutura do `CFG`, padrões, validações): `docs/configuracoes.md`
+- Integração Azure DevOps (única fonte de dados): `docs/integracao-azure.md`
+- Configurações (estrutura do `CFG`, padrões, validações, as 2 abas da tela): `docs/configuracoes.md`
 - Telas e funcionalidades: `docs/telas.md`
 - Arquitetura e mapa dos arquivos: `docs/arquitetura.md`
 - Decisões e motivos: `docs/decisoes/`

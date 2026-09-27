@@ -2,7 +2,7 @@
 
 **Status**: Report F4P completo — os 8 quadrantes (CycleTime, Variabilidade, Urgente, Technical Story, Vazão, Roadmap – Épicos, User Story e Eficiência de fluxo) estão implementados. Ver `docs/regras-de-negocio.md` §12 e `docs/decisoes/0011` a `0031`.
 
-Tela "Report F4P" (BUSINESS OUTCOMES – PRODUCTIVITY), inspirada no slide usado pela gestão, com o mesmo comportamento da Visão analítica: **painel lateral recolhível, habilitado só quando o filtro tem um Time e um Roadmap (interno ou executivo)**, e desabilitado se o semestre selecionado ainda não começou (não há dados possíveis). O filtro só habilita o acesso; o relatório mostra **sempre todos os times carregados no momento** (`S.model.teams` — o mesmo conjunto das colunas do quadro; ver decisão `0011`, que optou por isso em vez dos times da tela de Configurações, pois esta última exclui os times dos dados de exemplo).
+Tela "Report F4P" (BUSINESS OUTCOMES – PRODUCTIVITY), inspirada no slide usado pela gestão, com o mesmo comportamento da Visão analítica: **painel lateral recolhível, habilitado só quando o filtro tem um Time e um Roadmap (interno ou executivo)**, e desabilitado se o semestre selecionado ainda não começou (não há dados possíveis). O filtro só habilita o acesso; o relatório mostra **sempre todos os times carregados no momento** (`S.model.teams` — o mesmo conjunto das colunas do quadro; ver decisão `0011`, que optou por isso em vez dos times da tela de Configurações, pois esta última também lista fontes do Azure ainda sem carga).
 
 Cabeçalho: título + logo F4P + semestre do filtro de roadmap (ex.: "1º semestre 2026").
 

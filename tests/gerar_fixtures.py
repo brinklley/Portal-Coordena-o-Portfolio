@@ -98,23 +98,6 @@ def desdobramento():
     T.append([oid, 210, "x", "User Story", D0, D0, D0, D0, D0])
     wb.save(OUT / "desdobramento.xlsx")
 
-def csv_nas_abas():
-    """Formato exportado pela ferramenta de analytics: cada linha CSV numa célula da coluna A,
-    com acentos quebrados (UTF-8 lido como Windows-1252), um título com quebra de linha entre aspas
-    que a conversão do Excel partiu, e um registro truncado."""
-    def moji(s): return s.encode("utf-8").decode("cp1252", errors="replace")
-    wb = openpyxl.Workbook(); wb.remove(wb.active)
-    def aba(nome, cab, linhas):
-        ws = wb.create_sheet(nome); ws.append([moji(",".join(cab))])
-        for l in linhas: ws.append([moji(l)])
-    aba("INICIATIVA", ["ID","Title","AnoSemestreRoadmap","Materialização da Oportunidade ou Solicitação","Concluído"], ["1,Iniciativa Única,2026 2º Semestre,2026-04-01,"])
-    aba("RELEASE", ["ID","Title","Parent","Inventário de Opções de Valor","Entregue"],
-        ['10,"Release com vírgula, no título",1,2026-04-02,', '11,"Título com quebra', '",1,2026-04-03,',
-         '12,"Aspa que a conversão não fechou,1,2026-04-04,'])   # quebra de linha entre aspas e aspa perdida
-    aba("EPICO", ["ID","Title","Parent","Target Date","Backlog","Fechado"], ["100,Épico A,10,2026-06-30,2026-04-05,", "101,Épico B,11,2026-06-30,2026-04-05,"])
-    aba("CORE", ["ID","ID_EPICO_UNICRED","Title","Work Item Type","Backlog","READY / PRONTO PARA DEV","Pronto para Deploy","Fechado"],
-        ["500,100,Item Próximo,User Story,2026-04-06,2026-04-07,2026-04-20,2026-04-21", "501,101,Item dois,User Story,2026-04-06,,,", "502,Item truncado sem colunas"])
-    wb.save(OUT / "csv_nas_abas.xlsx")
 
 def f4p():
     """Time único (CORE) com 10 itens de CT conhecido, para conferir o P95/P50 do Report F4P
@@ -133,5 +116,5 @@ def f4p():
     wb.save(OUT / "f4p.xlsx")
 
 if __name__ == "__main__":
-    for f in (times, responsaveis, fluxo_largo, desdobramento, csv_nas_abas, f4p): f()
+    for f in (times, responsaveis, fluxo_largo, desdobramento, f4p): f()
     print("fixtures geradas em", OUT)

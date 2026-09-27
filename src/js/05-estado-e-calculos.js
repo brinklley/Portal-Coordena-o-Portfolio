@@ -1,5 +1,5 @@
 /* ---------------- estado ---------------- */
-const S = {model:null, source:"demo", f:{exec:"",owners:new Set(),int:"",team:"",ini:""}, path:{}, expand:false, focus:null, links:[], animateLevel:null, showEmpty:true, showBare:true, anchored:true, offsets:{}};
+const S = {model:null, f:{exec:"",owners:new Set(),int:"",team:"",ini:""}, path:{}, expand:false, focus:null, links:[], animateLevel:null, showEmpty:true, showBare:true, anchored:true, offsets:{}};
 
 /* Fase do épico pelos itens vinculados:
    Fechado = todos em Vazão; WIP = algum em WIP (ou já entregou parte e o resto ainda não começou);

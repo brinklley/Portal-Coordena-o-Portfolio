@@ -9,8 +9,5 @@
     "check": "node scripts/check-syntax.mjs",
     "fixtures": "python3 tests/gerar_fixtures.py",
     "test": "npm run build && python3 -m pytest tests -q"
-  },
-  "devDependencies": {
-    "xlsx": "0.18.5"
   }
 }

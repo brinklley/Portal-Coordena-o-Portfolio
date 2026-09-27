@@ -6,14 +6,10 @@
 <title>Mapa do Portfólio</title>
 <style>/*__CSS__*/</style>
 </head>
-<body>
+<body class="gate-active">
 <div class="top">
   <div class="top-row">
-    <div class="brand"><h1>Mapa do Portfólio</h1><span class="src" id="srcLabel">dados de exemplo</span></div>
-    <label class="btn primary" for="file">Carregar planilha</label>
-    <input id="file" type="file" accept=".xlsx,.xlsm,.xls,.csv,.txt" multiple class="visually-hidden" title="Planilha do Portal (tabela ou CSV nas abas) ou arquivos .csv, um por aba">
-    <button class="btn" id="btnDemo">Dados de exemplo</button>
-    <button class="btn" id="btnTemplate" title="Baixa a planilha de exemplo no formato esperado">Baixar modelo</button>
+    <div class="brand"><h1>Mapa do Portfólio</h1><span class="src" id="srcLabel"></span></div>
     <button class="btn" id="btnAz" title="Carrega ou atualiza os dados direto do Azure DevOps">Azure DevOps</button>
     <button class="btn" id="btnCfg" title="Alertas por time e colunas de Discovery, WIP e Vazão">Configurações</button>
     <button class="btn" id="btnHygiene">Higiene de dados</button>
@@ -52,7 +48,6 @@
     </div>
   </div>
 </div>
-<div class="notice" id="notice">Você está vendo dados fictícios. Carregue a planilha do Portal para ver o seu portfólio; nada sai do seu computador.</div>
 <nav class="crumbs" id="crumbs" aria-label="Caminho selecionado"></nav>
 <div class="viewport" id="viewport"><div class="sizer" id="sizer"><div id="board"></div></div></div>
 <div class="zoom" role="group" aria-label="Zoom do quadro">
@@ -110,7 +105,6 @@
 <div class="fmsg" id="fmsg" role="alert" hidden></div>
 <div class="toast" id="toast" role="status"></div>
 
-<script>/*__XLSX__*/</script>
 <script>/*__APP__*/</script>
 </body>
 </html>
