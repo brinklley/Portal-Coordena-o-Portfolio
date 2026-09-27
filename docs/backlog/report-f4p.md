@@ -1,6 +1,6 @@
 # Report F4P
 
-**Status**: Quadrantes 1 (CycleTime), 2 (Variabilidade), 3 (Urgente), 4 (Technical Story), 5 (Vazão), 6 (Roadmap – Épicos) e 7 (User Story) implementados — ver `docs/regras-de-negocio.md` §12 e `docs/decisoes/0011` a `0030`. **Próxima tarefa: especificar o último quadrante**, Eficiência de fluxo (seção "Quadrantes seguintes" abaixo) — mesmo processo dos anteriores: propor aqui, confirmar com o usuário, então codar.
+**Status**: Report F4P completo — os 8 quadrantes (CycleTime, Variabilidade, Urgente, Technical Story, Vazão, Roadmap – Épicos, User Story e Eficiência de fluxo) estão implementados. Ver `docs/regras-de-negocio.md` §12 e `docs/decisoes/0011` a `0031`.
 
 Tela "Report F4P" (BUSINESS OUTCOMES – PRODUCTIVITY), inspirada no slide usado pela gestão, com o mesmo comportamento da Visão analítica: **painel lateral recolhível, habilitado só quando o filtro tem um Time e um Roadmap (interno ou executivo)**, e desabilitado se o semestre selecionado ainda não começou (não há dados possíveis). O filtro só habilita o acesso; o relatório mostra **sempre todos os times carregados no momento** (`S.model.teams` — o mesmo conjunto das colunas do quadro; ver decisão `0011`, que optou por isso em vez dos times da tela de Configurações, pois esta última exclui os times dos dados de exemplo).
 
@@ -20,14 +20,6 @@ Por time: `[MIN] | [Variabilidade] | [MAX]`
 - **MIN**: variabilidade mínima esperada, por time, nas configurações. Padrão **1.5**.
 - **MAX**: variabilidade máxima esperada, por time. Padrão **3.5**.
 - **Variabilidade** = **P95 / P50** do CT (mesma amostra do quadrante 1), com **1 casa decimal**.
-
-## Decisões adotadas (implementadas)
-
-- Amostra: itens **concluídos** (com data de saída do CT) dos tipos configurados, de **todos** os itens do time (não filtrada por qual épico/iniciativa está no roadmap selecionado). **O período, porém, acompanha o semestre selecionado no filtro** (decisão `0013`, revisão do que este documento propunha originalmente): semestre em curso → últimos N meses a partir de hoje (janela corrida); semestre já encerrado → só as datas de saída dentro daquele semestre; semestre futuro → painel desabilitado (não há dados possíveis).
-- Percentil por **interpolação linear** (igual ao `PERCENTIL.INC` do Excel) — função `percentil` em `src/js/02-utilitarios.js`.
-- Indicadores: CT com P95 > máximo → ▼ vermelho; ≤ máximo → ▲ verde. Variabilidade > MAX → ▼ vermelho; dentro da faixa → ▲ verde; < MIN → ▼ laranja.
-- P50 = 0 (ou amostra vazia) → variabilidade "--". O tamanho da amostra (n) e o P50 ficam no texto de apoio (`title`) da célula, não sempre visíveis.
-- Ilustrações: as imagens reais do slide de referência (fornecidas pelo usuário), embutidas em base64 no build — não os SVGs originais cogitados inicialmente (decisão `0012`).
 
 ## Quadrante 3 · URGENTE (META VS REALIZADO) — implementado
 
@@ -95,6 +87,24 @@ Por time: `[Planejado] | [Não planejado] [Tendência]`
 - **Transparência**: tanto o Planejado quanto o Não planejado são clicáveis e abrem a lista dos itens exatos de cada contagem.
 - **Conferência cruzada** (decisão `0030`): Vazão Realizado, Technical Story Realizado e User Story (Planejado + Não planejado) são três recortes por tipo do mesmo universo de itens entregues no período — a soma dos dois últimos deveria sempre bater com o primeiro, por time. Quando não bate (configuração de tipos inconsistente entre os três campos), o painel mostra um aviso destacado no topo com os números exatos de cada lado, por time, para o usuário investigar.
 
+## Quadrante 8 · EFICIÊNCIA DE FLUXO (MIN VS ATUAL VS MAX) — implementado
+
+Único quadrante que não olha a data de um único evento do item (entrega, fechamento), mas soma quanto tempo, dentro do período, cada item do fluxo passou em trabalho (touch time) e quanto passou parado numa fila (waiting time). Decisão: `docs/decisoes/0031-report-f4p-quadrante-eficiencia-de-fluxo.md`. Regra completa: `docs/regras-de-negocio.md` §12.9.
+
+Por time: `[MIN] | [Atual] [Tendência] | [MAX]`
+
+- **Fórmula**: Eficiência do Fluxo = Touch Time ÷ (Touch Time + Waiting Time) × 100.
+- **Janela**: reaproveita `f4pWindow` (decisão `0013`, a mesma janela rolante do CycleTime/Variabilidade) — semestre em curso → últimos N meses (`CFG.f4p.months`) a partir de hoje; semestre já encerrado → período exato do semestre. **Diferente** dos demais quadrantes "por semestre" (Urgente, Technical Story, Vazão, Roadmap – Épicos, User Story), que usam `f4pExactSemesterWindow`.
+- **Filtro**: todos os itens do fluxo do time (únicos, vinculados ao time — sem exigir conclusão), dos tipos configurados para este quadrante (`CFG.f4p.effTypes`, configuração própria); **vazio = todos os tipos** (padrão), ao contrário das demais listas de tipo do Report F4P, que caem num tipo fixo quando vazias.
+- **Touch/Waiting time por coluna**: nova marcação em Configurações › Fluxo dos times — estilo "Queueing Stages" do Actionable Agile (ferramenta de Analytics usada como referência): o usuário marca só as colunas de **Fila de espera** (waiting time); as demais colunas contam como **touch time** automaticamente, sem um terceiro estado "sem classificação".
+- **Cálculo por item**: cada coluna do fluxo do item vira um intervalo (da própria data até a data da próxima coluna preenchida, ou até hoje se ainda não avançou) classificado pela coluna onde o intervalo começa; só a parte do intervalo dentro da janela do período entra na soma (**recorte, não exclusão** do item inteiro). Exceção: se a última coluna com data é a de categoria Vazão (item já entregue), o intervalo não se estende até hoje — o relógio da eficiência para na entrega.
+- **Agregação**: soma de touch e soma de wait de **todos** os itens do time no período (não a média das eficiências individuais) — pondera pelo tempo real de cada item.
+- **MIN**/**MAX**: faixa esperada de eficiência, configurável por time (Configurações), padrão **30%**/**55%**.
+- **Cor**: dentro da faixa MIN–MAX → verde; fora (para cima ou para baixo) → vermelho. Sem terceira cor.
+- **Tendência** (▲/▼/◆): compara a eficiência do período inteiro selecionado com a eficiência só dos últimos 2 meses desse período — últimos 2 meses melhor (estritamente maior) → ▲; pior (estritamente menor) → ▼; igual, ou sem dado num dos dois lados → ◆ (o usuário pediu "🔹"; usei o "◆" já padronizado nos outros quadrantes deste painel, pela mesma consistência visual).
+- **Sem item no período**: mostra "--" (não é 0% de eficiência, é ausência de dado).
+- **Transparência**: o número Atual é clicável e abre a lista dos itens do time no período, com o touch/wait (já recortado pela janela) de cada um.
+
 ## Decisões adotadas (implementadas)
 
 - Amostra CycleTime/Variabilidade: itens **concluídos** (com data de saída do CT) dos tipos configurados, de **todos** os itens do time (não filtrada por qual épico/iniciativa está no roadmap selecionado). **O período, porém, acompanha o semestre selecionado no filtro** (decisão `0013`, revisão do que este documento propunha originalmente): semestre em curso → últimos N meses a partir de hoje (janela corrida); semestre já encerrado → só as datas de saída dentro daquele semestre; semestre futuro → painel desabilitado (não há dados possíveis).
@@ -108,6 +118,7 @@ Por time: `[Planejado] | [Não planejado] [Tendência]`
 - Vazão: mesmo critério de "entregue" do Technical Story (categoria de fluxo Vazão), mas com os tipos configurados para o CT (`CFG.f4p.types`) em vez de um tipo fixo; Reserva/Realizado por tag de capacidade (`CFG.anTag`, reaproveitada da Visão analítica) em vez de meta vs. realizado; números sem cor; Reserva e Realizado clicáveis (decisão `0022`). Tendência ajustada depois de ver o quadrante em produção: mês corrente somado aos itens hoje em WIP (trabalho a caminho de virar Vazão) contra a média dos meses anteriores, arredondada sempre pra cima (decisão `0023`). A seta da tendência (não os números) ganhou cor por Realizado vs. Reserva: verde se Realizado ≥ Reserva, vermelho se menor (decisão `0024`).
 - Roadmap – Épicos: primeiro quadrante a operar sobre o quadro de Épicos em vez dos itens operacionais dos times; "fechado" é a última coluna do próprio quadro de Épicos (`e.st`), não `catOf`. Roadmap/Roadmap entregue seguem o Target Date do épico (semestre interno) ou o vínculo com a iniciativa via Release (semestre executivo); Atual é uma contagem independente, só pela data de fechamento no período do semestre, sem olhar Target Date nem iniciativa em nenhum dos dois casos. Tendência adaptada do Vazão (decisão `0023`), usando épicos do Roadmap ainda abertos como o "WIP" deste quadrante. Tipos de épico considerados por uma configuração própria (`CFG.f4p.epiTypes`, padrão Epic), independente de `CFG.f4p.types` (decisão `0025`).
 - User Story: mesmo critério de "entregue" do Technical Story/Vazão, mas com tipos próprios (`CFG.f4p.usTypes`, padrão User Story); Planejado/Não planejado são uma partição exata (com/sem a tag de capacidade), não subconjunto/total como no Vazão. Tendência adaptada do Vazão (decisão `0023`). Adicionada uma conferência cruzada (Vazão Realizado = Technical Story Realizado + User Story Planejado + User Story Não planejado, por time) que sinaliza no painel quando a soma diverge — pedido explícito do usuário para detectar configuração de tipos inconsistente entre os três quadrantes (decisão `0030`).
+- Eficiência de fluxo: único quadrante que soma duração recortada pela janela em vez de filtrar por uma única data do item; reaproveita `f4pWindow` (decisão `0013`), não `f4pExactSemesterWindow` como os quadrantes "por semestre" mais recentes. Touch/waiting time por coluna do fluxo é configurável estilo "Queueing Stages" do Actionable Agile (só se marca a Fila de espera; o resto é touch automaticamente, sem "sem classificação"). Tipos configuráveis com padrão vazio = todos os tipos (`CFG.f4p.effTypes`), diferente das demais listas de tipo do painel. MIN/MAX configuráveis por time (padrão 30%/55%); cor verde dentro da faixa, vermelha fora. Tendência própria (últimos 2 meses do período vs. o período inteiro), com "🔹" substituído por "◆" para manter a consistência visual dos outros quadrantes (decisão `0031`).
 
 ## Configuração implementada (seção "Report F4P" na tela de Configurações)
 
@@ -117,18 +128,18 @@ Por time: `[Planejado] | [Não planejado] [Tendência]`
 - Por time: variabilidade mínima (1.5) e máxima (3.5), com validação MIN < MAX; meta de Urgente (inteiro ≥ 0, opcional, independente da variabilidade); e meta de Technical Story (inteiro ≥ 0, opcional, padrão efetivo 6).
 - Tipos de **épico** considerados pelo Roadmap – Épicos (`CFG.f4p.epiTypes`, padrão "Epic") — lista própria, independente da lista de tipos operacionais acima.
 - Tipos considerados pelo **User Story** (`CFG.f4p.usTypes`, padrão "User Story") — lista própria, independente das outras duas.
-
-## Quadrantes seguintes (regras ainda em definição)
-
-Eficiência de fluxo (MIN vs ATUAL vs MAX, meta mínima 30%).
+- Tipos considerados pela **Eficiência de fluxo** (`CFG.f4p.effTypes`, padrão **vazio = todos os tipos**) — lista própria, única com esse padrão entre as do Report F4P.
+- Por time: eficiência de fluxo mínima (30%) e máxima (55%), com validação MIN < MAX, junto com as demais colunas da tabela por time.
+- Fluxo dos times (aba própria em Configurações): cada coluna ganha uma marcação **Fila de espera** (checkbox), separada da categoria Discovery/WIP/Vazão — usada só pela Eficiência de fluxo. Sem marcação, a coluna conta como touch time.
 
 ## Referências no código
 
-- Painel: `src/js/23-report-f4p.js` (`f4pEnabled`, `renderF4P`, `openF4P`, `placeF4P`, `f4pSemesterState`, `f4pSample`, `f4pMetrics`, `f4pExpediteOps`, `f4pTsOps`, `f4pVazaoOps`, `f4pVazaoWipCount`, `f4pExactSemesterWindow`, `f4pUrgentRealizado`, `f4pUrgentTrend`, `f4pUrgentCell`, `f4pTsRealizado`, `f4pTsCell`, `f4pVazaoReservaItems`, `f4pVazaoRealizadoItems`, `f4pVazaoTrend`, `f4pVazaoCell`, `f4pItemSituacao`, `f4pEpiTypeOk`, `f4pEpiClosed`, `f4pEpiHasTeam`, `f4pRoadmapEpis`, `f4pRoadmapEntregueEpis`, `f4pRoadmapAbertosEpis`, `f4pAtualEpis`, `f4pRoadmapTrend`, `f4pRoadmapEpiCell`, `f4pEpiSituacao`, `f4pUsTypes`, `f4pUsOps`, `f4pUsPlanejadoItems`, `f4pUsNaoPlanejadoItems`, `f4pUsWipCount`, `f4pUsTrend`, `f4pUsCell`, `f4pReconciliacao`, `f4pReconciliacaoBanner`), aba `#f4pTab` (dentro de `.side-tabs`) e painel `#f4pPanel` em `src/index.html`.
+- Painel: `src/js/23-report-f4p.js` (`f4pEnabled`, `renderF4P`, `openF4P`, `placeF4P`, `f4pSemesterState`, `f4pSample`, `f4pMetrics`, `f4pExpediteOps`, `f4pTsOps`, `f4pVazaoOps`, `f4pVazaoWipCount`, `f4pExactSemesterWindow`, `f4pUrgentRealizado`, `f4pUrgentTrend`, `f4pUrgentCell`, `f4pTsRealizado`, `f4pTsCell`, `f4pVazaoReservaItems`, `f4pVazaoRealizadoItems`, `f4pVazaoTrend`, `f4pVazaoCell`, `f4pItemSituacao`, `f4pEpiTypeOk`, `f4pEpiClosed`, `f4pEpiHasTeam`, `f4pRoadmapEpis`, `f4pRoadmapEntregueEpis`, `f4pRoadmapAbertosEpis`, `f4pAtualEpis`, `f4pRoadmapTrend`, `f4pRoadmapEpiCell`, `f4pEpiSituacao`, `f4pUsTypes`, `f4pUsOps`, `f4pUsPlanejadoItems`, `f4pUsNaoPlanejadoItems`, `f4pUsWipCount`, `f4pUsTrend`, `f4pUsCell`, `f4pReconciliacao`, `f4pReconciliacaoBanner`, `f4pEffTypes`, `f4pEffOps`, `f4pItemDurations`, `f4pEffPct`, `f4pEffTrend`, `f4pEffItemSituacao`, `f4pEffCell`), aba `#f4pTab` (dentro de `.side-tabs`) e painel `#f4pPanel` em `src/index.html`.
 - Categoria de fluxo na lista de itens (Situação) e no filtro do Vazão: `catOf(o)` em `src/js/01-configuracao-e-regras.js` — a mesma função usada no restante do portal (itens por categoria do épico, alertas de "parado na coluna").
 - Ilustrações: `src/assets/f4p/*.png`, embutidas como `F4P_ASSETS` (base64) por `scripts/build.mjs`.
-- CT de cada item: `o.ct`, `o.ready`, `o.deploy` (calculados por `recomputeCt` conforme o fluxo do time, em `src/js/01-configuracao-e-regras.js`). Limites: `limitsOf(time)`; faixa de variabilidade: `f4pRangeOf(time)`; meta de Urgente: `f4pUrgentMetaOf(time)`; tag Expedite: `f4pExpediteTag()`; meta de Technical Story: `f4pTsMetaOf(time)`; tag de capacidade (Vazão): `CFG.anTag`.
+- CT de cada item: `o.ct`, `o.ready`, `o.deploy` (calculados por `recomputeCt` conforme o fluxo do time, em `src/js/01-configuracao-e-regras.js`). Limites: `limitsOf(time)`; faixa de variabilidade: `f4pRangeOf(time)`; meta de Urgente: `f4pUrgentMetaOf(time)`; tag Expedite: `f4pExpediteTag()`; meta de Technical Story: `f4pTsMetaOf(time)`; tag de capacidade (Vazão): `CFG.anTag`; faixa de Eficiência de fluxo: `f4pEffRangeOf(time)`.
 - Épico: `e.st`/`S.model.stages.epi` (posição no próprio quadro de Épicos, não `catOf`), `e.stDate` (data da coluna atual, calculada em `buildModel`, `src/js/04-modelo.js`), `e.interno` (semestre do Target Date), `e.exec` (semestre herdado da iniciativa via Release).
+- Touch/waiting time de uma coluna do fluxo: `flowTimeOf(team, colName)` em `src/js/01-configuracao-e-regras.js` — lido de `CFG.flow[team].time`, escrito pela UI de Configurações › Fluxo dos times (`data-timewait` na tabela).
 - Testes: `tests/test_report_f4p.py`; fixture com CTs conhecidos: `tests/gerar_fixtures.py::f4p`.
 
 ## Critérios de aceite
@@ -153,3 +164,11 @@ Eficiência de fluxo (MIN vs ATUAL vs MAX, meta mínima 30%).
 - [x] Tendência do User Story soma os itens hoje em WIP ao mês corrente e compara com a média (arredondada pra cima) dos meses anteriores, mesma regra do Vazão; testada com os três exemplos equivalentes (melhora, piora, estável) e sem meses anteriores.
 - [x] Clique no Planejado e no Não planejado abre a lista dos itens exatos e navega até o item.
 - [x] Conferência cruzada: Vazão Realizado = Technical Story Realizado + User Story Planejado + User Story Não planejado, testada com o exemplo exato dado pelo usuário (38 = 27+4+7) e com um caso de configuração divergente, confirmando que o aviso aparece só quando a soma não bate.
+- [x] Eficiência de fluxo usa a mesma janela do CycleTime/Variabilidade (`f4pWindow`), não a exata do semestre; testada comparando as duas janelas.
+- [x] Touch/Waiting time por coluna configurável estilo "Fila de espera" (marca-se só a espera; o resto conta como touch automaticamente, sem estado "sem classificação"), persistido em `CFG.flow[time].time` e testado com colunas marcadas e não marcadas.
+- [x] Cálculo por item soma o touch/wait de cada intervalo do fluxo recortado pela janela (não excluído por inteiro); testado com item cujo intervalo começa antes e termina depois da janela.
+- [x] Item já entregue (última coluna com data é a de categoria Vazão) não soma tempo além da entrega, mesmo que o intervalo aberto até hoje seja grande.
+- [x] Todos os itens do fluxo entram no cálculo, concluídos ou não; tipos configuráveis com padrão vazio = todos os tipos (`CFG.f4p.effTypes`), testado com e sem filtro de tipo.
+- [x] Cor verde dentro da faixa MIN–MAX configurável por time (padrão 30%/55%), vermelha fora; testada nos dois casos.
+- [x] Tendência compara a eficiência dos últimos 2 meses do período com a do período inteiro (▲ maior, ▼ menor, ◆ igual ou sem dado), testada nos três casos.
+- [x] Sem item no período mostra "--"; clique no número Atual abre a lista dos itens com o touch/wait de cada um e navega até o item.

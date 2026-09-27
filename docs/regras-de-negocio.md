@@ -106,6 +106,8 @@ Padrão quando não configurado (`defaultSets`):
 - WIP: de `READY` até antes da Vazão;
 - Discovery: depois da primeira coluna até antes do WIP.
 
+Cada coluna também pode ser marcada, independentemente da categoria acima, como **Fila de espera** (waiting time) — usado só pelo quadrante Eficiência de fluxo do Report F4P (§12.9). Estilo "Queueing Stages" do Actionable Agile (ferramenta de Analytics usada como referência): o usuário marca só as colunas de fila de espera; as demais colunas contam como **Touch time** (em trabalho) automaticamente, sem um terceiro estado "sem classificação".
+
 **Card do épico**: contagens Backlog (Nenhum), Discovery, WIP e Vazão de todos os itens vinculados, barra de distribuição e **fase**:
 
 | Fase | Regra |
@@ -265,6 +267,16 @@ Mesmo critério de "entregue" do Technical Story/Vazão (categoria de fluxo Vaz�
 - **Transparência**: tanto o Planejado quanto o Não planejado são clicáveis e abrem a lista dos itens exatos de cada contagem, igual aos demais quadrantes calculados.
 - **Conferência cruzada** (decisão `0030`): como Vazão, Technical Story e User Story são três recortes por tipo do mesmo universo de itens entregues no período, a soma **Technical Story Realizado + User Story Planejado + User Story Não planejado** deveria sempre igualar o **Vazão Realizado** de cada time — isso só é garantido por convenção entre as três configurações de tipos (`CFG.f4p.types`, o tipo fixo do Technical Story e `CFG.f4p.usTypes`), não por um vínculo estrutural no código. Quando um time diverge (ex.: `CFG.f4p.types` passa a incluir um tipo que nenhum dos outros dois quadrantes cobre), o painel mostra um aviso destacado no topo, listando o time e os números exatos de cada lado da conta, para o usuário investigar a configuração — em vez de mostrar números inconsistentes sem sinalização.
 
-### 12.9 Demais quadrantes
+### 12.9 Eficiência de fluxo (min vs. atual vs. max)
 
-Eficiência de fluxo ainda não tem regra de cálculo definida; aparece no painel como "em definição", mantendo a mesma grade e as mesmas colunas de time dos quadrantes calculados.
+Último quadrante do Report F4P — com ele, os 8 quadrantes do painel têm regra fechada. Eficiência do Fluxo = **Touch Time ÷ (Touch Time + Waiting Time) × 100**. Decisão: `docs/decisoes/0031-report-f4p-quadrante-eficiencia-de-fluxo.md`.
+
+- **Janela de datas**: diferente de Urgente/Technical Story/Vazão/Roadmap-Épicos/User Story (que usam `f4pExactSemesterWindow`), este quadrante reaproveita **`f4pWindow`** (§12.1, decisão `0013`) — a mesma janela do CycleTime/Variabilidade: últimos `CFG.f4p.months` meses (padrão 6) até hoje, se o semestre selecionado estiver em curso; o período exato do semestre, se já encerrado.
+- **Filtro de dados**: **todos** os itens do fluxo do time, únicos, vinculados ao time — não só os concluídos (diferente de CycleTime/Variabilidade, que usam só itens com CT fechado). Tipos considerados: `CFG.f4p.effTypes`, configuração própria; **vazio significa todos os tipos** (padrão), ao contrário das demais listas de tipo do Report F4P.
+- **Fila de espera / Touch time por coluna**: cada coluna do fluxo de cada time pode ser marcada em Configurações › Fluxo dos times como **Fila de espera** (waiting time), independente da categoria Discovery/WIP/Vazão (§7). Estilo "Queueing Stages" do Actionable Agile (ferramenta de Analytics citada pelo usuário como referência): o usuário marca só as colunas de fila; as demais colunas contam como **Touch time** automaticamente — não existe mais um terceiro estado "sem classificação" à parte.
+- **Cálculo por item**: cada coluna preenchida do item vira um intervalo (da própria data até a data da próxima coluna preenchida, ou hoje, se o item ainda não avançou), somado ao total de Touch ou Waiting do time conforme a marcação da coluna onde o intervalo começa. Só a parte de cada intervalo que cai dentro da janela de datas conta (recorte, não exclusão do item inteiro) — um item que começou antes da janela ou ainda está aberto depois dela contribui só com a parcela dentro do período. **Exceção**: se a última coluna com data preenchida do item é da categoria Vazão (item já entregue), o intervalo dela não se estende até hoje — o relógio da eficiência para na entrega, para não somar como Touch/Waiting o tempo em que um item já concluído fica simplesmente parado no quadro.
+- **Agregação**: soma de Touch e de Waiting de **todos** os itens do time no período (não a média das eficiências individuais), preservando o peso real de cada item. Sem nenhum item do time no período (Touch + Waiting = 0), mostra "--" — não é 0% de eficiência, é ausência de dado.
+- **MIN/MAX**: faixa esperada configurável por time (`CFG.f4p.teams[time].effMin`/`effMax`), padrão **30%–55%**.
+- **Cor**: dentro da faixa MIN–MAX → verde; fora (acima do máximo ou abaixo do mínimo) → vermelho — sem uma terceira cor intermediária, diferente da Variabilidade.
+- **Tendência** (▲ melhora / ▼ piora / ◆ estável): compara a eficiência do período inteiro selecionado com a eficiência calculada só nos **últimos 2 meses** desse mesmo período — últimos 2 meses melhor → ▲; pior → ▼; igual (ou sem dado num dos dois lados) → ◆. Regra própria deste quadrante, não a mesma da tendência do Vazão (decisão `0023`).
+- **Transparência**: o número atual é clicável e abre a lista dos itens exatos do time no período; a coluna "Situação" mostra o Touch/Waiting (já recortado pela janela) que cada item contribuiu para a soma.

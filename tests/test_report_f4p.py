@@ -39,8 +39,11 @@ def test_todos_os_times_aparecem_mesmo_com_time_filtrado(page):
     assert n_teams > 1 and cols == n_teams
 
 def test_quadrante_em_definicao_mostra_travessao_e_nota(page):
+    """Nenhum quadrante fica mais "em definição" no painel atual (os 8 têm regra fechada, decisão 0031),
+    mas o código genérico que renderiza esse estado continua coberto — útil se um quadrante futuro for
+    adicionado sem regra ainda. Sinaliza um quadrante existente como não pronto diretamente no teste."""
     carregar(page, "f4p.xlsx")
-    page.evaluate("()=>{ S.f.team='CORE'; S.f.exec=semestre(TODAY); render(); }")
+    page.evaluate("()=>{ S.f.team='CORE'; S.f.exec=semestre(TODAY); F4P_QUADS.eff.done=false; render(); }")
     page.click("#f4pTab")
     assert "Regra de cálculo ainda em definição." in page.inner_text("#f4pBody")
 
@@ -1359,3 +1362,268 @@ def test_reconciliacao_banner_aparece_so_quando_ha_divergencia(page):
     assert "Vazão Realizado" in page.inner_text(".f4p-recon")
     page.evaluate("()=>{ CFG.f4p.types = ['user story', 'technical story']; render(); }")
     assert page.locator(".f4p-recon").count() == 0
+
+# ---------------- Quadrante 8 · Eficiência de fluxo (min vs atual vs max) ----------------
+# Decisão 0031. Eficiência do Fluxo = Touch Time ÷ (Touch Time + Waiting Time) × 100, pela classificação
+# de cada coluna do fluxo do time (Configurações › Fluxo dos times, novo campo `time`: "touch"/"wait").
+# Estilo "Queueing Stages" do Actionable Agile (ferramenta de Analytics citada pelo usuário como
+# referência): o usuário marca só as colunas de Fila de espera (waiting time); as demais contam como touch
+# time automaticamente — não existe um terceiro estado "sem classificação". Reaproveita f4pWindow (decisão
+# 0013, mesma janela do CycleTime/Variabilidade — últimos N meses no semestre em curso, período exato no
+# já encerrado), não f4pExactSemesterWindow como os demais quadrantes "por semestre".
+
+def _dias_atras(page, n):
+    return page.evaluate(f"() => new Date(TODAY.getTime() - {n} * 864e5)")
+
+def _setup_item_eff(page, *, team, op_id, fd_offsets, deploy_offset=None, tipo="User Story", tags=None):
+    """fd_offsets: dict coluna(normalizada) -> dias atrás de hoje. deploy_offset: dias atrás para o.deploy
+    (None = item ainda aberto, sem Vazao)."""
+    page.evaluate("""(args)=>{
+      const {team, opId, fdOffsets, deployOffset, tipo, tags} = args;
+      const fd = {}; Object.entries(fdOffsets).forEach(([k, v]) => { fd[k] = new Date(TODAY.getTime() - v * 864e5); });
+      S.model.ops.set(opId, {id:opId, title:opId, team, type:tipo, stName:"Vazao",
+        deploy: deployOffset != null ? new Date(TODAY.getTime() - deployOffset * 864e5) : null,
+        ready: null, fd, tags: tags || []});
+    }""", {"team": team, "opId": op_id, "fdOffsets": fd_offsets, "deployOffset": deploy_offset, "tipo": tipo, "tags": tags or []})
+
+def _setup_flow_eff(page, team, stages, time_map, cat_map=None):
+    page.evaluate("""(args)=>{
+      const {team, stages, timeMap, catMap} = args;
+      S.model.teamFlow[team] = stages;
+      CFG.flow[norm(team)] = {cat: catMap || {}, ct:[], time: timeMap};
+      S.flowCache = {};   // teamCfg/catOf/flowTimeOf têm cache por time; sem isso, um time já carregado
+                          // (ex.: CORE) manteria a configuração antiga até a próxima recomputeHealth().
+    }""", {"team": team, "stages": stages, "timeMap": time_map, "catMap": cat_map})
+
+def test_eff_calcula_touch_dividido_por_touch_mais_wait(page):
+    carregar(page, "f4p.xlsx")
+    _setup_flow_eff(page, "F4P_EFF1", ["Backlog", "Analise", "Dev", "Espera", "QA", "Vazao"],
+                     {"analise": "touch", "dev": "touch", "espera": "wait", "qa": "touch"}, {"vazao": "vazao"})
+    _setup_item_eff(page, team="F4P_EFF1", op_id="op1", deploy_offset=1, fd_offsets={
+        "backlog": 20, "analise": 19, "dev": 17, "espera": 9, "qa": 4, "vazao": 1})
+    r = page.evaluate("""()=>{
+      S.f.team = "F4P_EFF1"; S.f.exec = semestre(TODAY);
+      return f4pEffPct("F4P_EFF1", f4pWindow(f4pSemesterState()).from, f4pWindow(f4pSemesterState()).to);
+    }""")
+    # touch: Backlog->Analise (1, sem marcação = touch) + Analise->Dev (2) + Dev->Espera (8) + QA->Vazao (3) = 14
+    # wait: Espera->QA (5). O trecho Vazao->hoje não conta: o item já foi entregue (categoria Vazão), o
+    # relógio da eficiência para na entrega. 14/(14+5) = 73,68%
+    assert abs(r - (14 / 19 * 100)) < 1e-6
+
+def test_eff_colunas_sem_fila_de_espera_marcada_contam_como_touch(page):
+    """Estilo Actionable Agile (ferramenta de Analytics citada pelo usuário como referência): só se marca a
+    Fila de espera; as demais colunas contam como touch time automaticamente — não existe mais um estado
+    "sem classificação" separado."""
+    carregar(page, "f4p.xlsx")
+    _setup_flow_eff(page, "F4P_EFF2", ["Backlog", "Dev", "Vazao"], {"dev": "touch"}, {"vazao": "vazao"})
+    _setup_item_eff(page, team="F4P_EFF2", op_id="op1", deploy_offset=1, fd_offsets={"backlog": 10, "dev": 8, "vazao": 1})
+    r = page.evaluate("""()=>{
+      const st = f4pSemesterState(); S.f.team="F4P_EFF2"; S.f.exec=semestre(TODAY);
+      const {from, to} = f4pWindow(f4pSemesterState());
+      return f4pItemDurations([...S.model.ops.values()].find(o=>o.id==='op1'), from, to);
+    }""")
+    # Backlog não está marcado como Fila de espera: conta como touch (2 dias). Dev->Vazao (7 dias) também é touch.
+    assert r == {"touch": 9, "wait": 0}
+
+def test_eff_pega_todos_os_itens_nao_so_concluidos(page):
+    """'Deve-se pegar todos os itens do fluxo de cada time' — um item ainda aberto (sem Vazao) também
+    contribui com o touch/wait já acumulado até agora."""
+    carregar(page, "f4p.xlsx")
+    _setup_flow_eff(page, "F4P_EFF3", ["Backlog", "Dev", "Vazao"], {"dev": "touch"}, {"vazao": "vazao"})
+    page.evaluate("""()=>{
+      S.model.ops.set("aberto", {id:"aberto", title:"Aberto", team:"F4P_EFF3", type:"User Story", stName:"Dev",
+        deploy:null, ready:null, fd:{backlog:new Date(TODAY.getTime()-10*864e5), dev:new Date(TODAY.getTime()-5*864e5)}, tags:[]});
+    }""")
+    r = page.evaluate("""()=>{
+      S.f.team="F4P_EFF3"; S.f.exec=semestre(TODAY);
+      const {from, to} = f4pWindow(f4pSemesterState());
+      return f4pEffPct("F4P_EFF3", from, to);
+    }""")
+    assert r == 100.0   # só touch (Dev até hoje), sem nenhum wait
+
+def test_eff_usa_tipos_configuraveis_com_todos_por_padrao(page):
+    carregar(page, "f4p.xlsx")
+    _setup_flow_eff(page, "F4P_EFF4", ["Backlog", "Dev", "Vazao"], {"dev": "touch"}, {"vazao": "vazao"})
+    _setup_item_eff(page, team="F4P_EFF4", op_id="us1", tipo="User Story", deploy_offset=1, fd_offsets={"backlog": 10, "dev": 5, "vazao": 1})
+    _setup_item_eff(page, team="F4P_EFF4", op_id="bug1", tipo="Internal Bug", deploy_offset=1, fd_offsets={"backlog": 10, "dev": 5, "vazao": 1})
+    r = page.evaluate("""()=>{
+      S.f.team="F4P_EFF4"; S.f.exec=semestre(TODAY);
+      const {from, to} = f4pWindow(f4pSemesterState());
+      const comTodos = f4pEffOps("F4P_EFF4").length;
+      CFG.f4p.effTypes = ["user story"];
+      const soUserStory = f4pEffOps("F4P_EFF4").length;
+      CFG.f4p.effTypes = [];
+      return {comTodos, soUserStory};
+    }""")
+    assert r == {"comTodos": 2, "soUserStory": 1}
+
+def test_eff_recorta_duracao_pela_janela_do_semestre(page):
+    """Item cujo intervalo de coluna começa antes da janela e termina depois dela: só a parte dentro da
+    janela [from, to] entra na soma (recorte, não exclusão do item inteiro)."""
+    carregar(page, "f4p.xlsx")
+    _setup_flow_eff(page, "F4P_EFF5", ["Backlog", "Dev", "Vazao"], {"dev": "touch"}, {"vazao": "vazao"})
+    r = page.evaluate("""()=>{
+      const from = new Date(TODAY.getFullYear(), TODAY.getMonth() - 1, 1), to = new Date(TODAY.getFullYear(), TODAY.getMonth(), 1);
+      const antesDaJanela = new Date(from.getTime() - 10 * 864e5), dentroDoFim = new Date(to.getTime() - 2 * 864e5);
+      const o = {id:"op1", team:"F4P_EFF5", type:"User Story", fd:{dev:antesDaJanela, vazao:dentroDoFim}};
+      return f4pItemDurations(o, from, to);
+    }""")
+    # intervalo real Dev->Vazao é maior, mas só a parte dentro de [from, to] conta
+    assert r["touch"] == page.evaluate("""()=>{
+      const from = new Date(TODAY.getFullYear(), TODAY.getMonth() - 1, 1), to = new Date(TODAY.getFullYear(), TODAY.getMonth(), 1);
+      return days(from, new Date(to.getTime() - 2 * 864e5));
+    }""")
+
+def test_eff_janela_reaproveita_f4pwindow_nao_a_exata_do_semestre(page):
+    """Diferente de Urgente/Technical Story/Vazão/Roadmap-Épicos/User Story (f4pExactSemesterWindow),
+    Eficiência de fluxo usa f4pWindow — a mesma janela rolante do CycleTime/Variabilidade."""
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.f.exec = semestre(TODAY);
+      const stAtual = f4pSemesterState();
+      const janelaEff = f4pWindow(stAtual), janelaCt = f4pWindow(stAtual), janelaExata = f4pExactSemesterWindow(stAtual);
+      return {iguaisCt: +janelaEff.from === +janelaCt.from, diferenteDaExata: +janelaEff.from !== +janelaExata.from};
+    }""")
+    assert r == {"iguaisCt": True, "diferenteDaExata": True}
+
+def test_eff_sem_item_no_periodo_mostra_travessao(page):
+    """Sem nenhum item do time no período (aqui, um time sem carga nenhuma), a eficiência fica "--" — não
+    existe mais o caso de "nenhuma coluna classificada", já que colunas sem marcação contam como touch."""
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.f.team="TIME_SEM_ITEM_EFF"; S.f.exec=semestre(TODAY);
+      const {from, to} = f4pWindow(f4pSemesterState());
+      return f4pEffPct("TIME_SEM_ITEM_EFF", from, to);
+    }""")
+    assert r is None
+
+def test_eff_cor_verde_dentro_da_faixa_e_vermelha_fora(page):
+    carregar(page, "f4p.xlsx")
+    _setup_flow_eff(page, "F4P_EFF6", ["Backlog", "Dev", "Espera", "Vazao"], {"dev": "touch", "espera": "wait"}, {"vazao": "vazao"})
+    # ~50% (dentro de 30-55): Backlog (sem marcação = touch) + Dev = 100 dias touch, Espera = 99 dias wait
+    _setup_item_eff(page, team="F4P_EFF6", op_id="dentro", deploy_offset=1, fd_offsets={"backlog": 200, "dev": 155, "espera": 100, "vazao": 1})
+    r = page.evaluate("""()=>{
+      S.f.team="F4P_EFF6"; S.f.exec=semestre(TODAY);
+      return f4pEffCell("F4P_EFF6");
+    }""")
+    assert "f4p-good" in r and "f4p-bad" not in r
+    # zera e recria com uma proporção fora da faixa (10% touch)
+    page.evaluate("()=>{ S.model.ops.delete('dentro'); }")
+    _setup_item_eff(page, team="F4P_EFF6", op_id="fora", deploy_offset=1, fd_offsets={"backlog": 110, "dev": 101, "espera": 91, "vazao": 1})
+    r2 = page.evaluate("()=>f4pEffCell('F4P_EFF6')")
+    assert "f4p-bad" in r2 and "f4p-good" not in r2
+
+def test_eff_usa_faixa_min_max_configuravel_por_time(page):
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      CFG.f4p.teams.f4p_eff7 = {effMin: 10, effMax: 20};
+      const R = f4pEffRangeOf("F4P_EFF7");
+      delete CFG.f4p.teams.f4p_eff7;
+      return R;
+    }""")
+    assert r == {"min": 10, "max": 20}
+
+def test_eff_tendencia_ultimos_2_meses_melhor_fica_positiva(page):
+    carregar(page, "f4p.xlsx")
+    _setup_flow_eff(page, "F4P_EFFT1", ["Backlog", "Dev", "Espera", "Vazao"], {"dev": "touch", "espera": "wait"}, {"vazao": "vazao"})
+    # item antigo (fora dos ultimos 2 meses, mas dentro do periodo de 6 meses): baixa eficiencia (muito wait)
+    _setup_item_eff(page, team="F4P_EFFT1", op_id="antigo", deploy_offset=100, fd_offsets={"backlog": 130, "dev": 125, "espera": 105, "vazao": 100})
+    # item recente (dentro dos ultimos 2 meses): alta eficiencia (quase só touch)
+    _setup_item_eff(page, team="F4P_EFFT1", op_id="recente", deploy_offset=1, fd_offsets={"backlog": 20, "dev": 19, "espera": 2, "vazao": 1})
+    r = page.evaluate("""()=>{
+      S.f.team="F4P_EFFT1"; S.f.exec=semestre(TODAY);
+      const {from, to} = f4pWindow(f4pSemesterState());
+      return f4pEffTrend("F4P_EFFT1", from, to);
+    }""")
+    assert r == "▲"
+
+def test_eff_tendencia_ultimos_2_meses_pior_fica_negativa(page):
+    carregar(page, "f4p.xlsx")
+    _setup_flow_eff(page, "F4P_EFFT2", ["Backlog", "Dev", "Espera", "Vazao"], {"dev": "touch", "espera": "wait"}, {"vazao": "vazao"})
+    # item antigo (fora dos últimos 2 meses): alta eficiência (touch 19, wait 6) — só entra na média do
+    # período inteiro, não nos últimos 2 meses.
+    _setup_item_eff(page, team="F4P_EFFT2", op_id="antigo", deploy_offset=100, fd_offsets={"backlog": 130, "dev": 125, "espera": 106, "vazao": 100})
+    # item recente (dentro dos últimos 2 meses): baixa eficiência (touch 2, wait 16) — sozinho, arrasta a
+    # eficiência dos últimos 2 meses (11%) bem abaixo da eficiência do período inteiro (49%, com o antigo).
+    _setup_item_eff(page, team="F4P_EFFT2", op_id="recente", deploy_offset=1, fd_offsets={"backlog": 20, "dev": 19, "espera": 17, "vazao": 1})
+    r = page.evaluate("""()=>{
+      S.f.team="F4P_EFFT2"; S.f.exec=semestre(TODAY);
+      const {from, to} = f4pWindow(f4pSemesterState());
+      return f4pEffTrend("F4P_EFFT2", from, to);
+    }""")
+    assert r == "▼"
+
+def test_eff_tendencia_sem_diferenca_fica_neutra(page):
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      const st = {kind:"current", start:new Date(TODAY.getFullYear(), TODAY.getMonth(), 1), end:new Date(TODAY.getFullYear(), TODAY.getMonth() + 6, 0)};
+      const {from, to} = f4pWindow(st);
+      return f4pEffTrend("F4P_EFFT_VAZIO", from, to);
+    }""")
+    assert r == "◆"
+
+def test_eff_clique_no_numero_abre_lista_e_permite_navegar(page):
+    carregar(page, "f4p.xlsx")
+    _setup_flow_eff(page, "CORE", ["Backlog", "Ready / pronto para dev", "Pronto para Deploy", "Fechado"],
+                     {"ready / pronto para dev": "touch", "pronto para deploy": "wait"}, {"fechado": "vazao"})
+    _setup_item_eff(page, team="CORE", op_id="eff_click", deploy_offset=1, fd_offsets={
+        "backlog": 20, "ready / pronto para dev": 15, "pronto para deploy": 5, "fechado": 1})
+    page.evaluate("""()=>{ S.f.team='CORE'; S.f.exec=semestre(TODAY); render(); }""")
+    page.click("#f4pTab")
+    page.click('button[data-f4p-eff-team="CORE"]')
+    assert page.is_visible("#f4pItemsBg")
+    assert "eff_click" in page.inner_text("#f4pItemsBody")
+    assert "Touch" in page.inner_text("#f4pItemsBody") and "Wait" in page.inner_text("#f4pItemsBody")
+    page.click('button[data-f4p-go="eff_click"]')
+    assert not page.is_visible("#f4pItemsBg")
+    assert not page.is_visible("#f4pPanel.open")
+    assert page.evaluate("document.getElementById('goto').value") == "eff_click"
+
+def test_eff_aparece_calculado_no_painel(page):
+    carregar(page, "f4p.xlsx")
+    page.evaluate("()=>{ S.f.team='CORE'; S.f.exec=semestre(TODAY); render(); }")
+    page.click("#f4pTab")
+    assert "Eficiência de fluxo (min vs atual vs max)" in page.inner_text("#f4pBody")
+    assert "Regra de cálculo ainda em definição." not in page.inner_text("#f4pBody")
+
+def test_configuracao_eff_types_tem_padrao_vazio_todos_os_tipos(page):
+    r = page.evaluate("()=>{ const c = normCfg({}); return c.f4p.effTypes; }")
+    assert r == []
+
+def test_configuracao_eff_min_max_tem_padrao_30_55(page):
+    r = page.evaluate("()=>f4pEffRangeOf('TIME_SEM_CONFIG')")
+    assert r == {"min": 30, "max": 55}
+
+def test_configuracao_eff_persiste_e_entra_na_exportacao(page):
+    carregar(page, "times.xlsx")
+    page.evaluate("()=>{ CFG.f4p.effTypes = ['user story']; CFG.f4p.teams.core = {effMin: 20, effMax: 60}; }")
+    page.click("#btnCfg")
+    with page.expect_download() as d:
+        page.click("#cfgExport")
+    txt = open(d.value.path(), encoding="utf-8").read()
+    assert '"effTypes"' in txt and '"effMin": 20' in txt and '"effMax": 60' in txt
+
+def test_configuracao_touch_wait_por_coluna_persiste(page):
+    """A UI de Configurações › Fluxo dos times grava a marcação de Fila de espera por coluna em
+    CFG.flow[time].time ("wait"/"touch"), separada da categoria (Discovery/WIP/Vazão). Estilo Actionable
+    Agile: só se marca a Fila de espera; as demais colunas ficam "touch" automaticamente."""
+    carregar(page, "f4p.xlsx")
+    page.click("#btnCfg")
+    page.evaluate("""()=>{ document.querySelector('input[data-timewait="pronto para deploy"]').click(); }""")
+    page.click("#cfgSave")
+    r = page.evaluate("()=>CFG.flow.core.time")
+    assert r["pronto para deploy"] == "wait"
+    assert r["ready / pronto para dev"] == "touch"
+    assert r["backlog"] == "touch"
+
+def test_flow_time_of_le_classificacao_por_coluna(page):
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      CFG.flow.core = {cat:{}, ct:[], time:{"pronto para deploy":"wait"}};
+      S.flowCache = {};   // CORE já foi lido antes (carga inicial); sem isso o cache do teamCfg fica velho
+      const r = {deploy: flowTimeOf("CORE", "Pronto para Deploy"), ready: flowTimeOf("CORE", "Ready / Pronto para DEV"), backlog: flowTimeOf("CORE", "Backlog")};
+      delete CFG.flow.core;
+      S.flowCache = {};
+      return r;
+    }""")
+    assert r == {"deploy": "wait", "ready": "touch", "backlog": "touch"}
