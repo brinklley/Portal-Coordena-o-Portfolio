@@ -212,7 +212,7 @@ function flowTabsHtml(d){
     const rows = c.stages.map((s, i) => { const n = c.n[i], v = c.cat[i], tv = c.time[i];
       return `<tr data-stage="${esc(n)}" data-cat="${v}" data-time="${tv}"><td class="fnum"><span class="fnb">${i + 1}</span></td><td>${esc(s)}</td><td><span class="rg" role="radiogroup" aria-label="${esc(s)}">
         ${["none","disc","wip","vazao"].map(val => `<label class="cat-${val}"><input type="radio" name="fl_${esc(k)}_${i}" value="${val}" ${v === val ? "checked" : ""}>${CAT_LABEL[val]}</label>`).join("")}
-      </span></td><td style="text-align:center"><label><input type="checkbox" data-timewait="${esc(n)}" ${tv === "wait" ? "checked" : ""} aria-label="${esc(s)} é Fila de espera (waiting time)"> Fila de espera</label></td><td style="text-align:center"><input type="checkbox" data-ctcol="${esc(n)}" ${ctS.has(n) ? "checked" : ""} aria-label="${esc(s)} entra no CT"></td>
+      </span></td><td style="text-align:center"><input type="checkbox" data-timewait="${esc(n)}" ${tv === "wait" ? "checked" : ""} aria-label="${esc(s)} é Fila de espera (waiting time)"></td><td style="text-align:center"><input type="checkbox" data-ctcol="${esc(n)}" ${ctS.has(n) ? "checked" : ""} aria-label="${esc(s)} entra no CT"></td>
       <td class="muted" style="text-align:right">${count[n] ? `${count[n]} ${count[n] === 1 ? "item" : "itens"}` : ""}</td></tr>`; }).join("");
     return `<div class="fpanel" role="tabpanel" data-flteam="${esc(k)}" data-team-name="${esc(tm)}" ${tm === cur ? "" : "hidden"}>
       <div class="fvis">${flowVisHtml(c.stages, c.cat, c.ct, c.n)}</div>
