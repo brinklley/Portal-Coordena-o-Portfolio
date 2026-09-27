@@ -20,10 +20,10 @@ interface e a aba "Configurações gerais" (ver `docs/configuracoes.md`). Ver de
 
 ## Filtros e busca
 
-- Filtros: Roadmap executivo, Responsável (busca por qualquer parte do nome, múltipla escolha), Roadmap interno, Time (dinâmico: inclui times cadastrados sem carga), Iniciativa (ID ou nome).
+- Filtros: Roadmap executivo, Responsável (busca por qualquer parte do nome, múltipla escolha), Roadmap interno, Time (dinâmico: inclui times cadastrados sem carga), **ID ou descrição** (campo único — decisão `0034`).
+- **ID ou descrição**: casa por ID exato ou por texto no título, em qualquer nível (iniciativa, release, épico ou item de time) — quem casa revela a cadeia inteira até a iniciativa (só o item casado, quando o match é num item de time dentro de um épico que não casou por si). Ao digitar, filtra ao vivo; no Enter, também tenta rolar/abrir o item, se a busca for um ID. Fica salvo como filtro ativo, igual aos demais, até ser limpo.
 - Filtros ativos ficam destacados; "Limpar filtros (N)".
-- **Ir para qualquer ID**: abre a cadeia até o item. Se estiver escondido, o aviso ao lado do campo diz qual filtro esconde e oferece limpar e ir; se for regra de exibição, oferece a investigação.
-- **Diagnóstico de quadro vazio**: explica qual filtro zerou o resultado e quantas iniciativas aparecem sem cada um.
+- **Diagnóstico de quadro vazio**: explica qual filtro zerou o resultado e quantas iniciativas aparecem sem cada um; para um ID que existe mas não aparece, diz se é cadeia inválida, regra de exibição ou outro filtro escondendo, com um botão para remover e ir até ele.
 
 ## Investigação por ID
 

@@ -189,7 +189,7 @@ def test_urgente_clique_no_numero_abre_lista_e_permite_navegar(page):
     page.click(f'button[data-f4p-go="{alvo_id}"]')
     assert not page.is_visible("#f4pItemsBg")
     assert not page.is_visible("#f4pPanel.open")           # o painel F4P também fecha, para não esconder o item
-    assert page.evaluate("document.getElementById('goto').value") == alvo_id
+    assert page.evaluate("document.getElementById('fBusca').value") == alvo_id
 
 def test_urgente_semestre_passado_conta_so_fechados_no_periodo(page):
     """Sem histórico de quando a tag foi aplicada, um semestre já encerrado só pode contar o que fechou
@@ -363,7 +363,7 @@ def test_ts_clique_no_numero_abre_lista_e_permite_navegar(page):
     page.click(f'button[data-f4p-go="{alvo_id}"]')
     assert not page.is_visible("#f4pItemsBg")
     assert not page.is_visible("#f4pPanel.open")
-    assert page.evaluate("document.getElementById('goto').value") == alvo_id
+    assert page.evaluate("document.getElementById('fBusca').value") == alvo_id
 
 def test_ts_meta_padrao_6_colore_vermelho_ou_verde(page):
     carregar(page, "f4p.xlsx")
@@ -713,7 +713,7 @@ def test_vazao_clique_no_realizado_abre_lista_e_permite_navegar(page):
     page.click(f'button[data-f4p-go="{alvo_id}"]')
     assert not page.is_visible("#f4pItemsBg")
     assert not page.is_visible("#f4pPanel.open")
-    assert page.evaluate("document.getElementById('goto').value") == alvo_id
+    assert page.evaluate("document.getElementById('fBusca').value") == alvo_id
 
 def test_vazao_clique_na_reserva_mostra_so_os_com_a_tag(page):
     carregar(page, "f4p.xlsx")
@@ -962,7 +962,7 @@ def test_roadmap_clique_no_numero_abre_lista_de_epicos_com_situacao_do_proprio_q
     page.click(f'button[data-f4p-go="{alvo_id}"]')
     assert not page.is_visible("#f4pItemsBg")
     assert not page.is_visible("#f4pPanel.open")
-    assert page.evaluate("document.getElementById('goto').value") == alvo_id
+    assert page.evaluate("document.getElementById('fBusca').value") == alvo_id
 
 def test_roadmap_epicos_aparece_calculado_no_painel(page):
     carregar(page, "f4p.xlsx")
@@ -1263,7 +1263,7 @@ def test_us_clique_no_planejado_abre_lista_e_permite_navegar(page):
     page.click(f'button[data-f4p-go="{alvo_id}"]')
     assert not page.is_visible("#f4pItemsBg")
     assert not page.is_visible("#f4pPanel.open")
-    assert page.evaluate("document.getElementById('goto').value") == alvo_id
+    assert page.evaluate("document.getElementById('fBusca').value") == alvo_id
 
 def test_us_clique_no_nao_planejado_mostra_so_os_sem_a_tag(page):
     carregar(page, "f4p.xlsx")
@@ -1577,7 +1577,7 @@ def test_eff_clique_no_numero_abre_lista_e_permite_navegar(page):
     page.click('button[data-f4p-go="eff_click"]')
     assert not page.is_visible("#f4pItemsBg")
     assert not page.is_visible("#f4pPanel.open")
-    assert page.evaluate("document.getElementById('goto').value") == "eff_click"
+    assert page.evaluate("document.getElementById('fBusca').value") == "eff_click"
 
 def test_eff_aparece_calculado_no_painel(page):
     carregar(page, "f4p.xlsx")

@@ -112,7 +112,7 @@ def test_clique_no_item_do_modal_fecha_a_visao_analitica_e_navega(page):
     page.click(f'button[data-f4p-go="{alvo_id}"]')
     assert not page.is_visible("#f4pItemsBg")
     assert not page.is_visible("#anPanel.open")
-    assert page.evaluate("document.getElementById('goto').value") == alvo_id
+    assert page.evaluate("document.getElementById('fBusca').value") == alvo_id
 
 # Decisão 0028: a linha do épico não mostra mais "X US" (redundante com a coluna QTD); QTD e
 # "reservado" da linha ficam clicáveis, abrindo a lista dos itens daquele épico especificamente

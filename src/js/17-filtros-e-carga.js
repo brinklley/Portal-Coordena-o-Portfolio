@@ -11,8 +11,8 @@ function fillFilters(){
   $("fOwnerBox").hidden = !M.hasIniOwner;
   $("msSearch").value = ""; closeMs();
   $("fExec").innerHTML = opt(exec, "Todos"); $("fInt").innerHTML = opt(intr, "Todos"); fillTeamFilter();
-  $("fIni").value = ""; $("goto").value = "";
-  S.f = {exec:"", owners:new Set(), int:"", team:"", ini:""}; S.path = {}; S.expand = false; S.focus = null; S.offsets = {}; msLabel();
+  $("fBusca").value = "";
+  S.f = {exec:"", owners:new Set(), int:"", team:"", q:""}; S.path = {}; S.expand = false; S.focus = null; S.offsets = {}; msLabel();
 }
 function loadTables(tables, label, imp){
   S.tables = tables;

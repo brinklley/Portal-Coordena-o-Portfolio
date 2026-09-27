@@ -45,8 +45,10 @@ const endDrag = () => {
 };
 board.addEventListener("pointerup", endDrag); board.addEventListener("pointercancel", endDrag);
 
-let tIni; $("fIni").oninput = e => { clearTimeout(tIni); tIni = setTimeout(()=>{ S.f.ini = e.target.value; S.lastFilterEl = $("fIni"); render(); }, 350); };
-$("goto").addEventListener("keydown", e => { if (e.key === "Enter") gotoId(e.target.value.trim()); });
+/* filtro único "ID ou descrição" (decisão 0034): ao digitar, filtra ao vivo (debounced); no Enter,
+   também tenta navegar/rolar até o item (se a busca for um ID) — ver setQueryFilter()/gotoId(). */
+let tBusca; $("fBusca").oninput = e => { clearTimeout(tBusca); tBusca = setTimeout(()=>setQueryFilter(e.target.value), 350); };
+$("fBusca").addEventListener("keydown", e => { if (e.key === "Enter"){ clearTimeout(tBusca); gotoId(e.target.value.trim()); } });
 
 function renderCrumbs(){
   const M = S.model, p = S.path; const parts = [];

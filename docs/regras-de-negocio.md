@@ -61,7 +61,7 @@ Decisão: `docs/decisoes/0003-regra-b-itens-sem-desdobramento.md`.
 | Responsável da iniciativa (múltiplo) | `Assigned To` da iniciativa; não filtra releases, épicos e itens |
 | Roadmap interno | semestre do `Target Date` do épico |
 | Time | épicos com pelo menos um item do time; itens só daquele time; métricas do épico passam a considerar só o time |
-| Iniciativa (ID ou nome) | ID exato ou parte do título (sem acento, sem maiúsculas) |
+| ID ou descrição (decisão `0034`) | ID exato ou parte do título (sem acento, sem maiúsculas), em qualquer nível (iniciativa, release, épico ou item de time) — quem casa revela a cadeia até a iniciativa; quando só um item de time casa, os demais itens do épico continuam escondidos |
 
 ## 4. Fluxo e status
 
