@@ -2,7 +2,7 @@
 function azModal(html){ $("azBody").innerHTML = html; $("azBg").hidden = false; $("azBg").querySelector(".modal").style.width = "min(900px,100%)"; }
 function azClose(){ $("azBg").hidden = true; }
 $("azBg").addEventListener("pointerdown", e => { if (e.target === $("azBg") && !AZ.busy) azClose(); });
-$("btnAz").onclick = () => {
+function openAzureLoadModal(){
   const A = azCfgOf(CFG);
   if (!A.sources.length){ toast("Configure as organizações e as fontes em Configurações › Azure DevOps.", 5000); openCfg(); return; }
   const miss = A.orgs.filter(o => A.sources.some(s => s.org === o.org) && !azConnected(o.org));
@@ -14,7 +14,8 @@ $("btnAz").onclick = () => {
   $("azCancel").onclick = azClose;
   $("azGo").onclick = azRun;
   const f = $("azBody").querySelector("input"); if (f) f.focus();
-};
+}
+$("btnAz").onclick = openAzureLoadModal;
 async function azRun(){
   const A = azCfgOf(CFG);
   // 1. validar tokens pendentes
@@ -129,7 +130,10 @@ async function azApply(){
   saveCfg();                                                   // mapeamentos novos ficam salvos
   const when = new Date(), label = `Azure DevOps · ${when.toLocaleDateString("pt-BR")} ${when.toLocaleTimeString("pt-BR", {hour:"2-digit", minute:"2-digit"})}`;
   azClose();
-  if (loadTables(tables, label, false, imp)) azCacheSave({tables, label, notes, when:when.toISOString()});
+  if (loadTables(tables, label, false, imp)){
+    azCacheSave({tables, label, notes, when:when.toISOString()});
+    if (!$("cfgBg").hidden) closeCfg();   // 1ª carga: fecha a tela de bloqueio automaticamente
+  }
 }
 
 /* ---------- cache local dos dados (IndexedDB): cards e datas, nunca tokens ---------- */

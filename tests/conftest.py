@@ -1,6 +1,7 @@
 """Infraestrutura dos testes: abre dist/mapa_portfolio.html num Chromium sem interface.
 Pré-requisitos: npm run build · python3 tests/gerar_fixtures.py · python3 -m playwright install chromium
 """
+import re
 import pytest
 from pathlib import Path
 from playwright.sync_api import sync_playwright
@@ -29,8 +30,21 @@ def page(browser):
     assert not pg.errors, f"Erros de JavaScript na página: {pg.errors}"
     ctx.close()
 
-def carregar(pg, nome):
-    """Carrega uma planilha de fixtures/ pelo botão 'Carregar planilha'."""
-    pg.set_input_files("#file", str(FIX / nome))
-    pg.wait_for_function(f'document.getElementById("srcLabel").textContent.includes("{nome}")', timeout=60000)
+def carregar(pg, nome, **azure_kwargs):
+    """Carrega uma fixture de fixtures/ como se fosse uma carga do Azure DevOps: simula o backend
+    (tests/azure_simulado.py), registra as fontes das 4 funções e chama o pipeline real de carga
+    (azRun), sem depender de clique de UI. `**azure_kwargs` repassa para AzureSimulado (ex.:
+    item_removido=True) — por padrão nenhum caso extremo é ativado, senão o diálogo de mapeamento
+    de colunas (#azMapOk) travaria a espera abaixo."""
+    from azure_simulado import AzureSimulado, fontes_de
+    sim = AzureSimulado(nome, **azure_kwargs)
+    pg.route(re.compile(r"https://(analytics\.)?dev\.azure\.com/.*"), sim.rota)
+    fontes = fontes_de(sim)
+    orgs = sorted({f["org"] for f in fontes})
+    pg.evaluate("""([orgs, fontes]) => {
+      CFG.azure.orgs = orgs.map(o => ({org:o})); CFG.azure.sources = fontes; saveCfg();
+      orgs.forEach(o => AZ.tokens[o] = 'test-token');
+    }""", [orgs, fontes])
+    pg.evaluate("azRun()")
+    pg.wait_for_function('document.getElementById("srcLabel").textContent.includes("Azure DevOps")', timeout=60000)
     pg.wait_for_timeout(300)

@@ -1,6 +1,5 @@
 /* ---------------- leitura da planilha ---------------- */
 /* ---------- CSV: dentro das células (uma linha por célula na coluna A) ou arquivo .csv ---------- */
-const newImport = () => ({csvSheets:[], fixed:[], dropped:[], replaced:[]});
 /* um registro CSV (pode conter quebras de linha dentro de aspas); aspas só abrem no início do campo */
 function parseCsvRecord(s, d){
   const out = []; let f = "", q = false;

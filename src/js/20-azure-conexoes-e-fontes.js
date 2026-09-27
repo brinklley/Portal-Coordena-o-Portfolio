@@ -90,6 +90,7 @@ function azRender(){
       <label>Campo do roadmap executivo (nome)<input type="text" id="azFRoad" value="${esc(A.fields.roadmap)}" style="width:200px"></label>
       <label style="flex-direction:row;align-items:center;gap:6px;margin-top:16px"><input type="checkbox" id="azRem" ${A.excludeRemoved ? "checked" : ""}> Excluir itens no estado Removed</label></div>
     <p class="help" style="margin-top:6px">As datas das colunas seguem a regra validada na prova de conceito: Backlog pela data de criação, primeira entrada em cada coluna, colunas puladas recebem a data da próxima e, quando o item volta, as colunas à frente são apagadas. Colunas de quadros antigos ficam ignoradas, salvo mapeamento seu (feito após a primeira carga e salvo aqui).</p>`;
+  if (!S.model && A.sources.length) h += `<div class="az-actions" style="margin-top:14px"><button type="button" class="btn primary" id="azGateLoad">Carregar dados do Azure DevOps</button></div>`;
   box.innerHTML = h;
 }
 function azFormHtml(role){
@@ -134,6 +135,14 @@ $("cfgBody").addEventListener("click", async e => {
     A.orgs.splice(+b.dataset.azDelorg, 1); A.sources = A.sources.filter(s => s.org !== o.org); delete AZ.tokens[o.org]; azRender(); return;
   }
   if (b.dataset.azDelsrc !== undefined){ const s = A.sources.splice(+b.dataset.azDelsrc, 1)[0]; azRefreshTeams(s && s.role === "op" ? `Fonte ${s.alias || s.team} removida.` : ""); return; }
+  if (b.id === "azGateLoad"){
+    // pré-carga: salva o rascunho direto (sem o botão "Salvar" da aba Geral, que nem existe ainda)
+    const err = readForm();
+    if (err){ cfgForm(err); return; }
+    CFG = DRAFT; saveCfg(); fillTeamFilter();
+    openAzureLoadModal();
+    return;
+  }
   if (b.dataset.azAdd){ const first = A.orgs.find(o => azConnected(o.org)); AZ.form = {role:b.dataset.azAdd, org:first && first.org}; azRender(); return; }
   if (b.id === "azFCancel"){ AZ.form = null; azRender(); return; }
   if (b.id === "azFLoad"){

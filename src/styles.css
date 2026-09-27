@@ -25,6 +25,12 @@ body{font-family:var(--font);color:var(--ink);background:var(--board);font-size:
 button,select,input{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--ini);outline-offset:2px}
 
+/* primeiro acesso / sem dado carregado ainda: some com todo o app, só a tela de Configurações
+   (forçada aberta) fica visível. .zoom e .side-tabs têm display próprio na classe, então o
+   atributo hidden não bastaria — por isso uma regra com !important, aplicada uma vez por classe. */
+body.gate-active .top, body.gate-active .viewport, body.gate-active .zoom,
+body.gate-active .side-tabs, body.gate-active #crumbs { display:none !important; }
+
 /* ---------- barra superior ---------- */
 .top{position:relative;z-index:30;flex:none;background:#FBFCFC;border-bottom:1px solid var(--line)}
 .top-row{display:flex;align-items:center;gap:12px;padding:10px 20px;flex-wrap:wrap}
@@ -336,6 +342,10 @@ input[type=checkbox].bad{outline:2px solid var(--alert)}
 .ftab .muted{font-weight:400;font-size:11.5px}
 .ftab.on{background:#fff;border-color:var(--line);color:var(--ink)}
 .ftab.bad{color:var(--alert)}
+.cfg-tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:0 0 14px;position:sticky;top:-6px;z-index:3;background:#fff;padding-top:2px}
+.cfg-tab{border:1px solid transparent;border-bottom:0;background:none;padding:9px 16px;border-radius:8px 8px 0 0;cursor:pointer;font-weight:650;font-size:14px;margin-bottom:-1px;color:var(--ink-2)}
+.cfg-tab.on{background:#fff;border-color:var(--line);color:var(--ink)}
+.cfg-tab:disabled{cursor:not-allowed;opacity:.5}
 .fvis{background:#F4F6F8;border-radius:8px;padding:10px 12px;margin-bottom:10px;position:sticky;top:38px;z-index:2;box-shadow:0 6px 10px -8px rgba(0,0,0,.25)}
 .fstrip{display:flex;gap:3px;align-items:flex-start;flex-wrap:nowrap;overflow-x:auto;padding-bottom:9px}
 .fb{position:relative;flex:1 0 22px;height:22px;border-radius:4px;display:flex;align-items:center;justify-content:center}

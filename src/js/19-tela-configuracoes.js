@@ -12,7 +12,13 @@ function cfgForm(err){
   const disc = new Set(rs.disc), wip = new Set(rs.wip), vaz = new Set(rs.vazao);
   const teamUses = s => teams.filter(tm => stagesOf(tm, d).some(x => norm(x) === norm(s))).length;
   const num = (k, f, lab, tm) => { const v = (d.teams[k] || {})[f]; return `<input type="number" min="1" step="1" data-team="${esc(k)}" data-f="${f}" value="${v ?? ""}" placeholder="${f === "stuck" ? "geral" : "—"}" aria-label="${lab} do time ${esc(tm)}">`; };
-  $("cfgBody").innerHTML = `<div id="azSec"></div>
+  const tab2 = M ? (S.cfgTab2 || "geral") : "az";
+  $("cfgBody").innerHTML = `<div class="cfg-tabs" role="tablist">
+      <button type="button" class="cfg-tab${tab2 === "az" ? " on" : ""}" role="tab" aria-selected="${tab2 === "az"}" data-cfgtab2="az">Azure DevOps</button>
+      <button type="button" class="cfg-tab${tab2 === "geral" ? " on" : ""}" role="tab" aria-selected="${tab2 === "geral"}" data-cfgtab2="geral" ${!M ? `disabled title="Carregue os dados do Azure DevOps primeiro"` : ""}>Configurações gerais</button>
+    </div>
+    <div id="cfgTabAz" ${tab2 === "az" ? "" : "hidden"}><div id="azSec"></div></div>
+    <div id="cfgTabGeral" ${tab2 === "geral" ? "" : "hidden"}>
     <h4>Alertas por time (CT planejado)</h4>
     <p class="help">Preencha o <b>CT máximo</b> para o time passar a usar os próprios limites. <b>Atenção</b> vale para itens em andamento; <b>atraso</b> (acima do CT máximo) e <b>outlier</b> valem também para itens concluídos. Os valores devem crescer: atenção &lt; CT máximo &lt; outlier. Em branco no CT máximo, o time usa a regra geral abaixo.</p>
     ${!teams.length ? `<div class="az-lock">Nenhum time para configurar ainda. Os times aparecem aqui depois que você carregar uma planilha ou cadastrar fontes de times operacionais do Azure DevOps (seção no topo desta tela).${S.isDemo ? " Os times dos dados de exemplo não entram na configuração." : ""}</div>` : ""}
@@ -83,7 +89,8 @@ function cfgForm(err){
     ${fieldsForm(d)}
     <h4>Configuração do fluxo dos times</h4>
     <p class="help">Cada aba mostra só as colunas do fluxo daquele time, na ordem real. Para cada coluna, escolha como ela conta nos cards de épico: <b>Discovery</b> (já começou, mas ainda não entrou no WIP), <b>WIP</b> (trabalho em aberto) ou <b>Vazão</b> (concluído). Em <b>Entra no CT</b>, o CycleTime do item começa na <b>primeira</b> coluna marcada e termina na <b>última</b>. Marque <b>Fila de espera</b> nas colunas onde o item fica parado numa fila (aguardando), para o quadrante <b>Eficiência de fluxo</b> do Report F4P — as demais colunas contam automaticamente como tempo em trabalho (touch time); sem nenhuma marcada, todo o fluxo conta como touch time.</p>
-    ${flowTabsHtml(d)}`;
+    ${flowTabsHtml(d)}
+    </div>`;
   azRender();
 }
 /* lê o formulário para o rascunho; devolve mensagem de erro (ou null) */
@@ -263,6 +270,10 @@ $("cfgBody").addEventListener("click", e => {
   if (add) DRAFT.tags.push({id:"t" + Date.now(), name:"NOVA TAG", aliases:[], color:"#A7F3D0", level:"info", when:"since"});
   cfgForm(); $("cfgBody").querySelector("#tagTable tbody tr:last-child input")?.focus();
 });
+$("cfgBody").addEventListener("click", e => {
+  const t = e.target.closest("[data-cfgtab2]"); if (!t || t.disabled) return;
+  S.cfgTab2 = t.dataset.cfgtab2; cfgForm();
+});
 $("cfgBody").addEventListener("change", e => {
   const p = e.target.closest(".fpanel"); if (!p) return;
   if (e.target.type === "radio"){ const tr = e.target.closest("tr[data-stage]"); if (tr) tr.dataset.cat = e.target.value; }
@@ -304,7 +315,8 @@ $("cfgBody").addEventListener("input", e => {
   }
 });
 function openCfg(){ AZ.form = null; DRAFT = JSON.parse(JSON.stringify(CFG)); cfgForm(); $("cfgBg").hidden = false; const f = $("cfgBody").querySelector("input"); if (f) f.focus(); azFillMissingStages(); }
-function closeCfg(){ $("cfgBg").hidden = true; DRAFT = null; $("btnCfg").focus(); }
+/* antes da 1ª carga, a tela de Configurações é o próprio bloqueio de primeiro acesso: não fecha */
+function closeCfg(){ if (!S.model) return; $("cfgBg").hidden = true; DRAFT = null; $("btnCfg").focus(); }
 $("btnCfg").onclick = openCfg;
 $("cfgClose").onclick = $("cfgCancel").onclick = closeCfg;
 $("cfgBg").addEventListener("pointerdown", e => { if (e.target === $("cfgBg")) closeCfg(); });

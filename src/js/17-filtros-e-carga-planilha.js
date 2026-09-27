@@ -1,4 +1,5 @@
 /* ---------------- filtros ---------------- */
+const newImport = () => ({csvSheets:[], fixed:[], dropped:[], replaced:[]});
 function fillFilters(){
   const M = S.model;
   const exec = [...new Set([...M.inis.values()].filter(i=>iniCanAppear(i) && i.exec).map(i=>i.exec))].sort();
@@ -20,6 +21,7 @@ function loadTables(tables, label, isDemo, imp){
   try{
     S.model = buildModel(tables);
   }catch(err){ toast(err.message, 6000); return false; }
+  document.body.classList.remove("gate-active");
   recomputeHealth();
   $("srcLabel").textContent = label;
   $("notice").hidden = !isDemo;

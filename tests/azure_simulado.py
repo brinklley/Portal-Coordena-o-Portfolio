@@ -1,10 +1,15 @@
-"""Azure DevOps simulado para os testes, gerado a partir de fixtures/times.xlsx (dados fictícios).
-Reproduz os cenários reais encontrados na integração:
-- duas organizações: 'org-portfolio' (Iniciativa, Release, Épico e o time DADOS) e 'org-times' (demais times);
+"""Azure DevOps simulado para os testes, gerado a partir de qualquer fixture de fixtures/*.xlsx
+(mesmo formato "planilha do Portal": abas Iniciativa/Release/Épico + "TIME X"). Reproduz os
+cenários reais encontrados na integração:
+- duas organizações: 'org-portfolio' (Iniciativa, Release, Épico e o time DADOS, se existir) e
+  'org-times' (demais times);
 - times ligados ao épico pelo campo ID_EPICO_UNICRED (org-times) e pelo Parent (DADOS, na org-portfolio);
 - quadros com fluxos próprios (o de épicos termina em 'Fechado'; o do DADOS em 'Pronto');
-- um item no estado Removed (deve ser excluído), uma coluna antiga no histórico (ignorada por padrão)
-  e o token 'token-errado' (401)."""
+- o token 'token-errado' (401);
+- opcionalmente (flags `item_removido`/`coluna_antiga`, exigem um time CORE na fixture, ex.
+  times.xlsx): um item no estado Removed (deve ser excluído) e uma coluna antiga no histórico
+  (ignorada por padrão, exercita o diálogo de mapeamento) — desligadas por padrão, para não travar
+  as cargas genéricas de `conftest.carregar()` esperando um diálogo que ninguém confirma."""
 import json, re, base64, datetime as dt
 from urllib.parse import urlsplit, parse_qs, unquote
 import openpyxl
@@ -39,8 +44,8 @@ def _revisoes(iid, datas, keys):
     return rv
 
 class AzureSimulado:
-    def __init__(self):
-        wb = openpyxl.load_workbook(FIX / "times.xlsx")
+    def __init__(self, arquivo="times.xlsx", *, coluna_antiga=False, item_removido=False):
+        wb = openpyxl.load_workbook(FIX / arquivo)
         self.quadros = {}   # (org, projeto, time, nível) -> dados do quadro
         self.itens, self.revs, self.rels = {}, {}, {}
         def ler(ws):
@@ -71,13 +76,18 @@ class AzureSimulado:
             else:
                 quadro("org-times", "Times", time, "Stories", c, l, "Backlog", "Fechado", ["User Story", "Technical Story", "Internal Bug"],
                        lambda r: {"Custom.ID_EPICO_UNICRED": r["ID_EPICO_UNICRED"], "System.Tags": (r.get("Tags") or "").strip("[]")})
-        # item removido (só existe no Azure) e coluna antiga no histórico de um item do CORE
-        core = self.quadros[("org-times", "Times", "CORE", "Stories")]
-        self.itens[("org-times", 99999)] = {"System.Id": 99999, "System.Title": "Removido", "System.WorkItemType": "User Story", "System.State": "Removed"}
-        self.revs[("org-times", 99999)] = []; core["ids"].append(99999)
-        primeiro = core["ids"][0]
-        self.revs[("org-times", primeiro)].insert(0, {"WorkItemId": primeiro, "Revision": 0, "ChangedDate": "2025-01-01T10:00:00-03:00", "CreatedDate": "2025-01-01T09:00:00-03:00",
-            "State": "New", "TagNames": None, "BoardLocations": [{"ColumnId": "coluna-antiga", "ColumnName": "Coluna Antiga", "Done": "Unknown", "LaneName": "x"}]})
+        # casos extremos, opcionais: item removido (só existe no Azure) e coluna antiga no
+        # histórico de um item do CORE — exigem uma fixture com "TIME CORE" (ex.: times.xlsx)
+        if item_removido or coluna_antiga:
+            core = self.quadros.get(("org-times", "Times", "CORE", "Stories"))
+            if not core: raise ValueError("item_removido/coluna_antiga exigem uma fixture com TIME CORE")
+        if item_removido:
+            self.itens[("org-times", 99999)] = {"System.Id": 99999, "System.Title": "Removido", "System.WorkItemType": "User Story", "System.State": "Removed"}
+            self.revs[("org-times", 99999)] = []; core["ids"].append(99999)
+        if coluna_antiga:
+            primeiro = core["ids"][0]
+            self.revs[("org-times", primeiro)].insert(0, {"WorkItemId": primeiro, "Revision": 0, "ChangedDate": "2025-01-01T10:00:00-03:00", "CreatedDate": "2025-01-01T09:00:00-03:00",
+                "State": "New", "TagNames": None, "BoardLocations": [{"ColumnId": "coluna-antiga", "ColumnName": "Coluna Antiga", "Done": "Unknown", "LaneName": "x"}]})
         self.chamadas = 0
 
     def rota(self, route):
@@ -113,10 +123,13 @@ class AzureSimulado:
             return js({"value": [{"id": i, "fields": {k: v for k, v in self.itens[(org, i)].items() if k in b["fields"]}} for i in b["ids"] if (org, i) in self.itens]})
         return route.fulfill(status=404, headers=CORS, body="não simulado: " + path)
 
-FONTES = [
-    {"id": "s1", "role": "ini", "org": "org-portfolio", "project": "Portfolio", "team": "Portfolio UBR", "level": "Iniciativas", "alias": ""},
-    {"id": "s2", "role": "rel", "org": "org-portfolio", "project": "Portfolio", "team": "Portfolio UBR", "level": "Releases", "alias": ""},
-    {"id": "s3", "role": "epi", "org": "org-portfolio", "project": "Portfolio", "team": "Coordenacao Epicos", "level": "Epicos", "alias": ""},
-    {"id": "s4", "role": "op", "org": "org-portfolio", "project": "TI", "team": "DADOS", "level": "Stories", "alias": "DADOS"}] + [
-    {"id": f"t{n}", "role": "op", "org": "org-times", "project": "Times", "team": n, "level": "Stories", "alias": n}
-    for n in ["CORE", "IB", "BO", "MOBILE", "PAGAMENTOS", "CANAIS"]]
+NIVEL_ROLE = {"Iniciativas": "ini", "Releases": "rel", "Epicos": "epi", "Stories": "op"}
+
+def fontes_de(sim):
+    """Deriva a lista de fontes (CFG.azure.sources) a partir dos quadros que o simulado
+    efetivamente montou — funciona para qualquer fixture, não só times.xlsx."""
+    out = []
+    for i, (org, proj, time, nivel) in enumerate(sim.quadros):
+        role = NIVEL_ROLE[nivel]
+        out.append({"id": f"f{i}", "role": role, "org": org, "project": proj, "team": time, "level": nivel, "alias": time if role == "op" else ""})
+    return out
