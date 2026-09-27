@@ -417,6 +417,7 @@ tr[data-cat="disc"] .fnb{background:var(--c-disc);color:#fff} tr[data-cat="wip"]
 .an-table td.c{text-align:center}
 .an-table .ev{line-height:1.4}
 .an-table .ev .ep{font-weight:600}
+.an-table .ev mark{background:#FDE047;padding:1px 4px;font-weight:600;font-size:11.5px}
 .an-table .idb{all:unset;cursor:pointer;background:#22C55E;color:#0B2B14;padding:0 3px;font-weight:600}
 .an-table .idi{all:unset;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
 .an-table .res{background:#DBEAFE;color:#1E3A8A;padding:0 3px;font-weight:600;white-space:nowrap;font-size:11.5px}
