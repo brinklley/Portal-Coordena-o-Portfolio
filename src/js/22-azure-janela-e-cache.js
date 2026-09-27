@@ -148,11 +148,10 @@ async function wipeAll(){
   location.reload();
 }
 
-if (typeof XLSX === "undefined"){ $("btnTemplate").disabled = true; }
 (async () => {
   const c = await azCacheLoad();
   if (c && c.tables){ const imp = newImport(); imp.azure = c.notes || null;
     if (loadTables(c.tables, `${c.label} (dados guardados neste navegador; clique em Azure DevOps para atualizar)`, false, imp)) return; }
-  loadTables(demoTables(), "dados de exemplo", true);
+  openCfg();
 })();
 

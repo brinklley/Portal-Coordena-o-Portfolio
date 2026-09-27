@@ -20,6 +20,14 @@ TOKEN_RUIM = "Basic " + base64.b64encode(b":token-errado").decode()
 
 def _dia(v): return v.strftime("%Y-%m-%d") if isinstance(v, dt.datetime) else (str(v)[:10] if v else "")
 
+def _pessoa(v):
+    """Reconstrói {displayName, uniqueName} a partir do texto "Nome <email>" da coluna Assigned
+    To da planilha — o mesmo formato que azPerson() (21-azure-carga.js) espera para remontar essa
+    coluna a partir do campo real do Azure. Sem "<...>" (ex.: "Outra Pessoa"), vira só displayName."""
+    if not v: return None
+    m = re.match(r"^(.*?)\s*<([^>]+)>\s*$", str(v).strip())
+    return {"displayName": m.group(1), "uniqueName": m.group(2)} if m else {"displayName": str(v).strip(), "uniqueName": ""}
+
 def _colunas(nomes, prefixo):
     cols, keys, i = [], [], 0
     while i < len(nomes):
@@ -61,11 +69,11 @@ class AzureSimulado:
                 f.update(campos(r)); self.itens[(org, iid)] = f
             self.quadros[(org, proj, time, nivel)] = {"cols": cols, "ids": ids, "tipos": tipos, "area": f"{proj}\\{time}"}
         c, l = ler(wb["Iniciativa"]); quadro("org-portfolio", "Portfolio", "Portfolio UBR", "Iniciativas", c, l, "Materialização da Oportunidade ou Solicitação", "Concluído", ["Initiative"],
-            lambda r: {"Custom.AnoSemestreRoadmap": r["AnoSemestreRoadmap"], "System.AssignedTo": {"displayName": "Fulano de Tal", "uniqueName": "fulano@exemplo.com"}})
+            lambda r: {"Custom.AnoSemestreRoadmap": r["AnoSemestreRoadmap"], "System.AssignedTo": _pessoa(r.get("Assigned To"))})
         c, l = ler(wb["Release"]); quadro("org-portfolio", "Portfolio", "Portfolio UBR", "Releases", c, l, "Inventário de Opções de Valor", "Entregue", ["Product Release"],
-            lambda r: {"System.Parent": r["Parent"]})
+            lambda r: {"System.Parent": r["Parent"], "System.AssignedTo": _pessoa(r.get("Assigned To"))})
         c, l = ler(wb["Épico"]); quadro("org-portfolio", "Portfolio", "Coordenacao Epicos", "Epicos", c, l, "Backlog", "Fechado", ["Epic"],
-            lambda r: {"System.Parent": r["Parent"], "Microsoft.VSTS.Scheduling.TargetDate": _dia(r["Target Date"]) + "T03:00:00Z"})
+            lambda r: {"System.Parent": r["Parent"], "Microsoft.VSTS.Scheduling.TargetDate": _dia(r["Target Date"]) + "T03:00:00Z", "System.AssignedTo": _pessoa(r.get("Assigned To"))})
         for nome in [n for n in wb.sheetnames if n.startswith("TIME ")]:
             c, l = ler(wb[nome]); time = nome[5:]
             if time == "DADOS":   # time na organização do portfólio: vínculo pelo Parent; fluxo termina em "Pronto"
