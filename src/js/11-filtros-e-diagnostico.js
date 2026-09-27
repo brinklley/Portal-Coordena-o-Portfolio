@@ -63,7 +63,7 @@ function withFilters(patch, fn){
 /* filtro de Time: times com dados + times cadastrados como fonte (marcados "sem carga"); mantém a seleção */
 function fillTeamFilter(){
   const sel = $("fTeam"), cur = sel.value;
-  sel.innerHTML = `<option value="">Todos os times</option>` + cfgTeams(CFG, true).map(tm => `<option value="${esc(tm)}">${esc(tm)}${hasData(tm) ? "" : " (sem carga)"}</option>`).join("");
+  sel.innerHTML = `<option value="">Todos os times</option>` + cfgTeams(CFG).map(tm => `<option value="${esc(tm)}">${esc(tm)}${hasData(tm) ? "" : " (sem carga)"}</option>`).join("");
   sel.value = [...sel.options].some(o => o.value === cur) ? cur : "";
   if (sel.value !== cur){ S.f.team = ""; }
 }

@@ -21,10 +21,10 @@ function cfgForm(err){
     <div id="cfgTabGeral" ${tab2 === "geral" ? "" : "hidden"}>
     <h4>Alertas por time (CT planejado)</h4>
     <p class="help">Preencha o <b>CT máximo</b> para o time passar a usar os próprios limites. <b>Atenção</b> vale para itens em andamento; <b>atraso</b> (acima do CT máximo) e <b>outlier</b> valem também para itens concluídos. Os valores devem crescer: atenção &lt; CT máximo &lt; outlier. Em branco no CT máximo, o time usa a regra geral abaixo.</p>
-    ${!teams.length ? `<div class="az-lock">Nenhum time para configurar ainda. Os times aparecem aqui depois que você carregar uma planilha ou cadastrar fontes de times operacionais do Azure DevOps (seção no topo desta tela).${S.isDemo ? " Os times dos dados de exemplo não entram na configuração." : ""}</div>` : ""}
+    ${!teams.length ? `<div class="az-lock">Nenhum time para configurar ainda. Os times aparecem aqui depois que você cadastrar fontes de times operacionais na aba Azure DevOps.</div>` : ""}
     <table class="ctab" ${teams.length ? "" : "hidden"}><thead><tr><th>Time</th><th>Atenção (dias)</th><th>CT máximo, atraso (dias)</th><th>Outlier (dias)</th><th>Parado na coluna (dias)</th></tr></thead><tbody>
     ${teams.map(tm => { const k = norm(tm); return `<tr><td>${esc(tm)} <span class="muted">${hasData(tm) ? `${[...M.ops.values()].filter(o => o.team === tm).length} itens` : "ainda sem carga"}</span></td>
-      <td>${num(k,"warn","Atenção",tm)}</td><td>${num(k,"max","CT máximo",tm)}</td><td>${num(k,"out","Outlier",tm)}</td><td>${num(k,"stuck","Parado na coluna",tm)}</td></tr>`; }).join("") || `<tr><td colspan="5" class="muted">Carregue uma planilha para ver os times.</td></tr>`}
+      <td>${num(k,"warn","Atenção",tm)}</td><td>${num(k,"max","CT máximo",tm)}</td><td>${num(k,"out","Outlier",tm)}</td><td>${num(k,"stuck","Parado na coluna",tm)}</td></tr>`; }).join("") || `<tr><td colspan="5" class="muted">Carregue os dados do Azure DevOps para ver os times.</td></tr>`}
     </tbody></table>
     ${err ? `<p class="cfg-err" role="alert">${esc(err)}</p>` : ""}
     <h4>Regra geral (times sem CT planejado)</h4>
@@ -48,14 +48,14 @@ function cfgForm(err){
       <label>Período do P95/P50 (meses)<input type="number" min="1" id="cfgF4pMonths" value="${d.f4p.months}" style="width:100px"></label>
       <label>Tag da Classe de Serviço Expedite (quadrante Urgente)<select id="cfgF4pExpedite" style="width:200px">${(d.tags || []).map(tg => `<option value="${esc(tg.id)}" ${tg.id === (d.f4p.expediteTag || "urgent") ? "selected" : ""}>${esc(tg.name)}</option>`).join("") || `<option value="">Nenhuma tag cadastrada</option>`}</select></label>
     </div>
-    <div class="typelist">${typesFound().map(([ty, n]) => `<label><input type="checkbox" data-f4ptype="${esc(norm(ty))}" ${(d.f4p.types || []).includes(norm(ty)) ? "checked" : ""}> ${esc(ty)} <span class="muted">${n}</span></label>`).join("") || `<span class="muted">Carregue uma planilha para ver os tipos.</span>`}</div>
+    <div class="typelist">${typesFound().map(([ty, n]) => `<label><input type="checkbox" data-f4ptype="${esc(norm(ty))}" ${(d.f4p.types || []).includes(norm(ty)) ? "checked" : ""}> ${esc(ty)} <span class="muted">${n}</span></label>`).join("") || `<span class="muted">Carregue os dados do Azure DevOps para ver os tipos.</span>`}</div>
     <p class="help">Os tipos acima valem para CycleTime, Variabilidade e Vazão. O quadrante Urgente conta itens da tag Expedite acima de <b>qualquer</b> tipo; Technical Story conta só itens desse tipo, fixo.</p>
     <p class="help">Tipos de <b>épico</b> (não de item de time) considerados pelo quadrante <b>Roadmap – Épicos</b>; padrão Epic.</p>
-    <div class="typelist">${typesByLevel("epi").map(([ty, n]) => `<label><input type="checkbox" data-f4pepitype="${esc(norm(ty))}" ${(d.f4p.epiTypes || []).includes(norm(ty)) ? "checked" : ""}> ${esc(ty)} <span class="muted">${n}</span></label>`).join("") || `<span class="muted">Carregue uma planilha com a coluna Work Item Type nos épicos para ver os tipos.</span>`}</div>
+    <div class="typelist">${typesByLevel("epi").map(([ty, n]) => `<label><input type="checkbox" data-f4pepitype="${esc(norm(ty))}" ${(d.f4p.epiTypes || []).includes(norm(ty)) ? "checked" : ""}> ${esc(ty)} <span class="muted">${n}</span></label>`).join("") || `<span class="muted">Carregue os dados do Azure DevOps para ver os tipos de épico.</span>`}</div>
     <p class="help">Tipos considerados pelo quadrante <b>User Story (planejado vs não planejado)</b>; padrão User Story — configuração própria, independente da lista de tipos acima.</p>
-    <div class="typelist">${typesFound().map(([ty, n]) => `<label><input type="checkbox" data-f4pustype="${esc(norm(ty))}" ${(d.f4p.usTypes || []).includes(norm(ty)) ? "checked" : ""}> ${esc(ty)} <span class="muted">${n}</span></label>`).join("") || `<span class="muted">Carregue uma planilha para ver os tipos.</span>`}</div>
+    <div class="typelist">${typesFound().map(([ty, n]) => `<label><input type="checkbox" data-f4pustype="${esc(norm(ty))}" ${(d.f4p.usTypes || []).includes(norm(ty)) ? "checked" : ""}> ${esc(ty)} <span class="muted">${n}</span></label>`).join("") || `<span class="muted">Carregue os dados do Azure DevOps para ver os tipos.</span>`}</div>
     <p class="help">Tipos considerados pelo quadrante <b>Eficiência de fluxo</b>; sem nenhum marcado, contam <b>todos os tipos</b> (padrão) — diferente das listas acima, aqui vazio não cai num padrão fixo.</p>
-    <div class="typelist">${typesFound().map(([ty, n]) => `<label><input type="checkbox" data-f4pefftype="${esc(norm(ty))}" ${(d.f4p.effTypes || []).includes(norm(ty)) ? "checked" : ""}> ${esc(ty)} <span class="muted">${n}</span></label>`).join("") || `<span class="muted">Carregue uma planilha para ver os tipos.</span>`}</div>
+    <div class="typelist">${typesFound().map(([ty, n]) => `<label><input type="checkbox" data-f4pefftype="${esc(norm(ty))}" ${(d.f4p.effTypes || []).includes(norm(ty)) ? "checked" : ""}> ${esc(ty)} <span class="muted">${n}</span></label>`).join("") || `<span class="muted">Carregue os dados do Azure DevOps para ver os tipos.</span>`}</div>
     <table class="ctab" ${teams.length ? "" : "hidden"}><thead><tr><th>Time</th><th>Variabilidade mínima</th><th>Variabilidade máxima</th><th>Meta de Urgente (Expedite) no semestre</th><th>Meta de Technical Story no semestre</th><th>Eficiência de fluxo mínima</th><th>Eficiência de fluxo máxima</th></tr></thead><tbody>
     ${teams.map(tm => { const k = norm(tm), v = d.f4p.teams[k] || {};
       return `<tr><td>${esc(tm)}</td>
@@ -64,11 +64,11 @@ function cfgForm(err){
         <td><input type="number" min="0" step="1" data-f4pteam="${esc(k)}" data-f4pf="urgentMeta" value="${v.urgentMeta ?? ""}" placeholder="sem meta" aria-label="Meta de Urgente de ${esc(tm)}"></td>
         <td><input type="number" min="0" step="1" data-f4pteam="${esc(k)}" data-f4pf="tsMeta" value="${v.tsMeta ?? ""}" placeholder="6" aria-label="Meta de Technical Story de ${esc(tm)}"></td>
         <td><input type="number" min="0" step="1" data-f4pteam="${esc(k)}" data-f4pf="effMin" value="${v.effMin ?? ""}" placeholder="30" aria-label="Eficiência de fluxo mínima de ${esc(tm)}"></td>
-        <td><input type="number" min="0" step="1" data-f4pteam="${esc(k)}" data-f4pf="effMax" value="${v.effMax ?? ""}" placeholder="55" aria-label="Eficiência de fluxo máxima de ${esc(tm)}"></td></tr>`; }).join("") || `<tr><td colspan="7" class="muted">Carregue uma planilha para ver os times.</td></tr>`}
+        <td><input type="number" min="0" step="1" data-f4pteam="${esc(k)}" data-f4pf="effMax" value="${v.effMax ?? ""}" placeholder="55" aria-label="Eficiência de fluxo máxima de ${esc(tm)}"></td></tr>`; }).join("") || `<tr><td colspan="7" class="muted">Carregue os dados do Azure DevOps para ver os times.</td></tr>`}
     </tbody></table>
     <h4>Tipos considerados no CT do épico</h4>
     <p class="help">O CycleTime mostrado nos cards de épico usa só os itens dos tipos marcados. Os alertas de cada item continuam valendo para todos os tipos.</p>
-    <div class="typelist">${typesFound().map(([ty, n]) => `<label><input type="checkbox" data-cttype="${esc(norm(ty))}" ${(d.ctTypes || []).includes(norm(ty)) ? "checked" : ""}> ${esc(ty)} <span class="muted">${n}</span></label>`).join("") || `<span class="muted">Carregue uma planilha para ver os tipos.</span>`}</div>
+    <div class="typelist">${typesFound().map(([ty, n]) => `<label><input type="checkbox" data-cttype="${esc(norm(ty))}" ${(d.ctTypes || []).includes(norm(ty)) ? "checked" : ""}> ${esc(ty)} <span class="muted">${n}</span></label>`).join("") || `<span class="muted">Carregue os dados do Azure DevOps para ver os tipos.</span>`}</div>
     <h4>Tags cadastradas</h4>
     <p class="help">Itens dos times com estas tags (coluna Tags) ganham a cor de fundo no fluxo. Os itens ainda abertos também geram alerta nos cards pai (épico, release e iniciativa). BLOCKED também é reconhecido pela coluna Blocked, e o “desde” vem da coluna Blocked Days. Para as demais, o “desde” é a data em que o item entrou na coluna atual; “para o dia” usa a coluna Target Date, quando existir.</p>
     <table class="ctab" id="tagTable"><thead><tr><th>Tag</th><th>Também reconhece</th><th>Cor</th><th>Alerta nos pais</th><th>Data</th><th></th></tr></thead><tbody>
@@ -85,7 +85,7 @@ function cfgForm(err){
     <p class="help">A cor vale só para a faixa no topo do card, para identificar o tipo de relance (por exemplo, User Story × Internal Bug). Tipos sem cor escolhida usam a cor padrão do nível.</p>
     ${typeColorForm(d)}
     <h4>Campos adicionais nos cards</h4>
-    <p class="help">Escolha colunas da planilha para aparecer no corpo dos cards, abaixo das informações padrão, e no painel de detalhes. As informações padrão continuam sempre visíveis; as colunas do fluxo não entram na lista.</p>
+    <p class="help">Escolha campos da carga para aparecer no corpo dos cards, abaixo das informações padrão, e no painel de detalhes. As informações padrão continuam sempre visíveis; as colunas do fluxo não entram na lista.</p>
     ${fieldsForm(d)}
     <h4>Configuração do fluxo dos times</h4>
     <p class="help">Cada aba mostra só as colunas do fluxo daquele time, na ordem real. Para cada coluna, escolha como ela conta nos cards de épico: <b>Discovery</b> (já começou, mas ainda não entrou no WIP), <b>WIP</b> (trabalho em aberto) ou <b>Vazão</b> (concluído). Em <b>Entra no CT</b>, o CycleTime do item começa na <b>primeira</b> coluna marcada e termina na <b>última</b>. Marque <b>Fila de espera</b> nas colunas onde o item fica parado numa fila (aguardando), para o quadrante <b>Eficiência de fluxo</b> do Report F4P — as demais colunas contam automaticamente como tempo em trabalho (touch time); sem nenhuma marcada, todo o fluxo conta como touch time.</p>
@@ -193,23 +193,23 @@ function typesByLevel(lvl){
 }
 function typeColorForm(d){
   const lv = ["ini","rel","epi","op"].map(l => [l, typesByLevel(l)]).filter(([, ts]) => ts.length);
-  if (!lv.length) return `<p class="muted">A planilha não tem a coluna Work Item Type.</p>`;
+  if (!lv.length) return `<p class="muted">A carga não tem a coluna Work Item Type.</p>`;
   return lv.map(([l, ts]) => `<div class="tcgrp"><div class="tcgrp-h" style="border-left-color:${LVL_HEX[l]}">${LVL_NAME[l]}</div><div class="tcgrid">${ts.map(([ty, n]) => {
     const k = norm(ty), c = (d.typeColors[l] || {})[k] || LVL_HEX[l];
     return `<label class="tcitem"><input type="color" data-tc-lvl="${l}" data-tc-type="${esc(k)}" value="${esc(c)}" aria-label="Cor do tipo ${esc(ty)} em ${LVL_NAME[l]}"><span class="tcprev" style="border-top-color:${esc(c)}"></span>${esc(ty)} <span class="muted">${n}</span></label>`; }).join("")}</div></div>`).join("");
 }
 function fieldsForm(d){
   const av = S.model ? S.model.fieldsAvail : null;
-  if (!av) return `<p class="muted">Carregue uma planilha para ver as colunas.</p>`;
+  if (!av) return `<p class="muted">Carregue os dados do Azure DevOps para ver as colunas.</p>`;
   return ["ini","rel","epi","op"].map(l => { const ks = Object.entries(av[l] || {}); if (!ks.length) return "";
     return `<div class="tcgrp"><div class="tcgrp-h" style="border-left-color:${LVL_HEX[l]}">${LVL_NAME[l]}</div><div class="typelist">${ks.map(([k, name]) =>
       `<label><input type="checkbox" data-fld-lvl="${l}" data-fld="${esc(k)}" ${(d.fields[l] || []).includes(k) ? "checked" : ""}> ${esc(name)}</label>`).join("")}</div></div>`; }).join("");
 }
 const CAT_LABEL = {none:"Nenhum", disc:"Discovery", wip:"WIP", vazao:"Vazão"};
 function flowTabsHtml(d){
-  const M = S.model; if (!M) return `<p class="muted">Carregue uma planilha para configurar o fluxo dos times.</p>`;
+  const M = S.model; if (!M) return `<p class="muted">Carregue os dados do Azure DevOps para configurar o fluxo dos times.</p>`;
   const teams = cfgTeams(d), cur = teams.includes(S.cfgTab) ? S.cfgTab : teams[0];
-  if (!teams.length) return `<div class="az-lock">Nenhum time para configurar ainda. Os times aparecem aqui depois que você carregar uma planilha ou cadastrar fontes de times operacionais do Azure DevOps (seção no topo desta tela).${S.isDemo ? " Os times dos dados de exemplo não entram na configuração." : ""}</div>`;
+  if (!teams.length) return `<div class="az-lock">Nenhum time para configurar ainda. Os times aparecem aqui depois que você cadastrar fontes de times operacionais na aba Azure DevOps.</div>`;
   const tabs = `<div class="ftabs" role="tablist">${teams.map(tm => `<button type="button" role="tab" class="ftab${tm === cur ? " on" : ""}" aria-selected="${tm === cur}" data-ftab="${esc(tm)}">${esc(tm)} <span class="muted">${stagesOf(tm, d).length ? `${stagesOf(tm, d).length} colunas` : "sem colunas"}${hasData(tm) ? "" : " · sem carga"}</span></button>`).join("")}</div>`;
   const panels = teams.map(tm => {
     const c = teamFlowCfg(tm, d), k = norm(tm), ctS = new Set(c.ct);
@@ -341,9 +341,9 @@ $("cfgWipe").onclick = async () => {
     c ? `os dados carregados do Azure guardados neste navegador (${esc(c.label || "última carga")})` : "",
     Object.keys(AZ.tokens).length ? "os tokens informados nesta sessão" : ""].filter(Boolean);
   azModal(`<h3>Limpar tudo e reiniciar</h3>
-    <p class="help">O portal vai voltar ao estado do primeiro acesso, com os dados de exemplo. Isto não pode ser desfeito. Será apagado deste navegador:</p>
+    <p class="help">O portal vai voltar ao estado do primeiro acesso, com a tela de conexão do Azure DevOps. Isto não pode ser desfeito. Será apagado deste navegador:</p>
     <ul class="wipe-list">${itens.map(x => `<li>${x}</li>`).join("")}</ul>
-    <p class="help">Nada é apagado no Azure DevOps nem nas planilhas. Para poder restaurar as configurações depois, exporte-as antes (os tokens não vão no arquivo).</p>
+    <p class="help">Nada é apagado no Azure DevOps. Para poder restaurar as configurações depois, exporte-as antes (os tokens não vão no arquivo).</p>
     <div class="az-actions"><button class="btn" id="wipeExport">Exportar configurações antes</button><span style="flex:1"></span>
       <button class="btn" id="wipeCancel">Cancelar</button><button class="btn danger-solid" id="wipeGo">Apagar tudo e reiniciar</button></div>`);
   $("wipeCancel").onclick = azClose;

@@ -8,15 +8,12 @@ function investigate(q){
   Object.entries(S.tables || {}).forEach(([sheet, tb]) => { const i = (tb.headers || []).findIndex(h => norm(h) === "id");
     if (i >= 0 && tb.rows.some(r => nid(r[i]) === id)) where.push(sheet); });
   const removed = az && (az.removedIds || []).find(x => x.split(":")[1] === id);
-  const origin = az ? ["na carga do Azure DevOps", "a carga do Azure DevOps"] : S.isDemo ? ["nos dados de exemplo", "os dados de exemplo"] : ["na planilha carregada", "a planilha carregada"];
+  const origin = ["na carga do Azure DevOps", "a carga do Azure DevOps"];
   if (where.length) add(true, "Retornou nos dados", `Encontrado ${origin[0]}, na aba ${where.join(", ")}.`);
   else if (removed){ add(false, "Retornou do Azure, mas foi excluído na carga", `O item está no estado Removed e a opção “Excluir itens no estado Removed” está ligada (${roleName[removed.split(":")[0]]}).`,
       "Se ele não deveria estar removido, ajuste o estado no Azure DevOps. Para incluir itens removidos, desligue a opção em Configurações › Azure DevOps."); return steps; }
-  else { add(false, "Não retornou nos dados", az
-      ? "A carga do Azure não trouxe este ID. A consulta de cada fonte busca só os itens da Area Path do time configurado e dos tipos do nível de backlog escolhido."
-      : `Este ID não está ${origin[0]}.`,
-      az ? "No Azure DevOps, confira a Area Path e o tipo do item. Se o item aparece no quadro de outro time, ou se é de um tipo que não pertence ao nível configurado (ex.: Iniciativas), ajuste a fonte em Configurações › Azure DevOps ou o item no Azure. Depois, carregue de novo."
-         : "Confira se a planilha é a mais recente e se o item está na aba certa."); return steps; }
+  else { add(false, "Não retornou nos dados", "A carga do Azure não trouxe este ID. A consulta de cada fonte busca só os itens da Area Path do time configurado e dos tipos do nível de backlog escolhido.",
+      "No Azure DevOps, confira a Area Path e o tipo do item. Se o item aparece no quadro de outro time, ou se é de um tipo que não pertence ao nível configurado (ex.: Iniciativas), ajuste a fonte em Configurações › Azure DevOps ou o item no Azure. Depois, carregue de novo."); return steps; }
   // 2. entrou no modelo?
   const ini = M.inis.get(id), rel = M.rels.get(id), epi = M.epis.get(id), op = [...M.ops.values()].find(o => o.id === id);
   const lvl = ini ? "ini" : rel ? "rel" : epi ? "epi" : op ? "op" : null;

@@ -126,11 +126,11 @@ function azShowMapping(pend){
   };
 }
 async function azApply(){
-  const {tables, notes} = azBuildTables(), imp = newImport(); imp.azure = notes;
+  const {tables, notes} = azBuildTables(), imp = {azure: notes};
   saveCfg();                                                   // mapeamentos novos ficam salvos
   const when = new Date(), label = `Azure DevOps · ${when.toLocaleDateString("pt-BR")} ${when.toLocaleTimeString("pt-BR", {hour:"2-digit", minute:"2-digit"})}`;
   azClose();
-  if (loadTables(tables, label, false, imp)){
+  if (loadTables(tables, label, imp)){
     azCacheSave({tables, label, notes, when:when.toISOString()});
     if (!$("cfgBg").hidden) closeCfg();   // 1ª carga: fecha a tela de bloqueio automaticamente
   }
@@ -150,8 +150,8 @@ async function wipeAll(){
 
 (async () => {
   const c = await azCacheLoad();
-  if (c && c.tables){ const imp = newImport(); imp.azure = c.notes || null;
-    if (loadTables(c.tables, `${c.label} (dados guardados neste navegador; clique em Azure DevOps para atualizar)`, false, imp)) return; }
+  if (c && c.tables){ const imp = {azure: c.notes || null};
+    if (loadTables(c.tables, `${c.label} (dados guardados neste navegador; clique em Azure DevOps para atualizar)`, imp)) return; }
   openCfg();
 })();
 

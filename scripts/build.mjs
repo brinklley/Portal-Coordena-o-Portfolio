@@ -1,4 +1,4 @@
-// Gera dist/mapa_portfolio.html: um único arquivo, sem servidor, com estilos, código e a biblioteca SheetJS embutidos.
+// Gera dist/mapa_portfolio.html: um único arquivo, sem servidor, com estilos e código embutidos.
 // Uso: npm run build
 import { readFileSync, writeFileSync, readdirSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -20,11 +20,10 @@ const f4pAssets = Object.fromEntries(readdirSync(f4pAssetDir).filter(f => f.ends
 const f4pAssetsJs = `const F4P_ASSETS = ${JSON.stringify(f4pAssets)};\n`;
 const js = f4pAssetsJs + readdirSync(join(root, "src/js")).filter(f => f.endsWith(".js")).sort()
   .map(f => strip(read(join("src/js", f)))).join("\n");
-const xlsx = read("node_modules/xlsx/dist/xlsx.full.min.js");
 
-if (/<\/script/i.test(js) || /<\/script/i.test(xlsx)) throw new Error("O código contém </script>, o que quebraria o HTML de arquivo único.");
+if (/<\/script/i.test(js)) throw new Error("O código contém </script>, o que quebraria o HTML de arquivo único.");
 // replace com função: evita que "$&" e afins no código sejam interpretados
-const out = shell.replace("/*__CSS__*/", () => css).replace("/*__APP__*/", () => js).replace("/*__XLSX__*/", () => xlsx);
+const out = shell.replace("/*__CSS__*/", () => css).replace("/*__APP__*/", () => js);
 
 mkdirSync(join(root, "dist"), { recursive: true });
 writeFileSync(join(root, "dist/mapa_portfolio.html"), out);
