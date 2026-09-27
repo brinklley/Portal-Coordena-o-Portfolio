@@ -64,7 +64,7 @@ function renderCrumbs(){
 $("crumbs").addEventListener("click", e => {
   const b = e.target.closest("button"); if (!b) return;
   const c = b.dataset.c;
-  if (c === "root"){ S.path = {}; S.expand = false; S.focus = null; }
+  if (c === "root"){ S.path = {}; S.expand = false; S.focus = null; S.pathQueryId = null; }
   if (c === "ini"){ S.path = {ini:S.path.ini}; S.expand = false; S.focus = null; }
   if (c === "rel"){ delete S.path.epi; }
   render();

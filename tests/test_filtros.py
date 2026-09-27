@@ -51,3 +51,28 @@ def test_filtro_unico_por_texto_busca_em_qualquer_nivel(page):
       return {key:o.key, title:o.title}; }""")
     page.fill("#fBusca", op["title"]); page.wait_for_timeout(500)
     assert page.evaluate(f"S.V.visOp.has({op['key']!r})")
+
+def test_limpar_a_busca_desfaz_a_selecao_que_ela_criou(page):
+    """Bug relatado: limpar o campo (inclusive pelo "×" nativo do input — que dispara o mesmo
+    evento "input" que page.fill("", ...) simula) tirava o filtro mas deixava o quadro preso
+    mostrando só a iniciativa que a busca tinha selecionado via Enter (decisão 0035): a seleção
+    feita pela própria busca (gotoId) precisa se desfazer junto quando a busca é limpa."""
+    carregar(page, "times.xlsx")
+    epi_id = page.evaluate("[...S.model.epis.values()].find(e => e.valid).id")
+    page.fill("#fBusca", epi_id); page.press("#fBusca", "Enter"); page.wait_for_timeout(500)
+    assert page.evaluate("S.path.epi") == epi_id and page.evaluate("S.f.q") == epi_id
+    page.fill("#fBusca", ""); page.wait_for_timeout(500)
+    assert page.evaluate("S.f.q") == ""
+    assert page.evaluate("JSON.stringify(S.path)") == "{}"
+    assert page.evaluate("activeFilters().length") == 0
+
+def test_trocar_a_busca_por_outro_id_tambem_desfaz_a_selecao_anterior(page):
+    """Mesma correção (decisão 0035): trocar a busca para outro ID, mesmo só digitando (sem
+    Enter), também desfaz a seleção que a busca anterior tinha criado."""
+    carregar(page, "times.xlsx")
+    a, b = page.evaluate("[...S.model.epis.values()].filter(e => e.valid).map(e => e.id)")[:2]
+    page.fill("#fBusca", a); page.press("#fBusca", "Enter"); page.wait_for_timeout(500)
+    assert page.evaluate("S.path.epi") == a
+    page.fill("#fBusca", b); page.wait_for_timeout(500)
+    assert page.evaluate("JSON.stringify(S.path)") == "{}"
+    assert page.evaluate("S.f.q") == b
