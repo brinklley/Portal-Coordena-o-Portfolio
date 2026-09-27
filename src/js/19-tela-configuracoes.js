@@ -48,13 +48,17 @@ function cfgForm(err){
     <div class="typelist">${typesByLevel("epi").map(([ty, n]) => `<label><input type="checkbox" data-f4pepitype="${esc(norm(ty))}" ${(d.f4p.epiTypes || []).includes(norm(ty)) ? "checked" : ""}> ${esc(ty)} <span class="muted">${n}</span></label>`).join("") || `<span class="muted">Carregue uma planilha com a coluna Work Item Type nos épicos para ver os tipos.</span>`}</div>
     <p class="help">Tipos considerados pelo quadrante <b>User Story (planejado vs não planejado)</b>; padrão User Story — configuração própria, independente da lista de tipos acima.</p>
     <div class="typelist">${typesFound().map(([ty, n]) => `<label><input type="checkbox" data-f4pustype="${esc(norm(ty))}" ${(d.f4p.usTypes || []).includes(norm(ty)) ? "checked" : ""}> ${esc(ty)} <span class="muted">${n}</span></label>`).join("") || `<span class="muted">Carregue uma planilha para ver os tipos.</span>`}</div>
-    <table class="ctab" ${teams.length ? "" : "hidden"}><thead><tr><th>Time</th><th>Variabilidade mínima</th><th>Variabilidade máxima</th><th>Meta de Urgente (Expedite) no semestre</th><th>Meta de Technical Story no semestre</th></tr></thead><tbody>
+    <p class="help">Tipos considerados pelo quadrante <b>Eficiência de fluxo</b>; sem nenhum marcado, contam <b>todos os tipos</b> (padrão) — diferente das listas acima, aqui vazio não cai num padrão fixo.</p>
+    <div class="typelist">${typesFound().map(([ty, n]) => `<label><input type="checkbox" data-f4pefftype="${esc(norm(ty))}" ${(d.f4p.effTypes || []).includes(norm(ty)) ? "checked" : ""}> ${esc(ty)} <span class="muted">${n}</span></label>`).join("") || `<span class="muted">Carregue uma planilha para ver os tipos.</span>`}</div>
+    <table class="ctab" ${teams.length ? "" : "hidden"}><thead><tr><th>Time</th><th>Variabilidade mínima</th><th>Variabilidade máxima</th><th>Meta de Urgente (Expedite) no semestre</th><th>Meta de Technical Story no semestre</th><th>Eficiência de fluxo mínima</th><th>Eficiência de fluxo máxima</th></tr></thead><tbody>
     ${teams.map(tm => { const k = norm(tm), v = d.f4p.teams[k] || {};
       return `<tr><td>${esc(tm)}</td>
         <td><input type="number" min="0.1" step="0.1" data-f4pteam="${esc(k)}" data-f4pf="min" value="${v.min ?? ""}" placeholder="1,5" aria-label="Variabilidade mínima de ${esc(tm)}"></td>
         <td><input type="number" min="0.1" step="0.1" data-f4pteam="${esc(k)}" data-f4pf="max" value="${v.max ?? ""}" placeholder="3,5" aria-label="Variabilidade máxima de ${esc(tm)}"></td>
         <td><input type="number" min="0" step="1" data-f4pteam="${esc(k)}" data-f4pf="urgentMeta" value="${v.urgentMeta ?? ""}" placeholder="sem meta" aria-label="Meta de Urgente de ${esc(tm)}"></td>
-        <td><input type="number" min="0" step="1" data-f4pteam="${esc(k)}" data-f4pf="tsMeta" value="${v.tsMeta ?? ""}" placeholder="6" aria-label="Meta de Technical Story de ${esc(tm)}"></td></tr>`; }).join("") || `<tr><td colspan="5" class="muted">Carregue uma planilha para ver os times.</td></tr>`}
+        <td><input type="number" min="0" step="1" data-f4pteam="${esc(k)}" data-f4pf="tsMeta" value="${v.tsMeta ?? ""}" placeholder="6" aria-label="Meta de Technical Story de ${esc(tm)}"></td>
+        <td><input type="number" min="0" step="1" data-f4pteam="${esc(k)}" data-f4pf="effMin" value="${v.effMin ?? ""}" placeholder="30" aria-label="Eficiência de fluxo mínima de ${esc(tm)}"></td>
+        <td><input type="number" min="0" step="1" data-f4pteam="${esc(k)}" data-f4pf="effMax" value="${v.effMax ?? ""}" placeholder="55" aria-label="Eficiência de fluxo máxima de ${esc(tm)}"></td></tr>`; }).join("") || `<tr><td colspan="7" class="muted">Carregue uma planilha para ver os times.</td></tr>`}
     </tbody></table>
     <h4>Tipos considerados no CT do épico</h4>
     <p class="help">O CycleTime mostrado nos cards de épico usa só os itens dos tipos marcados. Os alertas de cada item continuam valendo para todos os tipos.</p>
@@ -78,7 +82,7 @@ function cfgForm(err){
     <p class="help">Escolha colunas da planilha para aparecer no corpo dos cards, abaixo das informações padrão, e no painel de detalhes. As informações padrão continuam sempre visíveis; as colunas do fluxo não entram na lista.</p>
     ${fieldsForm(d)}
     <h4>Configuração do fluxo dos times</h4>
-    <p class="help">Cada aba mostra só as colunas do fluxo daquele time, na ordem real. Para cada coluna, escolha como ela conta nos cards de épico: <b>Discovery</b> (já começou, mas ainda não entrou no WIP), <b>WIP</b> (trabalho em aberto) ou <b>Vazão</b> (concluído). Em <b>Entra no CT</b>, o CycleTime do item começa na <b>primeira</b> coluna marcada e termina na <b>última</b>.</p>
+    <p class="help">Cada aba mostra só as colunas do fluxo daquele time, na ordem real. Para cada coluna, escolha como ela conta nos cards de épico: <b>Discovery</b> (já começou, mas ainda não entrou no WIP), <b>WIP</b> (trabalho em aberto) ou <b>Vazão</b> (concluído). Em <b>Entra no CT</b>, o CycleTime do item começa na <b>primeira</b> coluna marcada e termina na <b>última</b>. Marque <b>Fila de espera</b> nas colunas onde o item fica parado numa fila (aguardando), para o quadrante <b>Eficiência de fluxo</b> do Report F4P — as demais colunas contam automaticamente como tempo em trabalho (touch time); sem nenhuma marcada, todo o fluxo conta como touch time.</p>
     ${flowTabsHtml(d)}`;
   azRender();
 }
@@ -114,6 +118,8 @@ function readForm(){
     .concat((d.f4p.epiTypes || []).filter(x => !$("cfgBody").querySelector(`input[data-f4pepitype="${cssEsc(x)}"]`)));
   d.f4p.usTypes = [...$("cfgBody").querySelectorAll("input[data-f4pustype]")].filter(i => i.checked).map(i => i.dataset.f4pustype)
     .concat((d.f4p.usTypes || []).filter(x => !$("cfgBody").querySelector(`input[data-f4pustype="${cssEsc(x)}"]`)));
+  d.f4p.effTypes = [...$("cfgBody").querySelectorAll("input[data-f4pefftype]")].filter(i => i.checked).map(i => i.dataset.f4pefftype)
+    .concat((d.f4p.effTypes || []).filter(x => !$("cfgBody").querySelector(`input[data-f4pefftype="${cssEsc(x)}"]`)));
   const f4pRows = {};
   $("cfgBody").querySelectorAll("input[data-f4pteam]").forEach(inp => {
     const k = inp.dataset.f4pteam, f = inp.dataset.f4pf, raw = parseFloat(inp.value.replace(",", "."));
@@ -130,6 +136,11 @@ function readForm(){
     }
     if (r.urgentMeta !== undefined) entry.urgentMeta = r.urgentMeta;
     if (r.tsMeta !== undefined) entry.tsMeta = r.tsMeta;
+    if (r.effMin !== undefined || r.effMax !== undefined){
+      if (r.effMin === undefined || r.effMax === undefined){ err = err || "Para a eficiência de fluxo de um time, preencha o mínimo e o máximo juntos."; bad(r.effMin === undefined ? "effMin" : "effMax"); }
+      else if (r.effMin >= r.effMax){ err = err || "A eficiência de fluxo mínima precisa ser menor que a máxima."; bad("effMin"); }
+      else { entry.effMin = r.effMin; entry.effMax = r.effMax; }
+    }
     if (Object.keys(entry).length) d.f4p.teams[k] = entry;
   });
   $("cfgBody").querySelectorAll("input[data-tc-lvl]").forEach(i => {
@@ -151,7 +162,8 @@ function readForm(){
     const pure = cfgDefaults(), flow = {}, badTeams = [];
     panels.forEach(p => {
       const tm = p.dataset.teamName, k = p.dataset.flteam, cur = readFlowPanel(p), def = teamFlowCfg(tm, pure);
-      const isDef = def.n.every((x, i) => cur.cat[x] === def.cat[i]) && same(cur.ct, def.ct);
+      const isDef = def.n.every((x, i) => cur.cat[x] === def.cat[i]) && same(cur.ct, def.ct)
+        && def.n.every(x => (cur.time[x] || "touch") === "touch");
       if (!isDef) flow[k] = cur;
       if (cur.ct.length < 2){
         badTeams.push(tm);
@@ -197,14 +209,14 @@ function flowTabsHtml(d){
     if (!c.stages.length) return `<div class="fpanel" role="tabpanel" data-flteam="${esc(k)}" data-team-name="${esc(tm)}" data-empty="1" ${tm === cur ? "" : "hidden"}>
       <div class="az-lock">As colunas do quadro de ${esc(tm)} ainda não foram lidas. Conecte a organização desta fonte nesta sessão (seção Azure DevOps, no topo) para buscá-las automaticamente, ou faça a carga dos dados.</div></div>`;
     const count = {}; M.ops.forEach(o => { if (o.team === tm){ const s = norm(o.stName); count[s] = (count[s] || 0) + 1; } });
-    const rows = c.stages.map((s, i) => { const n = c.n[i], v = c.cat[i];
-      return `<tr data-stage="${esc(n)}" data-cat="${v}"><td class="fnum"><span class="fnb">${i + 1}</span></td><td>${esc(s)}</td><td><span class="rg" role="radiogroup" aria-label="${esc(s)}">
+    const rows = c.stages.map((s, i) => { const n = c.n[i], v = c.cat[i], tv = c.time[i];
+      return `<tr data-stage="${esc(n)}" data-cat="${v}" data-time="${tv}"><td class="fnum"><span class="fnb">${i + 1}</span></td><td>${esc(s)}</td><td><span class="rg" role="radiogroup" aria-label="${esc(s)}">
         ${["none","disc","wip","vazao"].map(val => `<label class="cat-${val}"><input type="radio" name="fl_${esc(k)}_${i}" value="${val}" ${v === val ? "checked" : ""}>${CAT_LABEL[val]}</label>`).join("")}
-      </span></td><td style="text-align:center"><input type="checkbox" data-ctcol="${esc(n)}" ${ctS.has(n) ? "checked" : ""} aria-label="${esc(s)} entra no CT"></td>
+      </span></td><td style="text-align:center"><label><input type="checkbox" data-timewait="${esc(n)}" ${tv === "wait" ? "checked" : ""} aria-label="${esc(s)} é Fila de espera (waiting time)"> Fila de espera</label></td><td style="text-align:center"><input type="checkbox" data-ctcol="${esc(n)}" ${ctS.has(n) ? "checked" : ""} aria-label="${esc(s)} entra no CT"></td>
       <td class="muted" style="text-align:right">${count[n] ? `${count[n]} ${count[n] === 1 ? "item" : "itens"}` : ""}</td></tr>`; }).join("");
     return `<div class="fpanel" role="tabpanel" data-flteam="${esc(k)}" data-team-name="${esc(tm)}" ${tm === cur ? "" : "hidden"}>
       <div class="fvis">${flowVisHtml(c.stages, c.cat, c.ct, c.n)}</div>
-      <table class="ctab"><thead><tr><th>#</th><th>Coluna do fluxo de ${esc(tm)}</th><th>Conta como</th><th>Entra no CT</th><th style="text-align:right">Itens hoje</th></tr></thead><tbody>${rows}</tbody></table>
+      <table class="ctab"><thead><tr><th>#</th><th>Coluna do fluxo de ${esc(tm)}</th><th>Conta como</th><th>Fila de espera (Eficiência de fluxo)</th><th>Entra no CT</th><th style="text-align:right">Itens hoje</th></tr></thead><tbody>${rows}</tbody></table>
       ${teams.length > 1 ? `<button type="button" class="btn" data-fcopy="${esc(k)}" style="margin-top:8px">Aplicar estas marcações aos outros times (colunas com o mesmo nome)</button>` : ""}
     </div>`; }).join("");
   return tabs + panels;
@@ -223,9 +235,14 @@ function flowVisHtml(stages, cat, ct, n){
     </div>`;
 }
 function readFlowPanel(p){
-  const cat = {}, ct = [];
-  p.querySelectorAll("tr[data-stage]").forEach(tr => { const s = tr.dataset.stage; cat[s] = tr.querySelector("input[type=radio]:checked").value; if (tr.querySelector("input[data-ctcol]").checked) ct.push(s); });
-  return {cat, ct};
+  const cat = {}, ct = [], time = {};
+  p.querySelectorAll("tr[data-stage]").forEach(tr => {
+    const s = tr.dataset.stage;
+    cat[s] = tr.querySelector('input[name^="fl_"]:checked').value;
+    time[s] = tr.querySelector("input[data-timewait]").checked ? "wait" : "touch";
+    if (tr.querySelector("input[data-ctcol]").checked) ct.push(s);
+  });
+  return {cat, ct, time};
 }
 function ctSummary(d){
   if (!S.model) return "";
@@ -249,6 +266,7 @@ $("cfgBody").addEventListener("click", e => {
 $("cfgBody").addEventListener("change", e => {
   const p = e.target.closest(".fpanel"); if (!p) return;
   if (e.target.type === "radio"){ const tr = e.target.closest("tr[data-stage]"); if (tr) tr.dataset.cat = e.target.value; }
+  if (e.target.matches("input[data-timewait]")){ const tr = e.target.closest("tr[data-stage]"); if (tr) tr.dataset.time = e.target.checked ? "wait" : "touch"; }
   const c = readFlowPanel(p), tc = teamFlowCfg(p.dataset.teamName, {flow:{[p.dataset.flteam]:c}});
   p.querySelector(".fvis").innerHTML = flowVisHtml(tc.stages, tc.cat, tc.ct, tc.n);
   if (e.target.matches("input[data-ctcol]")){ p.querySelectorAll("input[data-ctcol].bad").forEach(i => i.classList.remove("bad")); }
@@ -268,7 +286,8 @@ $("cfgBody").addEventListener("click", e => {
       if (pp === cp.closest(".fpanel")) return;
       pp.querySelectorAll("tr[data-stage]").forEach(tr => {
         const s = tr.dataset.stage; if (!(s in src.cat)) return;
-        tr.querySelector(`input[type=radio][value="${src.cat[s]}"]`).checked = true;
+        tr.querySelector(`input[name^="fl_"][value="${src.cat[s]}"]`).checked = true;
+        tr.querySelector("input[data-timewait]").checked = src.time[s] === "wait";
         tr.querySelector("input[data-ctcol]").checked = src.ct.includes(s); n++;
       });
       const c = readFlowPanel(pp), tc = teamFlowCfg(pp.dataset.teamName, {flow:{[pp.dataset.flteam]:c}});

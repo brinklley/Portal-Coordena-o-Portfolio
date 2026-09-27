@@ -16,7 +16,7 @@ Testes: `tests/test_configuracoes.py`.
 |---|---|---|
 | `teams[time]` | `{}` | limites por time: `warn`, `max`, `out`, `stuck` (dias) |
 | `warnDays`, `alertDays`, `outlierDays`, `stuckDays` | 30, 60, 90, 10 | regra geral para times sem CT máximo |
-| `flow[time]` | `{}` | por time: `cat[coluna]` (none/disc/wip/vazao) e `ct` (colunas do CT) |
+| `flow[time]` | `{}` | por time: `cat[coluna]` (none/disc/wip/vazao), `ct` (colunas do CT) e `time[coluna]` (touch/wait — marca a Fila de espera para o quadrante Eficiência de fluxo do Report F4P; sem marcação, a coluna é touch) |
 | `ctCols`, `disc`, `wip`, `vazao` | `null` | formato antigo (único para todos os times); convertido ao salvar |
 | `ctTypes` | user story, technical story, technical solution | tipos do CT do épico, QTD e capacidade |
 | `tags` | BLOCKED, PAUSADO, URGENTE, DATA FIXA | tags cadastradas (nome, outros nomes, cor, nível, data) |
@@ -27,8 +27,9 @@ Testes: `tests/test_configuracoes.py`.
 | `f4p.types` | user story, technical story | tipos considerados na amostra de CycleTime/Variabilidade e no Realizado/Reserva do quadrante Vazão do Report F4P |
 | `f4p.epiTypes` | epic | tipos de **épico** (não de item de time) considerados pelo quadrante Roadmap – Épicos do Report F4P; configuração própria, independente de `f4p.types` |
 | `f4p.usTypes` | user story | tipos considerados pelo quadrante User Story do Report F4P; configuração própria, independente de `f4p.types` e `f4p.epiTypes` |
+| `f4p.effTypes` | `[]` (vazio = todos os tipos) | tipos considerados pelo quadrante Eficiência de fluxo do Report F4P; configuração própria — única do painel cujo padrão vazio significa "todos os tipos", em vez de cair num tipo fixo |
 | `f4p.expediteTag` | urgent (id da tag URGENTE) | tag cadastrada que marca a Classe de Serviço Expedite, usada pelo quadrante Urgente |
-| `f4p.teams[time]` | `{}` | por time: `min`/`max` da variabilidade esperada (padrão efetivo 1.5/3.5), `urgentMeta` (teto de itens Expedite no semestre; sem padrão) e `tsMeta` (teto de itens Technical Story no semestre; padrão efetivo 6) |
+| `f4p.teams[time]` | `{}` | por time: `min`/`max` da variabilidade esperada (padrão efetivo 1.5/3.5), `urgentMeta` (teto de itens Expedite no semestre; sem padrão), `tsMeta` (teto de itens Technical Story no semestre; padrão efetivo 6) e `effMin`/`effMax` da faixa de Eficiência de fluxo (padrão efetivo 30/55) |
 | `azure.orgs` | `[]` | organizações (sem token) |
 | `azure.sources` | `[]` | fontes: `id, role, org, project, team, level, alias, stages` |
 | `azure.maps[fonte]` | `{}` | mapeamento de colunas antigas (`colunaId` ou `colunaId|Done` → coluna atual) |
@@ -40,7 +41,7 @@ Testes: `tests/test_configuracoes.py`.
 - Por time: atenção < CT máximo < outlier; atenção ou outlier exigem CT máximo.
 - Regra geral: atenção < atraso < outlier.
 - Fluxo de cada time: pelo menos **duas** colunas em "Entra no CT"; as abas com problema ficam em vermelho.
-- Report F4P: `min` e `max` da variabilidade de um time só valem preenchidos os dois juntos, e `min` < `max`. `urgentMeta` e `tsMeta` são independentes (podem ser preenchidos sem `min`/`max` nem um do outro), aceitam zero.
+- Report F4P: `min` e `max` da variabilidade de um time só valem preenchidos os dois juntos, e `min` < `max`. `urgentMeta` e `tsMeta` são independentes (podem ser preenchidos sem `min`/`max` nem um do outro), aceitam zero. `effMin`/`effMax` seguem a mesma regra da variabilidade: só valem preenchidos os dois juntos, com `effMin` < `effMax`.
 - Com erro, nada é salvo e os valores digitados são preservados no formulário.
 
 ## Times listados na configuração

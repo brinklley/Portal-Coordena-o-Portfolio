@@ -9,7 +9,7 @@ const cfgDefaults = () => ({teams:{}, warnDays:30, alertDays:60, outlierDays:90,
   ctTypes:["user story","technical story","technical solution"], tags:TAG_DEFAULTS(),
   typeColors:{ini:{}, rel:{}, epi:{}, op:{}}, fields:{ini:[], rel:[], epi:[], op:[]}, ctCols:null, flow:{},
   anTag:"ROADMAP", anClassCol:"Classificação_Despesas_Comitê", anFreeze:0,
-  f4p:{months:6, types:["user story","technical story"], expediteTag:"urgent", epiTypes:["epic"], usTypes:["user story"], teams:{}},
+  f4p:{months:6, types:["user story","technical story"], expediteTag:"urgent", epiTypes:["epic"], usTypes:["user story"], effTypes:[], teams:{}},
   azure:{orgs:[], sources:[], maps:{}, fields:{epic:"ID_EPICO_UNICRED", roadmap:"AnoSemestreRoadmap"}, excludeRemoved:true}});
 /* aceita configurações antigas (ctMax + warnPct) e converte para limites por time */
 function normCfg(j){
@@ -25,6 +25,9 @@ function normCfg(j){
     expediteTag: typeof jf.expediteTag === "string" && jf.expediteTag ? jf.expediteTag : f4pD.expediteTag,
     epiTypes: Array.isArray(jf.epiTypes) && jf.epiTypes.length ? jf.epiTypes : f4pD.epiTypes,
     usTypes: Array.isArray(jf.usTypes) && jf.usTypes.length ? jf.usTypes : f4pD.usTypes,
+    // vazio é uma configuração válida aqui (significa "todos os tipos", padrão do quadrante Eficiência
+    // de fluxo) — diferente dos demais campos de tipo acima, que caem no padrão quando vazios.
+    effTypes: Array.isArray(jf.effTypes) ? jf.effTypes : f4pD.effTypes,
     teams: {...(jf.teams || {})}};
   const az = j.azure || {};   // tokens nunca fazem parte da configuração
   c.azure = {orgs:(az.orgs || []).map(o => ({org:o.org})), sources:az.sources || [], maps:az.maps || {},
@@ -56,6 +59,12 @@ function f4pUrgentMetaOf(team){
 function f4pTsMetaOf(team){
   const t = (CFG.f4p.teams || {})[norm(team)] || {};
   return t.tsMeta != null && t.tsMeta >= 0 ? t.tsMeta : 6;
+}
+/* faixa esperada de Eficiência de Fluxo de um time (Report F4P), em pontos percentuais: a planejada ou
+   o padrão 30–55. */
+function f4pEffRangeOf(team){
+  const t = (CFG.f4p.teams || {})[norm(team)] || {};
+  return {min: t.effMin > 0 ? t.effMin : 30, max: t.effMax > 0 ? t.effMax : 55};
 }
 /* tag configurada como Classe de Serviço Expedite (Report F4P) e o nome dela pra exibir */
 const f4pExpediteTag = () => CFG.f4p.expediteTag || "urgent";
@@ -112,11 +121,19 @@ function teamFlowCfg(team, cfg){
   if (t && Array.isArray(t.ct)) ct = t.ct.filter(x => n.includes(x));
   else if (Array.isArray(cfg.ctCols) && cfg.ctCols.length) ct = cfg.ctCols.filter(x => n.includes(x));
   else { const a = n.indexOf(CT_DEF.entry), b = n.indexOf(CT_DEF.exit); ct = a >= 0 && b >= a ? n.slice(a, b + 1) : []; }
-  return {stages, n, cat, ct};
+  // touch/waiting time (quadrante Eficiência de Fluxo, decisão 0031): estilo "Queueing Stages" do
+  // Actionable Agile (ferramenta de Analytics citada pelo usuário como referência) — o usuário marca só as
+  // colunas de Fila de espera (waiting time); as demais contam como Touch time automaticamente, sem um
+  // terceiro estado "sem classificação".
+  const time = t && t.time ? n.map(x => t.time[x] === "wait" ? "wait" : "touch") : n.map(() => "touch");
+  return {stages, n, cat, ct, time};
 }
 function teamCfg(team){ S.flowCache = S.flowCache || {}; return S.flowCache[team] || (S.flowCache[team] = teamFlowCfg(team)); }
 /* categoria da coluna em que o item está, pela configuração do time dele */
 function catOf(o){ const c = teamCfg(o.team), i = c.n.indexOf(norm(o.stName)); return i >= 0 ? c.cat[i] : "none"; }
+/* classificação de touch/waiting time de uma coluna do fluxo do time (Report F4P, Eficiência de Fluxo);
+   sem marcação, a coluna é Touch time (só a Fila de espera precisa ser marcada). */
+function flowTimeOf(team, colName){ const c = teamCfg(team), i = c.n.indexOf(norm(colName)); return i >= 0 ? c.time[i] : "touch"; }
 function flowSets(){
   if (S.sets) return S.sets;
   const r = resolveSets(CFG, S.model.stages.op);

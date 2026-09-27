@@ -1,8 +1,8 @@
 /* ---------- Report F4P (Business Outcomes – Productivity) ---------- */
 /* Painel lateral com o mesmo comportamento da Visão analítica (docs/backlog/report-f4p.md).
-   Quadrantes 1 (CycleTime), 2 (Variabilidade), 3 (Urgente), 4 (Technical Story), 5 (Vazão), 6
-   (Roadmap – Épicos) e 7 (User Story) têm regra fechada; só Eficiência de fluxo aguarda definição e
-   aparece como "em definição". Roadmap – Épicos é o único que opera sobre os cards do quadro de Épicos
+   Todos os 8 quadrantes têm regra fechada: 1 (CycleTime), 2 (Variabilidade), 3 (Urgente), 4 (Technical
+   Story), 5 (Vazão), 6 (Roadmap – Épicos), 7 (User Story) e 8 (Eficiência de fluxo). Roadmap – Épicos é
+   o único que opera sobre os cards do quadro de Épicos
    (M.stages.epi/e.st/e.target), não sobre os itens operacionais dos times — os demais quadrantes
    calculados usam S.model.ops. As ilustrações (selo de cada grupo e o logo do
    cabeçalho) são as imagens fornecidas pelo usuário a partir do slide de referência, embutidas em
@@ -10,7 +10,7 @@
 const F4P = {open:false};
 const F4P_QUADS = {
   var:   {title:"Variabilidade (min vs atual vs max)", side:"l", done:true},
-  eff:   {title:"Eficiência de fluxo (min vs atual vs max)", side:"l", done:false, goal:"Meta mínima 30%"},
+  eff:   {title:"Eficiência de fluxo (min vs atual vs max)", side:"l", done:true, goal:"Meta mínima 30%"},
   road:  {title:"Roadmap – Épicos (roadmap vs roadmap entregue vs atual)", side:"l", done:true},
   vazao: {title:"Vazão (reserva vs realizado)", side:"l", done:true},
   ct:    {title:"CycleTime (reserva vs atual)", side:"r", done:true},
@@ -80,6 +80,79 @@ function f4pVarCell(team){
   if (m.varr == null) return `<span title="${esc(tip)}"><span class="f4p-lo">${dec1(R.min)}</span><span class="f4p-sep">|</span><span class="f4p-dash">--</span><span class="f4p-sep">|</span><span class="f4p-hi">${dec1(R.max)}</span></span>`;
   const bad = m.varr > R.max, low = m.varr < R.min, cls = bad ? "f4p-bad" : low ? "f4p-warn" : "f4p-good", arrow = (bad || low) ? "▼" : "▲";
   return `<span title="${esc(tip)}"><span class="f4p-lo">${dec1(R.min)}</span><span class="f4p-sep">|</span><b class="${cls}">${dec1(m.varr)} ${arrow}</b><span class="f4p-sep">|</span><span class="f4p-hi">${dec1(R.max)}</span></span>`;
+}
+/* Quadrante · Eficiência de fluxo (min vs. atual vs. max). Único quadrante calculado que reaproveita
+   `f4pWindow` (decisão 0013 — janela rolante de N meses no semestre em curso, período exato no já
+   encerrado), igual a CycleTime/Variabilidade, em vez de `f4pExactSemesterWindow` (Urgente/Technical
+   Story/Vazão/Roadmap-Épicos/User Story): o pedido do usuário descreve literalmente essa mesma regra
+   ("range do semestre selecionado; se for o semestre atual, os últimos 6 meses até hoje"). Decisão
+   `0031`. */
+/* tipos considerados por este quadrante (`CFG.f4p.effTypes`) — configuração própria; ao contrário das
+   demais listas de tipo do Report F4P, vazio aqui significa "todos os tipos" (o pedido do usuário: "por
+   default todos os artefatos... devem fazer parte do cálculo"), não um padrão fixo de um tipo. */
+function f4pEffTypes(){ return new Set((CFG.f4p.effTypes || []).map(norm)); }
+function f4pEffTypeOk(o){ const types = f4pEffTypes(); return !types.size || (o.type && types.has(norm(o.type))); }
+/* todos os itens do fluxo do time (únicos, vinculados ao time), dos tipos configurados — sem filtro por
+   data ou por conclusão (pedido explícito: "deve-se pegar todos os itens do fluxo de cada time"); a
+   janela do semestre entra depois, recortando (não excluindo) a duração de cada item dentro dela. */
+function f4pEffOps(team){ return [...S.model.ops.values()].filter(o => o.team === team && f4pEffTypeOk(o)); }
+/* Touch time (em trabalho) e waiting time (fila) de um item, em dias, só a parte que cai dentro de
+   [from, to]. Cada coluna do fluxo do item vira um intervalo (da sua própria data até a data da próxima
+   coluna preenchida, ou hoje, se o item ainda não avançou) classificado pela configuração da coluna
+   (Configurações › Fluxo dos times, estilo "Fila de espera" do Actionable Agile): marcada como Fila de
+   espera conta como wait, senão conta como touch — não existe coluna "sem classificação". Colunas sem
+   data preenchida são puladas (mesma tolerância a dados incompletos já usada pelo cálculo do CT,
+   `recomputeCt`). Exceção: se a última coluna com data é a de categoria Vazão (item já entregue), o
+   intervalo dela não se estende até hoje — o relógio da eficiência para na entrega, não continua contando
+   o tempo em que o item já concluído fica parado no quadro. */
+function f4pItemDurations(o, from, to){
+  const n = (S.model.teamFlow[o.team] || []).map(norm), fd = o.fd || {}, cat = teamCfg(o.team).cat;
+  let touch = 0, wait = 0;
+  for (let i = 0; i < n.length; i++){
+    const start = fd[n[i]]; if (!start) continue;
+    let end = null;
+    for (let j = i + 1; j < n.length; j++){ if (fd[n[j]]){ end = fd[n[j]]; break; } }
+    if (!end){ if (cat[i] === "vazao") continue; end = TODAY; }
+    const s = start < from ? from : start, e = end > to ? to : end;
+    if (e > s){ const d = days(s, e); if (flowTimeOf(o.team, n[i]) === "wait") wait += d; else touch += d; }
+  }
+  return {touch, wait};
+}
+/* Eficiência do Fluxo = Touch Time ÷ (Touch Time + Waiting Time) × 100, somando touch e wait de todos os
+   itens do time no período (não a média das eficiências individuais) — uma soma agregada pondera pelo
+   tempo real de cada item, em vez de dar o mesmo peso a um item pequeno e a um item que passou meses no
+   fluxo. Sem nenhum item do time no período (touch+wait = 0), retorna null ("--"): ainda não há como
+   calcular, não é 0% de eficiência. */
+function f4pEffPct(team, from, to){
+  let touch = 0, wait = 0;
+  f4pEffOps(team).forEach(o => { const d = f4pItemDurations(o, from, to); touch += d.touch; wait += d.wait; });
+  return (touch + wait) > 0 ? (touch / (touch + wait)) * 100 : null;
+}
+/* Tendência: compara a eficiência do período inteiro selecionado com a eficiência só dos últimos 2
+   meses desse mesmo período — últimos 2 meses melhor → ▲; pior → ▼; igual (ou sem dado num dos dois
+   lados) → ◆. Diferente da tendência do Vazão (decisão 0023, buckets mensais + WIP): o usuário deu uma
+   regra própria e explícita para este quadrante, então não reaproveitei aquela. */
+function f4pEffTrend(team, from, to){
+  const atual = f4pEffPct(team, from, to);
+  const from2 = new Date(to.getFullYear(), to.getMonth() - 2, to.getDate());
+  const ultimos2 = f4pEffPct(team, from2 < from ? from : from2, to);
+  if (atual == null || ultimos2 == null) return "◆";
+  return ultimos2 > atual ? "▲" : ultimos2 < atual ? "▼" : "◆";
+}
+/* Situação de um item na lista de itens da Eficiência de Fluxo: diferente da categoria de fluxo
+   (`f4pItemSituacao`), mostra o próprio touch/wait (já recortado pela janela) que entrou na soma — a
+   informação relevante para conferir este cálculo específico. */
+function f4pEffItemSituacao(o, from, to){
+  const d = f4pItemDurations(o, from, to);
+  return `Touch ${d.touch}d · Wait ${d.wait}d`;
+}
+function f4pEffCell(team){
+  const st = f4pSemesterState(), {from, to} = f4pWindow(st), R = f4pEffRangeOf(team);
+  const atual = f4pEffPct(team, from, to), trend = f4pEffTrend(team, from, to);
+  const tip = `Eficiência do Fluxo = Touch Time ÷ (Touch Time + Waiting Time) × 100 · itens dos tipos ${(CFG.f4p.effTypes || []).join(", ") || "todos os tipos"} no período ${f4pPeriodLabel(st)} · tendência: últimos 2 meses do período vs. o período inteiro · clique no número para ver os itens`;
+  if (atual == null) return `<span title="${esc(tip)}"><span class="f4p-lo">${Math.round(R.min)}%</span><span class="f4p-sep">|</span><span class="f4p-dash">--</span><span class="f4p-sep">|</span><span class="f4p-hi">${Math.round(R.max)}%</span></span>`;
+  const bad = atual < R.min || atual > R.max, cls = bad ? "f4p-bad" : "f4p-good";
+  return `<span title="${esc(tip)}"><span class="f4p-lo">${Math.round(R.min)}%</span><span class="f4p-sep">|</span><button type="button" class="f4p-real ${cls}" data-f4p-eff-team="${esc(team)}">${Math.round(atual)}% ${trend}</button><span class="f4p-sep">|</span><span class="f4p-hi">${Math.round(R.max)}%</span></span>`;
 }
 /* itens do time com a tag Expedite/Urgente configurada, de qualquer tipo */
 function f4pExpediteOps(team){
@@ -435,9 +508,15 @@ $("f4pBody").addEventListener("click", e => {
     const label = set === "planejado" ? "planejado" : "não planejado";
     const items = set === "planejado" ? f4pUsPlanejadoItems(team, st) : f4pUsNaoPlanejadoItems(team, st);
     f4pItemsModal(`User Story · ${team} · ${label} · ${f4pExactSemesterLabel(st)}`, items);
+    return;
+  }
+  const btnEff = e.target.closest("[data-f4p-eff-team]");
+  if (btnEff){
+    const team = btnEff.dataset.f4pEffTeam, {from, to} = f4pWindow(st);
+    f4pItemsModal(`Eficiência de fluxo · ${team} · ${f4pPeriodLabel(st)}`, f4pEffOps(team), o => f4pEffItemSituacao(o, from, to));
   }
 });
-const F4P_CELL = {var: f4pVarCell, ct: f4pCtCell, urg: f4pUrgentCell, ts: f4pTsCell, vazao: f4pVazaoCell, road: f4pRoadmapEpiCell, us: f4pUsCell};
+const F4P_CELL = {var: f4pVarCell, ct: f4pCtCell, urg: f4pUrgentCell, ts: f4pTsCell, vazao: f4pVazaoCell, road: f4pRoadmapEpiCell, us: f4pUsCell, eff: f4pEffCell};
 function f4pCard(id, teams){
   const q = F4P_QUADS[id];
   const head = `<div class="f4p-card-h">${esc(q.title)}</div>${q.goal ? `<div class="f4p-goal">${esc(q.goal)}</div>` : ""}`;
@@ -472,7 +551,7 @@ function renderF4P(){
       <div class="f4p-col">${left.map(g => f4pGroup(g, teams)).join("")}</div>
       <div class="f4p-col">${right.map(g => f4pGroup(g, teams)).join("")}</div>
     </div>
-    <div class="an-note">Mostra sempre todos os times carregados (${esc(teams.join(", "))}), mesmo com um time diferente selecionado no filtro — o filtro só habilita o acesso a este painel. CycleTime e Variabilidade usam itens dos tipos ${esc((CFG.f4p.types || []).join(", ") || "nenhum tipo marcado")} concluídos no período: <b>${esc(f4pPeriodLabel(st))}</b>${st.kind === "past" ? " (semestre selecionado, já encerrado)" : " (semestre selecionado ainda em curso, ou não reconhecido — usa a janela corrida)"}. Urgente conta itens com a tag <b>${esc(f4pTagName(f4pExpediteTag()))}</b>: os ainda abertos contam sempre, e os fechados só se fecharam dentro do período exato do semestre selecionado (<b>${esc(f4pExactSemesterLabel(st))}</b>) — sem histórico de quando cada item passou a se qualificar, não dá pra saber quem estava marcado antes disso. Technical Story conta só itens desse tipo já <b>entregues</b> (categoria de fluxo Vazão) dentro do mesmo período — itens ainda em Backlog, Discovery ou WIP não entram. Vazão usa os mesmos tipos de CycleTime/Variabilidade, também só itens entregues no período: Reserva é o subconjunto com a tag <b>${esc(CFG.anTag || "ROADMAP")}</b> (capacidade do roadmap); Realizado é todo o conjunto, com ou sem a tag. Roadmap – Épicos conta cards do quadro de Épicos (dos tipos <b>${esc((CFG.f4p.epiTypes || []).join(", ") || "nenhum tipo marcado")}</b>) com item do time vinculado: Roadmap segue o Target Date do épico (semestre interno) ou o vínculo com a iniciativa (semestre executivo); Roadmap entregue é o subconjunto já fechado; Atual conta só pela data de fechamento dentro do semestre, sem olhar Target Date nem iniciativa. User Story usa os tipos <b>${esc((CFG.f4p.usTypes || []).join(", ") || "nenhum tipo marcado")}</b>, também só itens entregues no período: Planejado é o subconjunto com a tag de capacidade; Não planejado é o restante sem a tag — juntos, os dois somam todo o entregue desses tipos (partição, não sobreposição como no Vazão). A soma de Technical Story Realizado + User Story Planejado + User Story Não planejado deveria bater com o Vazão Realizado de cada time; uma divergência aparece destacada acima. Os demais quadrantes aguardam a definição da regra de cálculo.</div>`;
+    <div class="an-note">Mostra sempre todos os times carregados (${esc(teams.join(", "))}), mesmo com um time diferente selecionado no filtro — o filtro só habilita o acesso a este painel. CycleTime e Variabilidade usam itens dos tipos ${esc((CFG.f4p.types || []).join(", ") || "nenhum tipo marcado")} concluídos no período: <b>${esc(f4pPeriodLabel(st))}</b>${st.kind === "past" ? " (semestre selecionado, já encerrado)" : " (semestre selecionado ainda em curso, ou não reconhecido — usa a janela corrida)"}. Urgente conta itens com a tag <b>${esc(f4pTagName(f4pExpediteTag()))}</b>: os ainda abertos contam sempre, e os fechados só se fecharam dentro do período exato do semestre selecionado (<b>${esc(f4pExactSemesterLabel(st))}</b>) — sem histórico de quando cada item passou a se qualificar, não dá pra saber quem estava marcado antes disso. Technical Story conta só itens desse tipo já <b>entregues</b> (categoria de fluxo Vazão) dentro do mesmo período — itens ainda em Backlog, Discovery ou WIP não entram. Vazão usa os mesmos tipos de CycleTime/Variabilidade, também só itens entregues no período: Reserva é o subconjunto com a tag <b>${esc(CFG.anTag || "ROADMAP")}</b> (capacidade do roadmap); Realizado é todo o conjunto, com ou sem a tag. Roadmap – Épicos conta cards do quadro de Épicos (dos tipos <b>${esc((CFG.f4p.epiTypes || []).join(", ") || "nenhum tipo marcado")}</b>) com item do time vinculado: Roadmap segue o Target Date do épico (semestre interno) ou o vínculo com a iniciativa (semestre executivo); Roadmap entregue é o subconjunto já fechado; Atual conta só pela data de fechamento dentro do semestre, sem olhar Target Date nem iniciativa. User Story usa os tipos <b>${esc((CFG.f4p.usTypes || []).join(", ") || "nenhum tipo marcado")}</b>, também só itens entregues no período: Planejado é o subconjunto com a tag de capacidade; Não planejado é o restante sem a tag — juntos, os dois somam todo o entregue desses tipos (partição, não sobreposição como no Vazão). A soma de Technical Story Realizado + User Story Planejado + User Story Não planejado deveria bater com o Vazão Realizado de cada time; uma divergência aparece destacada acima. Eficiência de fluxo usa uma janela diferente dos demais (a mesma do CycleTime/Variabilidade — últimos ${esc(String(CFG.f4p.months || 6))} meses no semestre em curso, período exato no já encerrado) e conta <b>todos os itens</b> do fluxo dos tipos ${esc((CFG.f4p.effTypes || []).join(", ") || "todos os tipos")} (não só os concluídos): Touch Time ÷ (Touch Time + Waiting Time) × 100, pela classificação de cada coluna em Configurações › Fluxo dos times; sem nenhuma coluna classificada, mostra "--". A cor segue a faixa MIN–MAX do time (verde dentro, vermelho fora); a tendência compara os últimos 2 meses do período com o período inteiro.</div>`;
 }
 function placeF4P(){ const h = document.querySelector(".top").offsetHeight; $("f4pPanel").style.top = h + "px"; $("f4pPanel").style.height = `calc(100% - ${h}px)`; }
 function openF4P(){ if (!f4pEnabled()) return; if (AN.open) closeAnalytics(); F4P.open = true; placeF4P(); $("f4pPanel").classList.add("open"); $("f4pPanel").setAttribute("aria-hidden","false"); $("f4pTab").setAttribute("aria-expanded","true"); renderF4P(); $("f4pClose").focus(); }
