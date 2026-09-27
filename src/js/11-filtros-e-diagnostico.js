@@ -17,7 +17,15 @@ function markActiveFilters(){
   const n = activeFilters().length;
   $("btnClearF").disabled = !n; $("nFilters").textContent = n || "";
 }
+/* desfaz a seleção/drill-down (S.path) quando ela foi produzida pela própria busca (gotoId,
+   via S.pathQueryId) e a busca muda para outro valor ou é limpa — decisão 0035. Sem isso, limpar o
+   campo (inclusive pelo "×" nativo do input) tirava o filtro mas deixava o quadro preso mostrando
+   só aquele item, já que ele continua visível na lista inteira sem o filtro. */
+function dropSearchSelectionIfStale(newQ){
+  if (S.pathQueryId && S.pathQueryId !== (newQ ? nid(newQ) : null)){ S.path = {}; S.expand = false; S.focus = null; S.pathQueryId = null; }
+}
 function clearFilters(){
+  dropSearchSelectionIfStale("");
   S.f = {exec:"", owners:new Set(), int:"", team:"", q:""};
   $("fExec").value = ""; $("fInt").value = ""; $("fTeam").value = ""; $("fBusca").value = "";
   msLabel(); render();
@@ -25,7 +33,9 @@ function clearFilters(){
 /* aplica o filtro único ao vivo (input debounced): atualiza S.f.q, o campo e re-renderiza,
    sem tentar navegar/rolar (decisão 0034) — a navegação fica a cargo de gotoId(), no Enter */
 function setQueryFilter(q){
-  S.f.q = (q || "").trim();
+  q = (q || "").trim();
+  dropSearchSelectionIfStale(q);
+  S.f.q = q;
   const el = $("fBusca"); if (el && el.value !== q) el.value = q;
   S.lastFilterEl = el; render();
 }

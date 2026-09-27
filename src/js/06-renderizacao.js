@@ -9,7 +9,7 @@ function render(){
   if (!M){ board.innerHTML = `<div class="empty-state"><h2>Nenhum dado carregado</h2><p>Conecte e carregue os dados pelo Azure DevOps.</p></div>`; return; }
   const V = computeVisible(); S.V = V;
   // descarta caminho que ficou fora do filtro
-  if (S.path.ini && !V.visIni.has(S.path.ini)) { S.path = {}; S.expand = false; S.focus = null; }
+  if (S.path.ini && !V.visIni.has(S.path.ini)) { S.path = {}; S.expand = false; S.focus = null; S.pathQueryId = null; }
   if (S.path.rel && !V.visRel.has(S.path.rel)) { delete S.path.rel; delete S.path.epi; }
   if (S.path.epi && !V.visEpi.has(S.path.epi)) delete S.path.epi;
 

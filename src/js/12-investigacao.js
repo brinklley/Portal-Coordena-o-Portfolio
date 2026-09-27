@@ -128,7 +128,7 @@ function gotoId(q){
     return;
   }
   hideFmsg();
-  S.path = path; S.expand = false; S.focus = null; S.animateLevel = "rel";
+  S.path = path; S.pathQueryId = id; S.expand = false; S.focus = null; S.animateLevel = "rel";
   render(); openDetail(target);
   requestAnimationFrame(()=>{ const el = board.querySelector(`[data-key="${cssEsc(target)}"]`); if (el){ el.scrollIntoView({block:"center", inline:"center"}); el.classList.add("flash"); redraw(); } });
 }
