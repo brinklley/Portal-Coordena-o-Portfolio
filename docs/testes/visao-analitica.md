@@ -1,7 +1,7 @@
 # Testes: Visão analítica do roadmap do time
 
-Cobre `tests/test_visao_analitica.py` (14 testes). Ver `docs/regras-de-negocio.md` §10; decisões
-`0027`, `0028`, `0029`, `0036`.
+Cobre `tests/test_visao_analitica.py` (15 testes). Ver `docs/regras-de-negocio.md` §10; decisões
+`0027`, `0028`, `0029`, `0036`, `0039`.
 
 ## Regra: Projetada é a soma do QTD de cada épico mostrado na tabela
 
@@ -147,3 +147,19 @@ semestre próprio do épico para comparar.
   nenhuma iniciativa cujo AnoSemestreRoadmap pudesse justificar sua presença ali.
 - **Teste**: `test_epico_orfao_nao_aparece_no_roadmap_executivo`
 - **Relacionado**: decisão `0036`.
+
+## Regra: o filtro "Responsável da iniciativa" é utilizável com o painel aberto
+
+**Garante que**: o popup do filtro de responsável (`#msPop`) recebe cliques normalmente mesmo com a
+Visão analítica (ou o Report F4P) aberta — nenhum painel lateral fica visualmente por cima dele a
+ponto de bloquear o clique nas opções.
+
+- **Dado**: painel da Visão analítica aberto (`AN.open === true`).
+- **Quando**: clica em `#fOwner` e depois numa opção de `#msList .ms-item`.
+- **Então (sucesso)**: `S.f.owners.size === 1` — a opção foi marcada.
+- **Cenário de falha coberto**: um popup próprio (não um `<select>` nativo) preso dentro do contexto
+  de empilhamento CSS da barra de filtros fica limitado ao `z-index` dessa barra, não ao `z-index` que
+  o próprio popup declara — um painel lateral com `z-index` maior que a barra (mas menor que o que o
+  popup pede) intercepta o clique mesmo o popup estando visualmente desenhado por cima.
+- **Teste**: `test_filtro_responsavel_utilizavel_com_o_painel_aberto`
+- **Relacionado**: decisão `0039-filtro-responsavel-atras-do-painel.md`.

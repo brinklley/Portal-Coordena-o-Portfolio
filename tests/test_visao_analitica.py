@@ -257,3 +257,17 @@ def test_status_agrupador_conta_so_os_itens_do_time_filtrado(page):
     txt = page.inner_text("#anBody")
     assert "WIP 1" in txt
     assert "Vazão 0" in txt   # o item Vazão é do outro time (AN_DIST_B): não entra na contagem do AN_DIST_A
+
+def test_filtro_responsavel_utilizavel_com_o_painel_aberto(page):
+    """Bug relatado pelo usuário: com o painel da Visão analítica aberto, o filtro "Time" e "Roadmap
+    interno" (campos <select> nativos) funcionavam, mas "Responsável da iniciativa" (popup próprio,
+    #msPop) não — o painel (#anPanel, z-index 46) ficava por cima do popup (que herdava o z-index 45
+    de dentro de .top, cuja própria pilha de empilhamento ficava abaixo do painel), bloqueando o clique
+    nas opções. Um <select> nativo não sofre disso (o navegador sempre desenha por cima)."""
+    carregar(page, "f4p.xlsx")
+    page.evaluate("()=>{ S.f.team=S.model.teams[0]; S.f.exec=semestre(TODAY); render(); }")
+    page.click("#anTab")
+    assert page.evaluate("AN.open") is True
+    page.click("#fOwner")
+    page.click("#msList .ms-item >> nth=0")   # falha (timeout) se o painel intercepta o clique
+    assert page.evaluate("S.f.owners.size") == 1
