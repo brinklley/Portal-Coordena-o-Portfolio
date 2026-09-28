@@ -13,8 +13,7 @@ Visualizador encadeado Iniciativa → Release → Épico → itens dos times, co
 ## Regras de trabalho
 
 - **Antes de concluir qualquer mudança: `npm run build`, `npm run check` e `npm test` verdes.**
-- **Antes de implementar uma funcionalidade, melhoria ou correção, consulte `docs/testes/`**: é o contrato das regras de negócio que a suíte protege, por domínio. Se a mudança pedida contraria uma regra documentada lá, não é um teste a ajustar sem mais — entenda a decisão relacionada antes de mexer.
-- Mudou uma regra de negócio? Atualize `docs/regras-de-negocio.md`, o teste correspondente em `tests/`, a entrada correspondente em `docs/testes/` e registre o motivo em `docs/decisoes/` (novo arquivo numerado).
+- Mudou uma regra de negócio? Atualize `docs/regras-de-negocio.md`, o teste correspondente em `tests/` e registre o motivo em `docs/decisoes/` (novo arquivo numerado).
 - O código é um script global dividido em `src/js/NN-*.js`, juntado em **ordem alfabética**: respeite a ordem ao criar arquivos. Nada de módulos, `import`, bibliotecas externas em tempo de execução ou a sequência `</script>`.
 - **Nunca** versione dados reais (planilhas exportadas, `.har`, prints com dados). Testes usam só `fixtures/` e `tests/azure_simulado.py`.
 - **Nunca** persista tokens do Azure (nem em `localStorage`, `IndexedDB` ou exportação). Ver `docs/decisoes/0007-token-nunca-salvo.md`.
@@ -28,5 +27,4 @@ Visualizador encadeado Iniciativa → Release → Épico → itens dos times, co
 - Telas e funcionalidades: `docs/telas.md`
 - Arquitetura e mapa dos arquivos: `docs/arquitetura.md`
 - Decisões e motivos: `docs/decisoes/`
-- Documentação dos testes (o que cada teste garante, entrada/saída esperada, cenário de falha coberto): `docs/testes/`
 - Report F4P (8 quadrantes, todos implementados): `docs/backlog/report-f4p.md`, decisões em `docs/decisoes/0011` a `0031`. Pendências gerais: `docs/backlog/pendencias.md`
