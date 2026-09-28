@@ -448,6 +448,13 @@ tr[data-cat="disc"] .fnb{background:var(--c-disc);color:#fff} tr[data-cat="wip"]
 .f4p-tbl tr:first-child td{border-top:0}
 .f4p-lo,.f4p-hi{color:var(--ink-3)}
 .f4p-sep{color:var(--ink-3);margin:0 2px}
+/* Eficiência de fluxo é o único quadrante com min|atual|max em porcentagem (min/max de decimal
+   ficam bem mais curtos, ex. Variabilidade) — com vários times numa linha só a célula quebrava no
+   meio ("|max%" sozinho numa segunda linha desalinhada) ou, encolhendo a fonte sem mais, colunas
+   vizinhas se sobrepunham. Solução: o min/max vai numa linha própria, menor, abaixo do valor
+   principal — que continua do mesmo tamanho (o que até ajuda a destacar ele) e cabe em qualquer
+   quantidade de times, já que não depende mais de caber tudo lado a lado. */
+.f4p-eff-mm{display:block;font-size:10.5px;white-space:nowrap;margin-top:2px}
 .f4p-good{color:#1E8E3E;font-weight:700}
 .f4p-bad{color:var(--alert);font-weight:700}
 .f4p-warn{color:var(--warn);font-weight:700}
