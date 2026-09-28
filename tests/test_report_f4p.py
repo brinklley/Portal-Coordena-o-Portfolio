@@ -1513,6 +1513,22 @@ def test_eff_cor_verde_dentro_da_faixa_e_vermelha_fora(page):
     r2 = page.evaluate("()=>f4pEffCell('F4P_EFF6')")
     assert "f4p-bad" in r2 and "f4p-good" not in r2
 
+def test_eff_min_max_ficam_em_linha_propria(page):
+    """Decisão 0038: min/max ficam numa <span class="f4p-eff-mm"> separada, numa linha abaixo do
+    valor principal — antes vinham lado a lado (min|atual|max) na mesma linha, o que quebrava o
+    layout com vários times (a célula é bem mais larga aqui do que em Variabilidade, por causa do
+    "%" e por não ter casa decimal fixa)."""
+    carregar(page, "f4p.xlsx")
+    _setup_flow_eff(page, "F4P_EFF_MM", ["Backlog", "Dev", "Espera", "Vazao"], {"dev": "touch", "espera": "wait"}, {"vazao": "vazao"})
+    _setup_item_eff(page, team="F4P_EFF_MM", op_id="mm1", deploy_offset=1, fd_offsets={"backlog": 200, "dev": 155, "espera": 100, "vazao": 1})
+    r = page.evaluate("""()=>{
+      S.f.team="F4P_EFF_MM"; S.f.exec=semestre(TODAY);
+      return f4pEffCell("F4P_EFF_MM");
+    }""")
+    assert 'class="f4p-eff-mm"' in r
+    assert r.index("data-f4p-eff-team") < r.index('class="f4p-eff-mm"')   # valor principal vem antes da linha de min/max
+    assert r.index('class="f4p-eff-mm"') < r.index("f4p-lo")              # min/max ficam dentro dessa linha, não soltos
+
 def test_eff_usa_faixa_min_max_configuravel_por_time(page):
     carregar(page, "f4p.xlsx")
     r = page.evaluate("""()=>{

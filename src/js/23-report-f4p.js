@@ -146,13 +146,17 @@ function f4pEffItemSituacao(o, from, to){
   const d = f4pItemDurations(o, from, to);
   return `Touch ${d.touch}d · Wait ${d.wait}d`;
 }
+/* min/max ficam numa linha própria, abaixo do valor principal (decisão 0038) — em vez de min|atual|max
+   lado a lado, que quebrava ou se sobrepunha com vários times numa linha só (percentuais são mais
+   largos que os decimais de Variabilidade, o outro quadrante com min/max). */
 function f4pEffCell(team){
   const st = f4pSemesterState(), {from, to} = f4pWindow(st), R = f4pEffRangeOf(team);
   const atual = f4pEffPct(team, from, to), trend = f4pEffTrend(team, from, to);
   const tip = `Eficiência do Fluxo = Touch Time ÷ (Touch Time + Waiting Time) × 100 · itens dos tipos ${(CFG.f4p.effTypes || []).join(", ") || "todos os tipos"} no período ${f4pPeriodLabel(st)} · tendência: últimos 2 meses do período vs. o período inteiro · clique no número para ver os itens`;
-  if (atual == null) return `<span title="${esc(tip)}"><span class="f4p-lo">${Math.round(R.min)}%</span><span class="f4p-sep">|</span><span class="f4p-dash">--</span><span class="f4p-sep">|</span><span class="f4p-hi">${Math.round(R.max)}%</span></span>`;
+  const mm = `<span class="f4p-eff-mm"><span class="f4p-lo">${Math.round(R.min)}%</span><span class="f4p-sep">|</span><span class="f4p-hi">${Math.round(R.max)}%</span></span>`;
+  if (atual == null) return `<span title="${esc(tip)}"><span class="f4p-dash">--</span>${mm}</span>`;
   const bad = atual < R.min || atual > R.max, cls = bad ? "f4p-bad" : "f4p-good";
-  return `<span title="${esc(tip)}"><span class="f4p-lo">${Math.round(R.min)}%</span><span class="f4p-sep">|</span><button type="button" class="f4p-real ${cls}" data-f4p-eff-team="${esc(team)}">${Math.round(atual)}% ${trend}</button><span class="f4p-sep">|</span><span class="f4p-hi">${Math.round(R.max)}%</span></span>`;
+  return `<span title="${esc(tip)}"><button type="button" class="f4p-real ${cls}" data-f4p-eff-team="${esc(team)}">${Math.round(atual)}% ${trend}</button>${mm}</span>`;
 }
 /* itens do time com a tag Expedite/Urgente configurada, de qualquer tipo */
 function f4pExpediteOps(team){
