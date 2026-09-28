@@ -167,6 +167,7 @@ Habilitada com **Time** e **Roadmap** (interno ou executivo) no filtro. Uma linh
 - **Status**: fase do épico no time (+ coluna do item aberto mais avançado) e, numa linha própria, o mesmo **agrupador por categoria** (Backlog, Discovery, WIP e Vazão, com quadradinho colorido e contagem) já usado no card do épico no quadro (`distGroup`, decisão `0029`) — sempre as 4 categorias, mesmo com contagem zero, contando só os itens do time em análise (mesma base do QTD/Capacidade/Projetada). **Flow**: Ready, Ag. Deploy e CT do épico no time; CT em vermelho acima do máximo.
 - **Ref.**: roadmap interno (ou executivo) em formato `2S/26` e Capex/Opex (coluna configurável).
 - **Dead line** = fim do semestre − "dias antes do fim do semestre" − CT máximo do time. Itens ainda fora do fluxo do CT são destacados (laranja a menos de 14 dias, vermelho após o prazo).
+- **Épicos sem release/iniciativa, filtrando por roadmap interno** (decisão `0036`): um épico sem release válida (por isso fora do quadro normal) ainda aparece aqui se tiver itens do time filtrado e o **Target Date** dele cair no semestre do roadmap interno selecionado — no lugar da linha `[IN][id] título`, mostra o aviso `OBS: SEM INICIATIVA e SEM RELEASE`, e entra normalmente nas somas de QTD/Capacidade/Projetada. Só vale para roadmap **interno** (o próprio Target Date do épico); no executivo não aparece, porque não há iniciativa da qual herdar um roadmap executivo.
 
 ## 11. Higiene de dados
 

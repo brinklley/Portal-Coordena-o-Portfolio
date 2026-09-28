@@ -22,8 +22,8 @@ function anData(){
   const hasTag = o => o.tags.map(norm).includes(tag);
   const L = limitsOf(team);
   const classKey = norm(CFG.anClassCol || "");
-  const rows = [...V.visEpi].map(id => M.epis.get(id)).map(e => {
-    const m = epiMetrics(e, team), r = M.rels.get(e.parent), i = M.inis.get(r.parent);
+  const rowOf = (e, i) => {
+    const m = epiMetrics(e, team);
     // coluna mais avançada entre os itens do épico no fluxo do time
     const flow = (M.teamFlow[team] || []).map(norm); let far = -1, farName = "";
     // item aberto mais avançado (os já concluídos não indicam onde o trabalho está)
@@ -31,8 +31,16 @@ function anData(){
     const itens = m.recs.filter(isType);          // itens do épico que entram na Projetada
     const reservados = itens.filter(hasTag);       // subconjunto com a tag de capacidade (entram na Capacidade)
     const pending = m.recs.filter(o => isType(o) && !o.ready);   // ainda não entraram no fluxo do CT
-    const cls = classKey && i.x ? fmtField(classKey, i.x[classKey]) : "--";
-    return {e, i, m, itens, qtd: itens.length, reservados, farName, pending, ref: e.interno || i.exec, cls: cls === "--" ? "" : cls};
+    const cls = classKey && i && i.x ? fmtField(classKey, i.x[classKey]) : "--";
+    return {e, i, m, itens, qtd: itens.length, reservados, farName, pending, ref: e.interno || (i && i.exec), cls: cls === "--" ? "" : cls};
+  };
+  const rows = [...V.visEpi].map(id => M.epis.get(id)).map(e => rowOf(e, M.inis.get(M.rels.get(e.parent).parent)));
+  // épicos sem release/iniciativa válida (fora do quadro normal), mas com itens do time filtrado e
+  // dentro do roadmap interno filtrado: aparecem aqui mesmo assim, com um aviso — decisão 0036.
+  if (S.f.int) M.epis.forEach(e => {
+    if (e.valid || norm(e.interno || "") !== norm(S.f.int)) return;
+    if (!e.ops.some(k => M.ops.get(k).team === team)) return;
+    rows.push({...rowOf(e, null), orphan:true});
   });
   const projItems = rows.flatMap(r => r.itens);
   const capItems = rows.flatMap(r => r.reservados);
@@ -72,7 +80,7 @@ function renderAnalytics(){
     return `<tr>
       <td class="c"><button type="button" class="f4p-real" data-an-epi-items="qtd" data-an-epi="${esc(r.e.id)}" title="Ver os itens deste épico">${r.qtd}</button><br>${r.qtd === 1 ? "item" : "itens"}</td>
       <td class="ev"><span class="ep">[EP][<button class="idb" data-an-go="${esc(r.e.id)}">${esc(r.e.id)}</button>] ${esc(r.e.title || "")} <button type="button" class="f4p-real res" data-an-epi-items="res" data-an-epi="${esc(r.e.id)}" title="Ver os itens deste épico com a tag ${esc(CFG.anTag || "ROADMAP")} (capacidade do roadmap)">${r.reservados.length} reservado${r.reservados.length === 1 ? "" : "s"}</button></span><br>
-        [IN][<button class="idi" data-an-go="${esc(r.i.id)}">${esc(r.i.id)}</button>] ${esc(r.i.title)}</td>
+        ${r.orphan ? `<mark title="Este épico não tem release nem iniciativa vinculada no Azure DevOps — corrija o Parent dele.">OBS: SEM INICIATIVA e SEM RELEASE</mark>` : `[IN][<button class="idi" data-an-go="${esc(r.i.id)}">${esc(r.i.id)}</button>] ${esc(r.i.title)}`}</td>
       <td class="c">${m.phase === "fechado" ? `<span class="st-ent">Entregue</span>` : PH_TXT[m.phase]}${r.farName && m.phase !== "fechado" ? `<span class="st-sub">${esc(r.farName)}</span>` : ""}<div class="an-dist">${distGroup(m)}</div></td>
       <td class="c fl">Ready: <b>${m.ctFrom ? fmtDM(m.ctFrom) : "--"}</b><br>Ag. Deploy: <b>${m.ctTo ? fmtDM(m.ctTo) : "--"}</b><br>
         <span class="${bad ? "ct-bad" : "ct-ok"}">CycleTime: ${m.ct ?? "--"} Dias</span>${r.pending.length && d.dl ? (() => { const left = days(TODAY, d.dl.date);

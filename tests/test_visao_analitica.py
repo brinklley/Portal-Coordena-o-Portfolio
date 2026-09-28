@@ -185,6 +185,56 @@ def test_status_mostra_o_agrupador_por_categoria_do_card_do_epico(page):
     assert "WIP 1" in txt
     assert "Vazão 3" in txt
 
+def _setup_epico_orfao(page, *, team, sem, itens):
+    """Épico sem release/iniciativa (valid:false), com itens do time e Target Date no semestre dado
+    — usado para testar a inclusão desses épicos na Visão analítica quando filtrando por roadmap
+    interno (decisão 0036)."""
+    page.evaluate("""(args)=>{
+      const {team, itens, sem} = args;
+      S.model.teamFlow[team] = ["Backlog", "WIP", "Vazao"];
+      CFG.flow[norm(team)] = {cat:{wip:"wip", vazao:"vazao"}, ct:[]};
+      const opKeys = itens.map((it, idx) => {
+        const k = `${team}_op${idx}`;
+        S.model.ops.set(k, {id:k, title:"Item "+idx, team, type:"User Story", stName: it.stName, deploy: it.deploy ? new Date(it.deploy) : null,
+          ready: it.stName !== "Backlog" ? new Date(2026,0,1) : null, tags: it.tags || []});
+        return k;
+      });
+      const epiId = `EPIORFAO_${team}`;
+      S.model.epis.set(epiId, {id:epiId, valid:false, title:"Épico órfão "+team, parent:null, target:null, interno:sem, st:0, ops:opKeys, type:"Epic"});
+      S.f.team = team; S.f.int = sem; S.f.exec = "";
+      render();
+    }""", {"team": team, "itens": itens, "sem": sem})
+
+def test_epico_orfao_aparece_no_roadmap_interno_com_aviso(page):
+    """Decisão 0036: um épico sem release/iniciativa vinculada, mas com itens do time e Target Date
+    no semestre do roadmap interno filtrado, aparece na Visão analítica com o aviso
+    "OBS: SEM INICIATIVA e SEM RELEASE", em vez de simplesmente sumir do relatório."""
+    carregar(page, "f4p.xlsx")
+    sem = page.evaluate("semestre(TODAY)")
+    _setup_epico_orfao(page, team="AN_ORFAO", sem=sem, itens=[{"stName": "Backlog"}, {"stName": "WIP"}])
+    d = page.evaluate("anData()")
+    assert d["proj"] == 2
+    assert any(row["orphan"] for row in d["rows"])
+    page.click("#anTab")
+    assert "OBS: SEM INICIATIVA e SEM RELEASE" in page.inner_text("#anBody")
+
+def test_epico_orfao_nao_aparece_no_roadmap_executivo(page):
+    """O aviso só faz sentido para o roadmap interno (o épico não tem iniciativa pra herdar um
+    roadmap executivo) — filtrando só por executivo, o épico órfão continua fora, como antes."""
+    carregar(page, "f4p.xlsx")
+    sem = page.evaluate("semestre(TODAY)")
+    page.evaluate("""(args)=>{
+      const {team, sem} = args;
+      S.model.teamFlow[team] = ["Backlog", "WIP", "Vazao"];
+      CFG.flow[norm(team)] = {cat:{wip:"wip", vazao:"vazao"}, ct:[]};
+      S.model.ops.set(team+"_op0", {id:team+"_op0", title:"Item", team, type:"User Story", stName:"Backlog", deploy:null, ready:null, tags:[]});
+      S.model.epis.set("EPIORFAO2_"+team, {id:"EPIORFAO2_"+team, valid:false, title:"Épico órfão", parent:null, target:null, interno:sem, st:0, ops:[team+"_op0"], type:"Epic"});
+      S.f.team = team; S.f.exec = sem; S.f.int = "";
+      render();
+    }""", {"team": "AN_ORFAO2", "sem": sem})
+    d = page.evaluate("anData()")
+    assert d["rows"] == []
+
 def test_status_agrupador_conta_so_os_itens_do_time_filtrado(page):
     """epiMetrics(e, team) já filtra por time (mesma fonte usada pelo QTD/Capacidade/Projetada), então
     o agrupador da coluna Status só conta os itens do time em análise, não os de outros times."""
