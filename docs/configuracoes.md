@@ -32,7 +32,7 @@ de primeiro acesso do portal (ver `docs/arquitetura.md`).
 | `tags` | BLOCKED, PAUSADO, URGENTE, DATA FIXA | tags cadastradas (nome, outros nomes, cor, nível, data) |
 | `typeColors[nível][tipo]` | `{}` | cor da faixa do card por tipo |
 | `fields[nível]` | `[]` | campos adicionais exibidos nos cards |
-| `anTag`, `anClassCol`, `anFreeze` | ROADMAP, Classificação_Despesas_Comitê, 0 | visão analítica; `anTag` também é a tag de capacidade (Reserva) do quadrante Vazão do Report F4P |
+| `anTag`, `anClassCol`, `anFreeze` | ROADMAP, Classificação_Despesas_Comitê, 10 | visão analítica; `anTag` também é a tag de capacidade (Reserva) do quadrante Vazão do Report F4P; `anFreeze` ("Dias antes do fim do semestre") entra direto no cálculo do dead line — decisão `0037` |
 | `f4p.months` | 6 | período (meses) da amostra do P95/P50 do Report F4P |
 | `f4p.types` | user story, technical story | tipos considerados na amostra de CycleTime/Variabilidade e no Realizado/Reserva do quadrante Vazão do Report F4P |
 | `f4p.epiTypes` | epic | tipos de **épico** (não de item de time) considerados pelo quadrante Roadmap – Épicos do Report F4P; configuração própria, independente de `f4p.types` |

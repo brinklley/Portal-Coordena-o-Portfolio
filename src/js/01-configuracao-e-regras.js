@@ -8,7 +8,7 @@ const TAG_DEFAULTS = () => [
 const cfgDefaults = () => ({teams:{}, warnDays:30, alertDays:60, outlierDays:90, stuckDays:10, disc:null, wip:null, vazao:null,
   ctTypes:["user story","technical story","technical solution"], tags:TAG_DEFAULTS(),
   typeColors:{ini:{}, rel:{}, epi:{}, op:{}}, fields:{ini:[], rel:[], epi:[], op:[]}, ctCols:null, flow:{},
-  anTag:"ROADMAP", anClassCol:"Classificação_Despesas_Comitê", anFreeze:0,
+  anTag:"ROADMAP", anClassCol:"Classificação_Despesas_Comitê", anFreeze:10,
   f4p:{months:6, types:["user story","technical story"], expediteTag:"urgent", epiTypes:["epic"], usTypes:["user story"], effTypes:[], teams:{}},
   azure:{orgs:[], sources:[], maps:{}, mapMeta:{}, fields:{epic:"ID_EPICO_UNICRED", roadmap:"AnoSemestreRoadmap"}, excludeRemoved:true}});
 /* aceita configurações antigas (ctMax + warnPct) e converte para limites por time */
