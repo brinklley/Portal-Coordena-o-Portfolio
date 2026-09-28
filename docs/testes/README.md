@@ -62,8 +62,9 @@ aparecem juntos na mesma entrada, cada um citado pelo nome exato da função.
 | [`ct-alertas-tags.md`](ct-alertas-tags.md) | CycleTime do item/épico, alertas, tags | 4 | §6, §8, §9 |
 | [`filtros-e-busca.md`](filtros-e-busca.md) | Filtros e o campo único "ID ou descrição" | 7 | `docs/telas.md` |
 | [`quadro-e-selecao.md`](quadro-e-selecao.md) | Board de Iniciativas: recolher/manter visíveis | 6 | `docs/telas.md` |
+| [`ilhas-e-cadeia-completa.md`](ilhas-e-cadeia-completa.md) | Whiteboard: ilhas soltas manualmente | 3 | `docs/telas.md` |
 | [`configuracoes.md`](configuracoes.md) | Validações, exportação sem token, limpar tudo | 6 | `docs/configuracoes.md` |
-| [`visao-analitica.md`](visao-analitica.md) | Visão analítica do roadmap do time | 14 | §10 |
+| [`visao-analitica.md`](visao-analitica.md) | Visão analítica do roadmap do time | 15 | §10 |
 | [`report-f4p/README.md`](report-f4p/README.md) | Report F4P — regras compartilhadas entre os 8 quadrantes | — | §12, §12.1 |
 | [`report-f4p/cycletime-e-variabilidade.md`](report-f4p/cycletime-e-variabilidade.md) | F4P Quadrantes 1–2 | — | §12.2, §12.3 |
 | [`report-f4p/urgente.md`](report-f4p/urgente.md) | F4P Quadrante 3 | — | §12.4 |

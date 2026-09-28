@@ -1,5 +1,5 @@
 /* ---------------- estado ---------------- */
-const S = {model:null, f:{exec:"",owners:new Set(),int:"",team:"",q:""}, path:{}, pathQueryId:null, expand:false, focus:null, links:[], animateLevel:null, showEmpty:true, showBare:true, anchored:true, offsets:{}};
+const S = {model:null, f:{exec:"",owners:new Set(),int:"",team:"",q:""}, path:{}, pathQueryId:null, expand:false, focus:null, links:[], animateLevel:null, showEmpty:true, showBare:true, anchored:true, offsets:{}, offsetsSig:null};
 
 /* Fase do épico pelos itens vinculados:
    Fechado = todos em Vazão; WIP = algum em WIP (ou já entregou parte e o resto ainda não começou);
@@ -114,6 +114,14 @@ function computeVisible(){
   }
   return {visEpi, visRel, visIni, visOp};
 }
+
+/* Assinatura do que molda a forma do whiteboard (quais iniciativas/releases/épicos/itens aparecem e em
+   que iniciativa o caminho está): usada em render() para descartar S.offsets (posições de ilhas soltas
+   manualmente) quando ela muda — ver comentário em 06-renderizacao.js. */
+const offsetsSig = () => {
+  const f = S.f;
+  return `${S.path.ini || ""}|${f.team}|${f.q}|${f.exec}|${f.int}|${[...f.owners].sort().join(",")}`;
+};
 
 /* saúde agregada (considerando visibilidade e filtro de time) */
 function healthEpi(e){ const m = epiMetrics(e, S.f.team); return e.diverge ? "alert" : m.health; }

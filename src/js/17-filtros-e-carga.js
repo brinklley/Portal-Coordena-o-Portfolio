@@ -12,7 +12,7 @@ function fillFilters(){
   $("msSearch").value = ""; closeMs();
   $("fExec").innerHTML = opt(exec, "Todos"); $("fInt").innerHTML = opt(intr, "Todos"); fillTeamFilter();
   $("fBusca").value = "";
-  S.f = {exec:"", owners:new Set(), int:"", team:"", q:""}; S.path = {}; S.pathQueryId = null; S.expand = false; S.focus = null; S.offsets = {}; msLabel();
+  S.f = {exec:"", owners:new Set(), int:"", team:"", q:""}; S.path = {}; S.pathQueryId = null; S.expand = false; S.focus = null; S.offsets = {}; S.offsetsSig = null; msLabel();
 }
 function loadTables(tables, label, imp){
   S.tables = tables;

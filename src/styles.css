@@ -32,7 +32,7 @@ body.gate-active .top, body.gate-active .viewport, body.gate-active .zoom,
 body.gate-active .side-tabs, body.gate-active #crumbs { display:none !important; }
 
 /* ---------- barra superior ---------- */
-.top{position:relative;z-index:30;flex:none;background:#FBFCFC;border-bottom:1px solid var(--line)}
+.top{position:relative;z-index:47;flex:none;background:#FBFCFC;border-bottom:1px solid var(--line)}
 .top-row{display:flex;align-items:center;gap:12px;padding:10px 20px;flex-wrap:wrap}
 .brand{display:flex;align-items:baseline;gap:10px;margin-right:auto}
 .brand h1{font-family:var(--display);font-size:20px;font-weight:650;margin:0;letter-spacing:-.01em}

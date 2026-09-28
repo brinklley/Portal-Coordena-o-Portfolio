@@ -12,6 +12,13 @@ function render(){
   if (S.path.ini && !V.visIni.has(S.path.ini)) { S.path = {}; S.expand = false; S.focus = null; S.pathQueryId = null; }
   if (S.path.rel && !V.visRel.has(S.path.rel)) { delete S.path.rel; delete S.path.epi; }
   if (S.path.epi && !V.visEpi.has(S.path.epi)) delete S.path.epi;
+  // ilhas soltas manualmente (S.offsets) são um deslocamento fixo em pixels a partir da posição natural
+  // da vez: se o que está acima delas muda de tamanho (outro filtro, outra iniciativa, outra busca), o
+  // deslocamento antigo pode empurrar a ilha para cima do conteúdo novo. Como a posição só faz sentido
+  // para a cadeia que estava sendo vista quando foi arrastada, ela é descartada sempre que a combinação
+  // de filtros/caminho que molda o que aparece muda.
+  const sig = offsetsSig();
+  if (sig !== S.offsetsSig){ if (Object.keys(S.offsets).length) S.offsets = {}; S.offsetsSig = sig; }
 
   S.links = [];
   let html = "";
