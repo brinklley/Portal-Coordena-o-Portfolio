@@ -68,8 +68,9 @@ function cfgForm(err){
         <td><input type="number" min="0" step="1" data-f4pteam="${esc(k)}" data-f4pf="effMax" value="${v.effMax ?? ""}" placeholder="55" aria-label="Eficiência de fluxo máxima de ${esc(tm)}"></td></tr>`; }).join("") || `<tr><td colspan="7" class="muted">Carregue os dados do Azure DevOps para ver os times.</td></tr>`}
     </tbody></table>
     <h4>Actionable</h4>
-    <p class="help">Painel Actionable (aba à esquerda, junto com a Visão analítica e o Report F4P). O quadrante <b>Distribuição Vazão por mês</b> usa os mesmos critérios de User Story (<code>f4p.usTypes</code>, acima) e Technical Story (tipo fixo) do Report F4P; os tipos marcados abaixo são excluídos por inteiro da amostra desse quadrante (não entram nem em "demais").</p>
+    <p class="help">Painel Actionable (aba à esquerda, junto com a Visão analítica e o Report F4P). O quadrante <b>Distribuição Vazão por mês</b> usa os mesmos critérios de User Story (<code>f4p.usTypes</code>, acima) e Technical Story (tipo fixo) do Report F4P; os tipos marcados abaixo são excluídos por inteiro da amostra desse quadrante (não entram nem em "demais"). O quadrante <b>CFD</b> usa a mesma lista para decidir o que é bug quando a opção abaixo estiver desligada.</p>
     <div class="typelist">${typesFound().map(([ty, n]) => `<label><input type="checkbox" data-actbugtype="${esc(norm(ty))}" ${(d.act.bugTypes || []).includes(norm(ty)) ? "checked" : ""}> ${esc(ty)} <span class="muted">${n}</span></label>`).join("") || `<span class="muted">Carregue os dados do Azure DevOps para ver os tipos.</span>`}</div>
+    <label style="display:flex;align-items:center;gap:6px;margin-top:8px"><input type="checkbox" id="cfgActCfdBugs" ${d.act.cfdIncludeBugs !== false ? "checked" : ""}> Contar itens do tipo bug no quadrante CFD (Cumulative Flow Diagram) — padrão: contar</label>
     <h4>Tipos considerados no CT do épico</h4>
     <p class="help">O CycleTime mostrado nos cards de épico usa só os itens dos tipos marcados. Os alertas de cada item continuam valendo para todos os tipos.</p>
     <div class="typelist">${typesFound().map(([ty, n]) => `<label><input type="checkbox" data-cttype="${esc(norm(ty))}" ${(d.ctTypes || []).includes(norm(ty)) ? "checked" : ""}> ${esc(ty)} <span class="muted">${n}</span></label>`).join("") || `<span class="muted">Carregue os dados do Azure DevOps para ver os tipos.</span>`}</div>
@@ -133,6 +134,7 @@ function readForm(){
     .concat((d.f4p.effTypes || []).filter(x => !$("cfgBody").querySelector(`input[data-f4pefftype="${cssEsc(x)}"]`)));
   d.act.bugTypes = [...$("cfgBody").querySelectorAll("input[data-actbugtype]")].filter(i => i.checked).map(i => i.dataset.actbugtype)
     .concat((d.act.bugTypes || []).filter(x => !$("cfgBody").querySelector(`input[data-actbugtype="${cssEsc(x)}"]`)));
+  d.act.cfdIncludeBugs = $("cfgActCfdBugs").checked;
   const f4pRows = {};
   $("cfgBody").querySelectorAll("input[data-f4pteam]").forEach(inp => {
     const k = inp.dataset.f4pteam, f = inp.dataset.f4pf, raw = parseFloat(inp.value.replace(",", "."));

@@ -189,6 +189,114 @@ function actDistCard(team, data){
   </div>`;
 }
 
+/* Quadrante 4 · CFD (Cumulative Flow Diagram): reconstrói, semana a semana, quantos itens do time já
+   chegaram a cada categoria de fluxo (Nenhum/Discovery/WIP/Vazão), usando as datas de entrada por
+   coluna já guardadas no modelo (`o.fd`, decisão `0006`: a primeira coluna recebe a data de criação do
+   item, colunas puladas herdam a data da próxima em que o item entrou) — não um cálculo novo sobre os
+   dados, só uma leitura histórica do que o modelo já guarda. Eixo X: semanas do semestre selecionado,
+   em blocos fixos de 7 dias a partir do 1º dia do semestre, terminando exatamente no último dia (a
+   última semana pode ter menos de 7 dias). Eixo Y: contagem acumulada. Empilhamento estilo
+   ActionableAgile (já citado no quadrante Eficiência de Fluxo do Report F4P, §12.9): Vazão na base
+   (cresce pra cima), Nenhum no topo — sempre o total de itens já criados até aquela semana, nunca
+   diminui. Configurável se conta itens do tipo bug (`CFG.act.cfdIncludeBugs`, padrão `true` — quando
+   desligado, exclui os tipos de `CFG.act.bugTypes`, a mesma lista do quadrante Distribuição Vazão por
+   mês). Decisão `0045`. */
+function actCfdWeeks(st){
+  st = st || f4pSemesterState();
+  const {from, to} = f4pExactSemesterWindow(st);
+  if (!from || !to) return [];
+  const weeks = [];
+  let cursor = from;
+  while (cursor <= to){
+    const fimBruto = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 6);
+    weeks.push({from: cursor, to: fimBruto < to ? fimBruto : to});
+    cursor = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 7);
+  }
+  return weeks;
+}
+function actCfdOps(team){
+  const ops = [...S.model.ops.values()].filter(o => o.team === team);
+  if (CFG.act.cfdIncludeBugs !== false) return ops;
+  const bugs = actBugTypes();
+  return ops.filter(o => !(o.type && bugs.has(norm(o.type))));
+}
+/* categoria de um item numa data T: o índice mais avançado (maior) do fluxo do time cuja coluna tem
+   data de entrada (`o.fd`) menor ou igual a T — null se o item ainda não tinha sido criado até T. */
+function actCfdCategoriaEm(o, T, c){
+  let idx = -1;
+  for (let i = 0; i < c.n.length; i++){
+    const d = (o.fd || {})[c.n[i]];
+    if (d && d <= T) idx = i;
+  }
+  return idx >= 0 ? c.cat[idx] : null;
+}
+function actCfdData(team, st){
+  const weeks = actCfdWeeks(st);
+  const ops = actCfdOps(team), c = teamCfg(team);
+  const RANK = {none:0, disc:1, wip:2, vazao:3};
+  return weeks.map(w => {
+    let nenhum = 0, disc = 0, wip = 0, vazao = 0;
+    ops.forEach(o => {
+      const cat = actCfdCategoriaEm(o, w.to, c);
+      if (cat == null) return;
+      nenhum++;
+      const r = RANK[cat];
+      if (r >= 1) disc++;
+      if (r >= 2) wip++;
+      if (r >= 3) vazao++;
+    });
+    return {from: w.from, to: w.to, nenhum, disc, wip, vazao,
+      bandNenhum: nenhum - disc, bandDisc: disc - wip, bandWip: wip - vazao, bandVazao: vazao};
+  });
+}
+function actCfdSvg(data){
+  if (!data.length) return `<div class="an-empty">Sem semanas no período para calcular.</div>`;
+  const W = 460, H = 240, mL = 34, mR = 14, mT = 12, mB = 22;
+  const pw = W - mL - mR, ph = H - mT - mB, n = data.length;
+  const maxY = Math.max(...data.map(d => d.nenhum), 1) * 1.15;
+  const xOf = i => n === 1 ? mL + pw / 2 : mL + (i / (n - 1)) * pw;
+  const yOf = v => mT + ph - (v / maxY) * ph;
+  const curve = key => data.map(d => d[key]);
+  const zero = data.map(() => 0);
+  const areaPath = (top, bottom) => {
+    const up = top.map((v, i) => `${i === 0 ? "M" : "L"}${xOf(i).toFixed(1)},${yOf(v).toFixed(1)}`).join(" ");
+    const down = bottom.slice().reverse().map((v, i) => `L${xOf(bottom.length - 1 - i).toFixed(1)},${yOf(v).toFixed(1)}`).join(" ");
+    return `${up} ${down} Z`;
+  };
+  const vazao = curve("vazao"), wip = curve("wip"), disc = curve("disc"), nenhum = curve("nenhum");
+  const bands = [
+    {cls:"act-cfd-vazao", d: areaPath(vazao, zero)},
+    {cls:"act-cfd-wip", d: areaPath(wip, vazao)},
+    {cls:"act-cfd-disc", d: areaPath(disc, wip)},
+    {cls:"act-cfd-nenhum", d: areaPath(nenhum, disc)}];
+  const yTicks = [0, Math.round(maxY)];
+  const yAxis = yTicks.map(v => `<text class="act-axis" x="${mL - 6}" y="${(yOf(v) + 3).toFixed(1)}" text-anchor="end">${v}</text><line class="act-grid" x1="${mL}" x2="${mL + pw}" y1="${yOf(v).toFixed(1)}" y2="${yOf(v).toFixed(1)}"></line>`).join("");
+  const xAxis = `<text class="act-axis" x="${mL}" y="${H - 6}" text-anchor="start">${esc(fmtDM(data[0].from))}</text><text class="act-axis" x="${mL + pw}" y="${H - 6}" text-anchor="end">${esc(fmtDM(data[n - 1].to))}</text>`;
+  const hit = data.map((d, i) => {
+    const x0 = n === 1 ? mL : i === 0 ? mL : (xOf(i - 1) + xOf(i)) / 2;
+    const x1 = n === 1 ? mL + pw : i === n - 1 ? mL + pw : (xOf(i) + xOf(i + 1)) / 2;
+    const tip = `${fmtL(d.from)} a ${fmtL(d.to)} · Nenhum: ${d.bandNenhum} · Discovery: ${d.bandDisc} · WIP: ${d.bandWip} · Vazão: ${d.bandVazao}`;
+    return `<rect class="act-cfd-hit" x="${x0.toFixed(1)}" y="${mT}" width="${(x1 - x0).toFixed(1)}" height="${ph}"><title>${esc(tip)}</title></rect>`;
+  }).join("");
+  return `<svg class="act-chart act-cfd" viewBox="0 0 ${W} ${H}" role="img" aria-label="Diagrama de fluxo cumulativo">
+    ${yAxis}
+    ${bands.map(b => `<path class="act-cfd-band ${b.cls}" d="${b.d}"></path>`).join("")}
+    ${hit}
+    ${xAxis}
+  </svg>`;
+}
+function actCfdCard(data){
+  return `<div class="act-cfd-wrap">
+    <div class="act-cfd-legend">
+      <span class="act-leg act-cfd-l-nenhum">Nenhum</span>
+      <span class="act-leg act-cfd-l-disc">Discovery</span>
+      <span class="act-leg act-cfd-l-wip">WIP</span>
+      <span class="act-leg act-cfd-l-vazao">Vazão</span>
+    </div>
+    ${actCfdSvg(data)}
+  </div>`;
+}
+
 function actCard(title, bodyHtml, note){
   return `<div class="f4p-card"><div class="f4p-card-h">${esc(title)}</div><div class="act-card-body">${bodyHtml}</div>${note ? `<div class="f4p-note">${note}</div>` : ""}</div>`;
 }
@@ -217,11 +325,14 @@ function renderActionable(){
   const distData = actDistData(team, st);
   const distCard = actCard("Distribuição Vazão por mês", actDistCard(team, distData),
     `Para cada mês do semestre ${esc(semLong(f4pSemester()))}, dos itens entregues (Vazão) do time — exceto os tipos de bug (${esc((CFG.act.bugTypes || []).join(", ") || "nenhum tipo marcado")}) — % User Story (${esc((CFG.f4p.usTypes || []).join(", ") || "nenhum tipo marcado")}), % Technical Story (tipo fixo) e % demais tipos entregues. Um mês sem nenhum item na amostra (inclui os meses ainda não decorridos, no semestre em curso) mostra uma barra cinza com 0%. Clique numa fatia para ver os itens dela.`);
+  const cfdData = actCfdData(team, st);
+  const cfdCard = actCard("CFD (Cumulative Flow Diagram)", actCfdCard(cfdData),
+    `Para cada semana do semestre ${esc(semLong(f4pSemester()))} (blocos de 7 dias a partir do 1º dia do semestre), quantos itens do time já chegaram a cada categoria de fluxo — Nenhum (criados), Discovery, WIP e Vazão — usando as datas reais de entrada em cada coluna do quadro. Vazão fica na base (cresce pra cima); Nenhum no topo é sempre o total de itens já criados até aquela semana (nunca diminui). ${CFG.act.cfdIncludeBugs === false ? "Itens do tipo bug não entram na amostra (desligado em Configurações)." : "Itens do tipo bug entram na amostra (padrão)."} Passe o mouse sobre o gráfico para ver os valores de cada semana.`);
   $("actBody").innerHTML = `<div class="f4p-grid">
       <div class="f4p-col">${ctCard}${distCard}</div>
-      <div class="f4p-col">${buCard}${actPlaceholderCard("Em definição")}</div>
+      <div class="f4p-col">${buCard}${cfdCard}</div>
     </div>
-    <div class="an-note">Primeira versão (MVP) do Actionable — só falta detalhar o último quadrante.</div>`;
+    <div class="an-note">Os 4 quadrantes do Actionable têm regra definida.</div>`;
 }
 function placeAct(){ const h = document.querySelector(".top").offsetHeight; $("actPanel").style.top = h + "px"; $("actPanel").style.height = `calc(100% - ${h}px)`; }
 function openActionable(){ if (!actEnabled()) return; if (AN.open) closeAnalytics(); if (F4P.open) closeF4P(); ACT.open = true; placeAct(); $("actPanel").classList.add("open"); $("actPanel").setAttribute("aria-hidden","false"); $("actTab").setAttribute("aria-expanded","true"); renderActionable(); $("actClose").focus(); }

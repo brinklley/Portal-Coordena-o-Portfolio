@@ -40,7 +40,8 @@ de primeiro acesso do portal (ver `docs/arquitetura.md`).
 | `f4p.effTypes` | `[]` (vazio = todos os tipos) | tipos considerados pelo quadrante Eficiência de fluxo do Report F4P; configuração própria — única do painel cujo padrão vazio significa "todos os tipos", em vez de cair num tipo fixo |
 | `f4p.expediteTag` | urgent (id da tag URGENTE) | tag cadastrada que marca a Classe de Serviço Expedite, usada pelo quadrante Urgente |
 | `f4p.teams[time]` | `{}` | por time: `min`/`max` da variabilidade esperada (padrão efetivo 1.5/3.5), `urgentMeta` (teto de itens Expedite no semestre; sem padrão), `tsMeta` (teto de itens Technical Story no semestre; padrão efetivo 6) e `effMin`/`effMax` da faixa de Eficiência de fluxo (padrão efetivo 30/55) |
-| `act.bugTypes` | bug, internal bug, external bug | tipos excluídos por inteiro da amostra do quadrante Distribuição Vazão por mês (Actionable) |
+| `act.bugTypes` | bug, internal bug, external bug | tipos excluídos por inteiro da amostra do quadrante Distribuição Vazão por mês (Actionable); também usados pelo CFD quando `act.cfdIncludeBugs` está desligado |
+| `act.cfdIncludeBugs` | `true` | se o quadrante CFD (Actionable) conta itens dos tipos em `act.bugTypes` — padrão: conta |
 | `azure.orgs` | `[]` | organizações (sem token) |
 | `azure.sources` | `[]` | fontes: `id, role, org, project, team, level, alias, stages` |
 | `azure.maps[fonte]` | `{}` | mapeamento de colunas antigas (`colunaId` ou `colunaId|Done` → coluna atual); revisável depois na aba Azure DevOps (ver abaixo), sem precisar de nova carga |
