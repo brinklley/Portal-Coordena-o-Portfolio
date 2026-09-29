@@ -256,8 +256,23 @@ def test_os_4_quadrantes_tem_regra_definida(page):
     page.click("#actTab")
     page.wait_for_timeout(200)
     titulos = page.evaluate("[...document.querySelectorAll('#actBody .f4p-card-h')].map(x=>x.textContent)")
-    assert titulos == ["CycleTime", "Distribuição Vazão por mês", "Burnup Reserva", "CFD (Cumulative Flow Diagram)"]
+    # ordem de leitura em linhas (decisão 0047): CT+Burnup na 1ª linha, Distribuição+CFD na 2ª —
+    # diferente da ordem por coluna de antes, para os quadrantes 3 e 4 ficarem alinhados na mesma altura.
+    assert titulos == ["CycleTime", "Burnup Reserva", "Distribuição Vazão por mês", "CFD (Cumulative Flow Diagram)"]
     assert page.locator("#actBody .an-empty", has_text="Regra de cálculo ainda em definição.").count() == 0
+
+def test_quadrantes_3_e_4_ficam_alinhados_na_mesma_altura(page):
+    """Melhoria pedida pelo usuário: os quadrantes 3 e 4 devem começar na mesma altura — antes, cada
+    coluna empilhava seus dois quadrantes de forma independente, então uma diferença de altura entre os
+    quadrantes 1 e 2 (que ficam acima) desalinhava o início dos quadrantes 3 e 4 (decisão 0047)."""
+    carregar(page, "f4p.xlsx")
+    _habilitar(page)
+    page.click("#actTab")
+    page.wait_for_timeout(200)
+    tops = page.evaluate("[...document.querySelectorAll('#actBody .f4p-card')].map(c => c.getBoundingClientRect().top)")
+    # ordem de leitura: [CT, Burnup, Distribuição, CFD] — linha 1 = CT+Burnup, linha 2 = Distribuição+CFD
+    assert abs(tops[0] - tops[1]) < 1
+    assert abs(tops[2] - tops[3]) < 1
 
 # ---------------- Quadrante 3 · Distribuição Vazão por mês (decisão 0044) ----------------
 # Para cada mês do semestre selecionado (do time em foco), dos itens ENTREGUES (Vazão) naquele mês —
@@ -624,6 +639,51 @@ def test_cfd_vazao_comeca_em_zero_e_cresce_com_entregas_dentro_do_semestre(page)
       return actCfdData("CFD_GROW", f4pSemesterState()).map(d => d.vazao).slice(0, 4);
     }""", sem)
     assert r == [0, 1, 2, 2]
+
+# Melhoria pedida pelo usuário (decisão 0047): num semestre em curso, o CFD não precisa "construir o
+# resto do morro" — desenha só até a semana atual, marcada por uma linha vertical "hoje"; o restante do
+# período fica em branco em vez de projetar uma continuação achatada. Num semestre já encerrado não há
+# "resto" (todo o período já é passado), então desenha tudo normalmente, sem linha "hoje".
+
+def test_cfd_semestre_em_curso_mostra_linha_hoje_e_nao_desenha_alem_dela(page):
+    carregar(page, "f4p.xlsx")
+    sem = page.evaluate("semestre(TODAY)")
+    page.evaluate("""(sem)=>{
+      S.model.teamFlow.CFD_HOJE = ["Backlog", "Vazao"];
+      CFG.flow.cfd_hoje = {cat:{vazao:"vazao"}, ct:[]};
+      const start = f4pSemStart(sem);
+      S.model.ops.set("h1", {team:"CFD_HOJE", fd:{backlog:start}});
+      S.model.teams.push("CFD_HOJE");
+      S.f.team = "CFD_HOJE"; S.f.exec = sem;
+      render();
+    }""", sem)
+    page.click("#actTab")
+    page.wait_for_timeout(200)
+    assert page.locator(".act-cfd-hoje").count() == 1
+    totalSemanas = page.evaluate("actCfdWeeks(f4pSemesterState()).length")
+    hitCount = page.locator(".act-cfd-hit").count()
+    assert hitCount < totalSemanas   # não desenha as semanas futuras do semestre em curso
+
+def test_cfd_semestre_encerrado_nao_mostra_linha_hoje_e_desenha_tudo(page):
+    carregar(page, "f4p.xlsx")
+    page.evaluate("""()=>{
+      const curStart = f4pSemStart(semestre(TODAY));
+      const prevMid = new Date(curStart.getFullYear(), curStart.getMonth() - 3, 15);
+      const prevSem = semestre(prevMid);
+      S.model.teamFlow.CFD_PAST = ["Backlog", "Vazao"];
+      CFG.flow.cfd_past = {cat:{vazao:"vazao"}, ct:[]};
+      const start = f4pSemStart(prevSem);
+      S.model.ops.set("p1", {team:"CFD_PAST", fd:{backlog:start}});
+      S.model.teams.push("CFD_PAST");
+      S.f.team = "CFD_PAST"; S.f.int = prevSem;
+      render();
+    }""")
+    page.click("#actTab")
+    page.wait_for_timeout(200)
+    assert page.locator(".act-cfd-hoje").count() == 0
+    totalSemanas = page.evaluate("actCfdWeeks(f4pSemesterState()).length")
+    hitCount = page.locator(".act-cfd-hit").count()
+    assert hitCount == totalSemanas
 
 def test_cfd_aparece_no_painel_com_legenda_e_grafico(page):
     carregar(page, "f4p.xlsx")

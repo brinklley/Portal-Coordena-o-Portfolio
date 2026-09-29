@@ -264,20 +264,37 @@ function actCfdData(team, st){
       bandNenhum: nenhum - disc, bandDisc: disc - wip, bandWip: wip - vazao, bandVazao: vazao};
   });
 }
-function actCfdSvg(data){
+/* Num semestre em curso, o "morro" só é desenhado até a semana atual (inclusive) — o restante não
+   precisa ser construído, já que não há dado real depois de hoje (nenhuma data de coluna cai no
+   futuro); em vez de deixar as faixas achatadas como projeção (como a Distribuição Vazão por mês faz de
+   propósito, §13.2), o CFD marca uma linha vertical "hoje" no limite e deixa o resto do período em
+   branco. O eixo X continua mostrando o semestre inteiro (mesmas marcas de início/fim), só a área
+   desenhada é que para em hoje. Num semestre já encerrado, desenha o período inteiro normalmente (não
+   há "resto" para deixar de construir). Decisão `0047`. */
+function actCfdSvg(data, st){
   if (!data.length) return `<div class="an-empty">Sem semanas no período para calcular.</div>`;
+  st = st || f4pSemesterState();
+  const n = data.length;
+  let cutoff = n - 1, hojeIdx = null;
+  if (st.kind === "current"){
+    hojeIdx = data.findIndex(w => TODAY >= w.from && TODAY <= w.to);
+    if (hojeIdx < 0) hojeIdx = n - 1;
+    cutoff = hojeIdx;
+  }
   const W = 460, H = 240, mL = 34, mR = 14, mT = 12, mB = 22;
-  const pw = W - mL - mR, ph = H - mT - mB, n = data.length;
+  const pw = W - mL - mR, ph = H - mT - mB;
   const maxY = Math.max(...data.map(d => d.nenhum), 1) * 1.15;
   const xOf = i => n === 1 ? mL + pw / 2 : mL + (i / (n - 1)) * pw;
   const yOf = v => mT + ph - (v / maxY) * ph;
-  const curve = key => data.map(d => d[key]);
-  const zero = data.map(() => 0);
+  const drawn = data.slice(0, cutoff + 1);
   const areaPath = (top, bottom) => {
+    if (top.length < 2) return "";
     const up = top.map((v, i) => `${i === 0 ? "M" : "L"}${xOf(i).toFixed(1)},${yOf(v).toFixed(1)}`).join(" ");
     const down = bottom.slice().reverse().map((v, i) => `L${xOf(bottom.length - 1 - i).toFixed(1)},${yOf(v).toFixed(1)}`).join(" ");
     return `${up} ${down} Z`;
   };
+  const curve = key => drawn.map(d => d[key]);
+  const zero = drawn.map(() => 0);
   const vazao = curve("vazao"), wip = curve("wip"), disc = curve("disc"), nenhum = curve("nenhum");
   const bands = [
     {cls:"act-cfd-vazao", d: areaPath(vazao, zero)},
@@ -287,20 +304,23 @@ function actCfdSvg(data){
   const yTicks = [0, Math.round(maxY)];
   const yAxis = yTicks.map(v => `<text class="act-axis" x="${mL - 6}" y="${(yOf(v) + 3).toFixed(1)}" text-anchor="end">${v}</text><line class="act-grid" x1="${mL}" x2="${mL + pw}" y1="${yOf(v).toFixed(1)}" y2="${yOf(v).toFixed(1)}"></line>`).join("");
   const xAxis = `<text class="act-axis" x="${mL}" y="${H - 6}" text-anchor="start">${esc(fmtDM(data[0].from))}</text><text class="act-axis" x="${mL + pw}" y="${H - 6}" text-anchor="end">${esc(fmtDM(data[n - 1].to))}</text>`;
-  const hit = data.map((d, i) => {
+  const hoje = hojeIdx == null ? "" :
+    `<line class="act-cfd-hoje" x1="${xOf(hojeIdx).toFixed(1)}" x2="${xOf(hojeIdx).toFixed(1)}" y1="${mT}" y2="${mT + ph}"></line><text class="act-cfd-hoje-label" x="${xOf(hojeIdx).toFixed(1)}" y="${mT - 2}" text-anchor="middle">hoje</text>`;
+  const hit = drawn.map((d, i) => {
     const x0 = n === 1 ? mL : i === 0 ? mL : (xOf(i - 1) + xOf(i)) / 2;
-    const x1 = n === 1 ? mL + pw : i === n - 1 ? mL + pw : (xOf(i) + xOf(i + 1)) / 2;
+    const x1 = n === 1 ? mL + pw : i === n - 1 ? mL + pw : i === cutoff ? xOf(i) : (xOf(i) + xOf(i + 1)) / 2;
     const tip = `${fmtL(d.from)} a ${fmtL(d.to)} · Nenhum: ${d.bandNenhum} · Discovery: ${d.bandDisc} · WIP: ${d.bandWip} · Vazão: ${d.bandVazao}`;
     return `<rect class="act-cfd-hit" x="${x0.toFixed(1)}" y="${mT}" width="${(x1 - x0).toFixed(1)}" height="${ph}"><title>${esc(tip)}</title></rect>`;
   }).join("");
   return `<svg class="act-chart act-cfd" viewBox="0 0 ${W} ${H}" role="img" aria-label="Diagrama de fluxo cumulativo">
     ${yAxis}
-    ${bands.map(b => `<path class="act-cfd-band ${b.cls}" d="${b.d}"></path>`).join("")}
+    ${bands.map(b => b.d ? `<path class="act-cfd-band ${b.cls}" d="${b.d}"></path>` : "").join("")}
     ${hit}
+    ${hoje}
     ${xAxis}
   </svg>`;
 }
-function actCfdCard(data){
+function actCfdCard(data, st){
   return `<div class="act-cfd-wrap">
     <div class="act-cfd-legend">
       <span class="act-leg act-cfd-l-nenhum">Nenhum</span>
@@ -308,7 +328,7 @@ function actCfdCard(data){
       <span class="act-leg act-cfd-l-wip">WIP</span>
       <span class="act-leg act-cfd-l-vazao">Vazão</span>
     </div>
-    ${actCfdSvg(data)}
+    ${actCfdSvg(data, st)}
   </div>`;
 }
 
@@ -341,12 +361,9 @@ function renderActionable(){
   const distCard = actCard("Distribuição Vazão por mês", actDistCard(team, distData),
     `Para cada mês do semestre ${esc(semLong(f4pSemester()))}, dos itens entregues (Vazão) do time — exceto os tipos de bug (${esc((CFG.act.bugTypes || []).join(", ") || "nenhum tipo marcado")}) — % User Story (${esc((CFG.f4p.usTypes || []).join(", ") || "nenhum tipo marcado")}), % Technical Story (tipo fixo) e % demais tipos entregues. Um mês sem nenhum item na amostra (inclui os meses ainda não decorridos, no semestre em curso) mostra uma barra cinza com 0%. Clique numa fatia para ver os itens dela.`);
   const cfdData = actCfdData(team, st);
-  const cfdCard = actCard("CFD (Cumulative Flow Diagram)", actCfdCard(cfdData),
-    `Para cada semana do semestre ${esc(semLong(f4pSemester()))} (blocos de 7 dias a partir do 1º dia do semestre), quantos itens do time já chegaram a cada categoria de fluxo — Nenhum (criados), Discovery, WIP e Vazão — usando as datas reais de entrada em cada coluna do quadro. Não entram itens já entregues (Vazão) antes do início do semestre selecionado, para a Vazão refletir o que aconteceu dentro do período, não o histórico acumulado de negócio já resolvido antes dele. Vazão fica na base (cresce pra cima); Nenhum no topo é sempre o total de itens (do escopo do semestre) já criados até aquela semana (nunca diminui). ${CFG.act.cfdIncludeBugs === false ? "Itens do tipo bug não entram na amostra (desligado em Configurações)." : "Itens do tipo bug entram na amostra (padrão)."} Passe o mouse sobre o gráfico para ver os valores de cada semana.`);
-  $("actBody").innerHTML = `<div class="f4p-grid">
-      <div class="f4p-col">${ctCard}${distCard}</div>
-      <div class="f4p-col">${buCard}${cfdCard}</div>
-    </div>
+  const cfdCard = actCard("CFD (Cumulative Flow Diagram)", actCfdCard(cfdData, st),
+    `Para cada semana do semestre ${esc(semLong(f4pSemester()))} (blocos de 7 dias a partir do 1º dia do semestre), quantos itens do time já chegaram a cada categoria de fluxo — Nenhum (criados), Discovery, WIP e Vazão — usando as datas reais de entrada em cada coluna do quadro. Não entram itens já entregues (Vazão) antes do início do semestre selecionado, para a Vazão refletir o que aconteceu dentro do período, não o histórico acumulado de negócio já resolvido antes dele. Vazão fica na base (cresce pra cima); Nenhum no topo é sempre o total de itens (do escopo do semestre) já criados até aquela semana (nunca diminui).${st.kind === "current" ? " Num semestre em curso, o gráfico só desenha até a semana atual (marcada por uma linha vertical \"hoje\") — o restante do período fica em branco, em vez de projetar uma continuação achatada." : ""} ${CFG.act.cfdIncludeBugs === false ? "Itens do tipo bug não entram na amostra (desligado em Configurações)." : "Itens do tipo bug entram na amostra (padrão)."} Passe o mouse sobre o gráfico para ver os valores de cada semana.`);
+  $("actBody").innerHTML = `<div class="act-quad-grid">${ctCard}${buCard}${distCard}${cfdCard}</div>
     <div class="an-note">Os 4 quadrantes do Actionable têm regra definida.</div>`;
 }
 function placeAct(){ const h = document.querySelector(".top").offsetHeight; $("actPanel").style.top = h + "px"; $("actPanel").style.height = `calc(100% - ${h}px)`; }
