@@ -1,12 +1,14 @@
-# Testes: Report F4P — Quadrante 5 (Vazão: reserva vs. realizado)
+# Testes: Report F4P — Quadrante 5 (Vazão: reserva vs. reserva entregue vs. realizado)
 
 Ver `docs/testes/report-f4p/README.md` para as regras compartilhadas. Regras de negócio: §12.6.
-Decisões `0022`–`0024`.
+Decisões `0022`–`0024`, `0043`.
 
 Mesmo critério de "entregue" (categoria de fluxo Vazão) do Technical Story, mas usa os **tipos
 configurados para o CT** (`CFG.f4p.types`, padrão User Story e Technical Story) em vez de um tipo
 fixo. Reserva é o **subconjunto** do Realizado com a tag de capacidade do roadmap (`CFG.anTag`, a
-mesma tag já usada na Visão analítica); Realizado é todo o conjunto, com ou sem a tag.
+mesma tag já usada na Visão analítica); Realizado é todo o conjunto, com ou sem a tag. Reserva
+entregue (decisão `0043`) é um terceiro número, subconjunto da própria Reserva, cujo épico vinculado
+tem compromisso de roadmap batendo com o semestre selecionado.
 
 ## Regra: Realizado conta só tipos configurados e já entregues
 
@@ -82,6 +84,44 @@ Reserva mostra só o subconjunto com a tag — cada item navega ao quadro como n
 - **Testes**: `test_vazao_clique_no_realizado_abre_lista_e_permite_navegar`,
   `test_vazao_clique_na_reserva_mostra_so_os_com_a_tag`
 
-## Regra: o quadrante aparece calculado no painel
+## Regra: Reserva entregue é o subconjunto da Reserva cujo épico tem compromisso de roadmap no semestre selecionado
+
+**Garante que**: `f4pVazaoReservaEntregueItems` reaproveita o mesmo critério interno/executivo do
+Roadmap – Épicos (`f4pRoadmapEpis`, via `f4pEpiCompromissoBate`) para decidir se o **épico vinculado**
+(`o.epicoId`) de cada item da Reserva tem compromisso de roadmap batendo com o semestre selecionado —
+sem alterar o quadrante Roadmap – Épicos em si, que continua intocado (decisão `0043`).
+
+- **Dado**: Roadmap Interno selecionado, 2 itens reservados, um cujo épico tem `interno` igual ao
+  semestre selecionado (bate), outro cujo épico aponta para outro semestre.
+- **Então (sucesso)**: `{reserva: 2, reservaEntregue: 1}` — a Reserva continua contando os dois, só a
+  Reserva entregue exclui o que aponta pra outro semestre.
+- **Teste (critério Interno)**: `test_vazao_reserva_entregue_bate_com_compromisso_interno_do_proprio_epico`
+- **Teste (critério Executivo)**: `test_vazao_reserva_entregue_usa_iniciativa_quando_roadmap_executivo_ativo`
+  — sobe Épico → Release → Iniciativa e compara `AnoSemestreRoadmap` (`i.exec`), ignorando o Target
+  Date do próprio épico, exatamente como o Roadmap – Épicos faz no critério Executivo.
+- **Cenário de falha coberto**: sem esse filtro extra, um item entregue no período mas cujo compromisso
+  de roadmap é de outro semestre contaria como "reserva do semestre selecionado" só por ter a tag —
+  exatamente o problema de conceito reportado pelo usuário ao comparar com o Analytics (um item entregue
+  em agosto, encaixando no 2º semestre por data, mas mapeado no roadmap para o 1º semestre).
+
+## Regra: épico sem compromisso registrado, ou item sem épico vinculado, ficam fora da Reserva entregue (caso de borda)
+
+**Garante que**: um épico sem Target Date preenchido (critério Interno) — ou um item reservado sem
+`epicoId`/apontando para um épico inexistente — não bate com nenhum semestre; continua contando
+normalmente na Reserva (e no Realizado), mas nunca soma à Reserva entregue.
+
+- **Testes**: `test_vazao_reserva_entregue_exclui_epico_sem_compromisso_registrado`,
+  `test_vazao_reserva_entregue_exclui_reserva_sem_epico_vinculado`
+- **Cenário de falha coberto**: sem essa checagem explícita, um épico incompleto (dado ausente) poderia
+  ser tratado como "bate com qualquer semestre" por uma comparação frouxa (`undefined === undefined`),
+  inflando a Reserva entregue com itens sem garantia real de compromisso — decisão explícita do usuário
+  ao ser consultado sobre este caso de borda: conta como "outro semestre"/fora da Reserva entregue.
+- **Relacionado**: decisão `0043`.
+
+## Regra: clique na Reserva entregue mostra só os itens com compromisso no semestre selecionado
+
+**Teste**: `test_vazao_clique_na_reserva_entregue_mostra_so_os_com_compromisso_no_semestre`
+
+## Regra: o quadrante aparece calculado no painel, com os 3 números (Reserva | Reserva entregue | Realizado)
 
 **Teste**: `test_vazao_aparece_calculado_no_painel`
