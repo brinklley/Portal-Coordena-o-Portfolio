@@ -10,6 +10,7 @@ const cfgDefaults = () => ({teams:{}, warnDays:30, alertDays:60, outlierDays:90,
   typeColors:{ini:{}, rel:{}, epi:{}, op:{}}, fields:{ini:[], rel:[], epi:[], op:[]}, ctCols:null, flow:{},
   anTag:"ROADMAP", anClassCol:"Classificação_Despesas_Comitê", anFreeze:10,
   f4p:{months:6, types:["user story","technical story"], expediteTag:"urgent", epiTypes:["epic"], usTypes:["user story"], effTypes:[], teams:{}},
+  act:{bugTypes:["bug","internal bug","external bug"]},
   azure:{orgs:[], sources:[], maps:{}, mapMeta:{}, fields:{epic:"ID_EPICO_UNICRED", roadmap:"AnoSemestreRoadmap"}, excludeRemoved:true}});
 /* aceita configurações antigas (ctMax + warnPct) e converte para limites por time */
 function normCfg(j){
@@ -29,6 +30,8 @@ function normCfg(j){
     // de fluxo) — diferente dos demais campos de tipo acima, que caem no padrão quando vazios.
     effTypes: Array.isArray(jf.effTypes) ? jf.effTypes : f4pD.effTypes,
     teams: {...(jf.teams || {})}};
+  const actD = cfgDefaults().act, ja = j.act || {};
+  c.act = {bugTypes: Array.isArray(ja.bugTypes) && ja.bugTypes.length ? ja.bugTypes : actD.bugTypes};
   const az = j.azure || {};   // tokens nunca fazem parte da configuração
   c.azure = {orgs:(az.orgs || []).map(o => ({org:o.org})), sources:az.sources || [], maps:az.maps || {}, mapMeta:az.mapMeta || {},
     fields:{epic:"ID_EPICO_UNICRED", roadmap:"AnoSemestreRoadmap", ...(az.fields || {})}, excludeRemoved: az.excludeRemoved !== false};

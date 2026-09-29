@@ -50,6 +50,7 @@ function percentil(a, p){
   return lo === hi ? a[lo] : a[lo] + (rank - lo) * (a[hi] - a[lo]);
 }
 const dec1 = x => (x == null || isNaN(x)) ? "--" : (Math.round(x * 10) / 10).toFixed(1).replace(".", ",");
+const dec2 = x => (x == null || isNaN(x)) ? "--" : x.toFixed(2).replace(".", ",");
 function colIdx(headers, name){ const n = norm(name); return headers.findIndex(h => norm(h) === n); }
 function flowCols(headers, start, end){
   const ns = norm(start), ne = norm(end);

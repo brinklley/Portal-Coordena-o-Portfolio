@@ -288,7 +288,7 @@ Mesmo critério de "entregue" do Technical Story/Vazão (categoria de fluxo Vaz�
 
 Painel lateral com o mesmo comportamento de habilitação da Visão analítica (§10) e do Report F4P (§12): habilitado com **Time** e **Roadmap** (interno ou executivo) no filtro, um time por vez (diferente do Report F4P, que sempre mostra todos os times). Semestre futuro: aba desabilitada, painel recolhe sozinho se já estiver aberto (mesma regra do Report F4P, `f4pEnabled`/`actEnabled`). Decisão: `docs/decisoes/0041-actionable-primeira-versao.md`.
 
-**Primeira versão (MVP)**: estrutura fixa de 4 quadrantes em 2 colunas, inspirada no layout do Report F4P — só os dois primeiros têm regra definida; os outros dois aparecem como "Regra de cálculo ainda em definição" (mesmo padrão do Report F4P para um quadrante sem regra fechada) até serem detalhados.
+**Primeira versão (MVP)**: estrutura fixa de 4 quadrantes em 2 colunas, inspirada no layout do Report F4P — três já têm regra definida (CycleTime, Distribuição Vazão por mês e Burnup Reserva); o quarto aparece como "Regra de cálculo ainda em definição" (mesmo padrão do Report F4P para um quadrante sem regra fechada) até ser detalhado.
 
 ### 13.1 CycleTime (dispersão)
 
@@ -300,7 +300,20 @@ Mesma amostra e mesma Reserva do quadrante CycleTime do Report F4P (§12.2) — 
 - **Transparência**: cada ponto é clicável e navega direto até o item (`gotoId`), fechando o painel.
 - Sem itens concluídos no período, mostra uma mensagem em vez de um gráfico vazio.
 
-### 13.2 Burnup Reserva
+### 13.2 Distribuição Vazão por mês
+
+Para cada mês do semestre selecionado no filtro (roadmap interno ou executivo), do time em foco, mostra que fração dos itens **entregues** (categoria de fluxo Vazão) naquele mês é User Story, Technical Story ou os demais tipos — excluindo tipos de bug da amostra por inteiro. Decisão: `docs/decisoes/0044-actionable-distribuicao-vazao-por-mes.md`.
+
+- **Meses do gráfico**: sempre os **6 meses inteiros** do semestre selecionado (`f4pSemStart(sem)` até 5 meses depois) — diferente do Burnup Reserva (§13.3), que para em "hoje" num semestre em curso, aqui os meses ainda não decorridos entram no gráfico como referência do que falta ao longo do período, não são escondidos.
+- **Filtro de dados de cada mês**: itens do time cuja categoria de fluxo atual (`catOf`) é **Vazão**, com `o.deploy` caindo dentro daquele mês (1º ao último dia), de **qualquer tipo** — exceto os tipos marcados como bug (`CFG.act.bugTypes`, configuração própria, padrão **bug**, **internal bug** e **external bug**), que saem da amostra por inteiro (não contam nem no total, nem em nenhuma das três fatias).
+- **User Story**: subconjunto (do conjunto acima, já sem bugs) cujo tipo está em `CFG.f4p.usTypes` — mesmo critério do quadrante User Story do Report F4P (§12.8).
+- **Technical Story**: subconjunto cujo tipo é **Technical Story** (tipo fixo) — mesmo critério do quadrante Technical Story do Report F4P (§12.5).
+- **Demais**: o restante da amostra (sem bugs, sem User Story, sem Technical Story) — as três fatias formam uma partição exata da amostra do mês (sempre somam o total, sem sobreposição).
+- **Mês sem nenhum item na amostra** (sem nenhuma entrega no mês, ou todas as entregas do mês eram de tipo bug): mostra uma barra cinza fraca preenchida por inteiro, com o rótulo "0,00%" — cobre tanto um mês real sem entrega quanto, de propósito, os meses ainda não decorridos de um semestre em curso (ver item acima).
+- **Rótulo de cada fatia**: percentual com **2 casas decimais arredondadas**, separador decimal vírgula (ex.: "33,33%") — diferente da convenção de porcentagem inteira usada pelo quadrante Eficiência de fluxo do Report F4P (§12.9), aqui o usuário pediu explicitamente 2 casas.
+- **Transparência**: cada fatia (User Story, Technical Story, Demais) é clicável **separadamente** e abre a lista exata dos itens daquele tipo, naquele mês — mesmo padrão de transparência por número já usado no resto do portal (`f4pItemsModal`). A fatia "Sem registro" (mês vazio) não é clicável, por não ter itens para mostrar.
+
+### 13.3 Burnup Reserva
 
 - **Reservado** (escopo do burnup): o mesmo conjunto de itens da **Capacidade** da Visão analítica (§10) — itens com a tag de capacidade do roadmap (`CFG.anTag`, padrão "ROADMAP") nos épicos do roadmap do time+semestre selecionado, em **qualquer status** (Backlog, Discovery, WIP ou Vazão) — não só os já entregues. Essa é uma diferença deliberada da Reserva do quadrante Vazão do Report F4P (§12.6), que só existe dentro do que já foi entregue: sem incluir os itens ainda não entregues, não haveria "quanto falta" para calcular.
 - **Entregue**: subconjunto do Reservado cuja categoria de fluxo atual (`catOf`) é **Vazão**, com a saída caindo **dentro do período do semestre selecionado** (1/jan–30/jun ou 1/jul–31/dez; no semestre em curso, até hoje), acumulado mês a mês — um item entregue no último dia de um mês já conta dentro desse mês (limite inclusivo). Um item entregue **depois** desse período (ex.: um semestre já encerrado cuja entrega só saiu no semestre seguinte) não conta como Entregue **deste** período — estava previsto para ele, mas não chegou dentro do prazo.

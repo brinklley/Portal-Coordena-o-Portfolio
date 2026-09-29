@@ -122,6 +122,73 @@ function actBurnupSummary(data){
   </div>`;
 }
 
+/* Quadrante 3 · Distribuição Vazão por mês: para cada mês do semestre selecionado (do time em foco),
+   dos itens ENTREGUES (categoria de fluxo Vazão) naquele mês — de qualquer tipo, exceto os tipos de
+   bug configurados (CFG.act.bugTypes, padrão bug/internal bug/external bug, excluídos por inteiro da
+   amostra) — quanto % é User Story (mesmo critério do quadrante User Story do Report F4P, §12.8:
+   `CFG.f4p.usTypes`), quanto % é Technical Story (mesmo critério do quadrante Technical Story do Report
+   F4P, §12.5: tipo fixo "technical story") e quanto % é "demais" (o resto da amostra, sem bugs). Um mês
+   sem nenhum item na amostra — sem entregas no mês, ou todas bug — mostra uma barra cinza cheia com
+   "0,00%"; isso cobre, de propósito, os meses ainda não decorridos de um semestre em curso: o gráfico
+   sempre mostra os 6 meses do semestre (não só os já decorridos), para o usuário ver de antemão o que
+   ainda falta ao longo do período. Decisão `0044`. */
+function actBugTypes(){ return new Set(((CFG.act && CFG.act.bugTypes) || []).map(norm)); }
+function actDistMonths(st){
+  st = st || f4pSemesterState();
+  const sem = f4pSemester(), start = f4pSemStart(sem);
+  if (!start) return [];
+  const months = [];
+  for (let i = 0; i < 6; i++) months.push(new Date(start.getFullYear(), start.getMonth() + i, 1));
+  return months;
+}
+function actDistItems(team, month){
+  const fim = new Date(month.getFullYear(), month.getMonth() + 1, 0);
+  const bugs = actBugTypes();
+  return [...S.model.ops.values()].filter(o => o.team === team && o.type && !bugs.has(norm(o.type)) && catOf(o) === "vazao" && o.deploy && o.deploy >= month && o.deploy <= fim);
+}
+function actDistBuckets(team, month){
+  const items = actDistItems(team, month);
+  const usTypes = f4pUsTypes();
+  const us = items.filter(o => usTypes.has(norm(o.type)));
+  const ts = items.filter(o => norm(o.type) === "technical story");
+  const demais = items.filter(o => !usTypes.has(norm(o.type)) && norm(o.type) !== "technical story");
+  return {items, us, ts, demais};
+}
+function actDistData(team, st){
+  return actDistMonths(st).map(month => {
+    const {items, us, ts, demais} = actDistBuckets(team, month);
+    const total = items.length;
+    return {month, total, us, ts, demais,
+      usPct: total ? us.length / total * 100 : 0,
+      tsPct: total ? ts.length / total * 100 : 0,
+      demaisPct: total ? demais.length / total * 100 : 0};
+  });
+}
+function actDistMonthKey(month){ return `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, "0")}`; }
+function actDistMonthFromKey(key){ const [y, m] = key.split("-").map(Number); return new Date(y, m - 1, 1); }
+function actDistRow(team, d){
+  const mesLabel = d.month.toLocaleDateString("pt-BR", {month:"short"}).replace(".", "");
+  const monthKey = actDistMonthKey(d.month);
+  const seg = (cls, set, pct) => pct <= 0 ? "" :
+    `<button type="button" class="act-dist-seg act-dist-${cls}" style="flex:0 0 ${pct}%" data-act-dist-team="${esc(team)}" data-act-dist-month="${monthKey}" data-act-dist-set="${set}"><span>${dec2(pct)}%</span></button>`;
+  const bar = d.total > 0
+    ? `${seg("us", "us", d.usPct)}${seg("ts", "ts", d.tsPct)}${seg("demais", "demais", d.demaisPct)}`
+    : `<span class="act-dist-seg act-dist-none" style="flex:0 0 100%">${dec2(0)}%</span>`;
+  return `<div class="act-dist-row"><span class="act-dist-month">${esc(mesLabel)}</span><div class="act-dist-bar" role="img" aria-label="${esc(mesLabel)}: ${d.total} ${d.total === 1 ? "item" : "itens"} na amostra">${bar}</div></div>`;
+}
+function actDistCard(team, data){
+  return `<div class="act-dist">
+    <div class="act-dist-legend">
+      <span class="act-leg act-dist-us">User Story</span>
+      <span class="act-leg act-dist-ts">Technical Story</span>
+      <span class="act-leg act-dist-demais">Demais</span>
+      <span class="act-leg act-dist-none">Sem registro</span>
+    </div>
+    <div class="act-dist-rows">${data.map(d => actDistRow(team, d)).join("")}</div>
+    <div class="act-dist-xaxis"><span>0%</span><span>100%</span></div>
+  </div>`;
+}
+
 function actCard(title, bodyHtml, note){
   return `<div class="f4p-card"><div class="f4p-card-h">${esc(title)}</div><div class="act-card-body">${bodyHtml}</div>${note ? `<div class="f4p-note">${note}</div>` : ""}</div>`;
 }
@@ -147,11 +214,14 @@ function renderActionable(){
     `Dispersão de CycleTime dos itens concluídos (${esc((CFG.f4p.types || []).join(", ") || "nenhum tipo marcado")}) no período <b>${esc(f4pPeriodLabel(st))}</b> — mesma amostra e Reserva (CT máximo do time) do quadrante CycleTime do Report F4P (§12.2); Atual é o P95 da amostra. Pontos acima da Reserva ficam em destaque. Clique num ponto para ir até o item.`);
   const buCard = actCard("Burnup Reserva", actBurnupSummary(buData) + actBurnupSvg(buData),
     `Reservado: itens com a tag <b>${esc(CFG.anTag || "ROADMAP")}</b> nos épicos do roadmap ${esc(S.f.int ? "interno" : "executivo")} do time (mesmo conjunto da Capacidade da Visão analítica, §10) — inclui itens em qualquer status, não só os já entregues. Entregue: subconjunto já na categoria de fluxo Vazão dentro do período do semestre selecionado, acumulado mês a mês. Faltam: o restante do Reservado que ainda não entrou em Vazão dentro do período (inclui uma entrega tardia, fora do semestre, se houver). Sem histórico de quando cada item entrou no roadmap, a linha Reservado é sempre a contagem atual (uma reta), não uma evolução real do escopo. Clique em "reservado", "entregue" ou "faltam" para ver os itens de cada grupo.`);
+  const distData = actDistData(team, st);
+  const distCard = actCard("Distribuição Vazão por mês", actDistCard(team, distData),
+    `Para cada mês do semestre ${esc(semLong(f4pSemester()))}, dos itens entregues (Vazão) do time — exceto os tipos de bug (${esc((CFG.act.bugTypes || []).join(", ") || "nenhum tipo marcado")}) — % User Story (${esc((CFG.f4p.usTypes || []).join(", ") || "nenhum tipo marcado")}), % Technical Story (tipo fixo) e % demais tipos entregues. Um mês sem nenhum item na amostra (inclui os meses ainda não decorridos, no semestre em curso) mostra uma barra cinza com 0%. Clique numa fatia para ver os itens dela.`);
   $("actBody").innerHTML = `<div class="f4p-grid">
-      <div class="f4p-col">${ctCard}${actPlaceholderCard("Em definição")}</div>
+      <div class="f4p-col">${ctCard}${distCard}</div>
       <div class="f4p-col">${buCard}${actPlaceholderCard("Em definição")}</div>
     </div>
-    <div class="an-note">Primeira versão (MVP) do Actionable — só os quadrantes CycleTime e Burnup Reserva têm regra definida; os outros dois serão detalhados depois.</div>`;
+    <div class="an-note">Primeira versão (MVP) do Actionable — só falta detalhar o último quadrante.</div>`;
 }
 function placeAct(){ const h = document.querySelector(".top").offsetHeight; $("actPanel").style.top = h + "px"; $("actPanel").style.height = `calc(100% - ${h}px)`; }
 function openActionable(){ if (!actEnabled()) return; if (AN.open) closeAnalytics(); if (F4P.open) closeF4P(); ACT.open = true; placeAct(); $("actPanel").classList.add("open"); $("actPanel").setAttribute("aria-hidden","false"); $("actTab").setAttribute("aria-expanded","true"); renderActionable(); $("actClose").focus(); }
@@ -170,5 +240,16 @@ $("actBody").addEventListener("click", e => {
     const items = which === "reserva" ? buData.capItems : which === "entregue" ? buData.entregues : buData.faltamItems;
     const label = which === "reserva" ? "reservado" : which === "entregue" ? "entregue" : "faltam";
     f4pItemsModal(`Burnup Reserva · ${S.f.team} · ${label} · ${semLong(f4pSemester())}`, items);
+    return;
+  }
+  const distBtn = e.target.closest("[data-act-dist-set]");
+  if (distBtn){
+    const team = distBtn.dataset.actDistTeam, set = distBtn.dataset.actDistSet;
+    const month = actDistMonthFromKey(distBtn.dataset.actDistMonth);
+    const {us, ts, demais} = actDistBuckets(team, month);
+    const items = set === "us" ? us : set === "ts" ? ts : demais;
+    const label = set === "us" ? "User Story" : set === "ts" ? "Technical Story" : "Demais";
+    const mesLabel = month.toLocaleDateString("pt-BR", {month:"long", year:"numeric"});
+    f4pItemsModal(`Distribuição Vazão por mês · ${team} · ${label} · ${mesLabel}`, items);
   }
 });
