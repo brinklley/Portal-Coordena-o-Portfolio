@@ -198,9 +198,10 @@ function actDistCard(team, data){
    última semana pode ter menos de 7 dias). Eixo Y: contagem acumulada. Empilhamento estilo
    ActionableAgile (já citado no quadrante Eficiência de Fluxo do Report F4P, §12.9): Vazão na base
    (cresce pra cima), Nenhum no topo — sempre o total de itens já criados até aquela semana, nunca
-   diminui. Configurável se conta itens do tipo bug (`CFG.act.cfdIncludeBugs`, padrão `true` — quando
-   desligado, exclui os tipos de `CFG.act.bugTypes`, a mesma lista do quadrante Distribuição Vazão por
-   mês). Decisão `0045`. */
+   diminui (dentro do escopo do semestre — ver `actCfdOps`). Configurável se conta itens do tipo bug
+   (`CFG.act.cfdIncludeBugs`, padrão `true` — quando desligado, exclui os tipos de `CFG.act.bugTypes`, a
+   mesma lista do quadrante Distribuição Vazão por mês). Decisões `0045`, `0046` (Vazão passou a iniciar
+   em 0 no início do semestre, excluindo itens já entregues antes dele). */
 function actCfdWeeks(st){
   st = st || f4pSemesterState();
   const {from, to} = f4pExactSemesterWindow(st);
@@ -214,12 +215,6 @@ function actCfdWeeks(st){
   }
   return weeks;
 }
-function actCfdOps(team){
-  const ops = [...S.model.ops.values()].filter(o => o.team === team);
-  if (CFG.act.cfdIncludeBugs !== false) return ops;
-  const bugs = actBugTypes();
-  return ops.filter(o => !(o.type && bugs.has(norm(o.type))));
-}
 /* categoria de um item numa data T: o índice mais avançado (maior) do fluxo do time cuja coluna tem
    data de entrada (`o.fd`) menor ou igual a T — null se o item ainda não tinha sido criado até T. */
 function actCfdCategoriaEm(o, T, c){
@@ -230,9 +225,29 @@ function actCfdCategoriaEm(o, T, c){
   }
   return idx >= 0 ? c.cat[idx] : null;
 }
+/* itens do time relevantes para o CFD do semestre selecionado: exclui os que já estavam em Vazão no dia
+   anterior ao início do semestre — itens de negócio já resolvidos antes do período, que só inflariam a
+   faixa de Vazão com histórico alheio ao semestre em análise (melhoria pedida pelo usuário depois de ver
+   o gráfico dominado por esse histórico: "a vazão deveria iniciar em 0 no primeiro dia do semestre").
+   Itens ainda não entregues, e itens entregues dentro do próprio semestre selecionado, continuam
+   contando normalmente — só o que já estava pronto ANTES do período some do gráfico inteiro (não só da
+   faixa de Vazão), já que deixaram de ser parte do fluxo em análise. */
+function actCfdOps(team, st){
+  st = st || f4pSemesterState();
+  const {from} = f4pExactSemesterWindow(st);
+  const c = teamCfg(team);
+  const diaAnterior = from ? new Date(from.getFullYear(), from.getMonth(), from.getDate() - 1) : null;
+  let ops = [...S.model.ops.values()].filter(o => o.team === team && (!diaAnterior || actCfdCategoriaEm(o, diaAnterior, c) !== "vazao"));
+  if (CFG.act.cfdIncludeBugs === false){
+    const bugs = actBugTypes();
+    ops = ops.filter(o => !(o.type && bugs.has(norm(o.type))));
+  }
+  return ops;
+}
 function actCfdData(team, st){
+  st = st || f4pSemesterState();
   const weeks = actCfdWeeks(st);
-  const ops = actCfdOps(team), c = teamCfg(team);
+  const ops = actCfdOps(team, st), c = teamCfg(team);
   const RANK = {none:0, disc:1, wip:2, vazao:3};
   return weeks.map(w => {
     let nenhum = 0, disc = 0, wip = 0, vazao = 0;
@@ -327,7 +342,7 @@ function renderActionable(){
     `Para cada mês do semestre ${esc(semLong(f4pSemester()))}, dos itens entregues (Vazão) do time — exceto os tipos de bug (${esc((CFG.act.bugTypes || []).join(", ") || "nenhum tipo marcado")}) — % User Story (${esc((CFG.f4p.usTypes || []).join(", ") || "nenhum tipo marcado")}), % Technical Story (tipo fixo) e % demais tipos entregues. Um mês sem nenhum item na amostra (inclui os meses ainda não decorridos, no semestre em curso) mostra uma barra cinza com 0%. Clique numa fatia para ver os itens dela.`);
   const cfdData = actCfdData(team, st);
   const cfdCard = actCard("CFD (Cumulative Flow Diagram)", actCfdCard(cfdData),
-    `Para cada semana do semestre ${esc(semLong(f4pSemester()))} (blocos de 7 dias a partir do 1º dia do semestre), quantos itens do time já chegaram a cada categoria de fluxo — Nenhum (criados), Discovery, WIP e Vazão — usando as datas reais de entrada em cada coluna do quadro. Vazão fica na base (cresce pra cima); Nenhum no topo é sempre o total de itens já criados até aquela semana (nunca diminui). ${CFG.act.cfdIncludeBugs === false ? "Itens do tipo bug não entram na amostra (desligado em Configurações)." : "Itens do tipo bug entram na amostra (padrão)."} Passe o mouse sobre o gráfico para ver os valores de cada semana.`);
+    `Para cada semana do semestre ${esc(semLong(f4pSemester()))} (blocos de 7 dias a partir do 1º dia do semestre), quantos itens do time já chegaram a cada categoria de fluxo — Nenhum (criados), Discovery, WIP e Vazão — usando as datas reais de entrada em cada coluna do quadro. Não entram itens já entregues (Vazão) antes do início do semestre selecionado, para a Vazão refletir o que aconteceu dentro do período, não o histórico acumulado de negócio já resolvido antes dele. Vazão fica na base (cresce pra cima); Nenhum no topo é sempre o total de itens (do escopo do semestre) já criados até aquela semana (nunca diminui). ${CFG.act.cfdIncludeBugs === false ? "Itens do tipo bug não entram na amostra (desligado em Configurações)." : "Itens do tipo bug entram na amostra (padrão)."} Passe o mouse sobre o gráfico para ver os valores de cada semana.`);
   $("actBody").innerHTML = `<div class="f4p-grid">
       <div class="f4p-col">${ctCard}${distCard}</div>
       <div class="f4p-col">${buCard}${cfdCard}</div>

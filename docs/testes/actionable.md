@@ -1,6 +1,6 @@
 # Testes: Actionable (métricas acionáveis por time no período do roadmap)
 
-Cobre `tests/test_actionable.py` (39 testes). Ver `docs/regras-de-negocio.md` §13; decisões `0041`, `0042`, `0044`, `0045`.
+Cobre `tests/test_actionable.py` (42 testes). Ver `docs/regras-de-negocio.md` §13; decisões `0041`, `0042`, `0044`, `0045`, `0046`.
 Os 4 quadrantes (CycleTime, Distribuição Vazão por mês, Burnup Reserva e CFD) têm regra definida.
 
 ## Regra: habilitado com Time + Roadmap, desabilitado num semestre futuro
@@ -256,6 +256,28 @@ não decrescente ao longo das semanas — é a propriedade que dá nome ao "flux
 lista do quadrante Distribuição Vazão por mês) quando desligado.
 
 - **Teste**: `test_cfd_conta_bugs_por_padrao_e_pode_ser_desligado`
+
+### Regra: a Vazão começa no início do semestre — itens já entregues antes ficam fora do gráfico inteiro (decisão `0046`)
+
+**Garante que**: `actCfdOps` exclui um item de **todas** as 4 faixas (não só da Vazão) se ele já estava
+em Vazão no dia **anterior** ao início do semestre selecionado — item de negócio de um ciclo anterior,
+já resolvido, que não faz parte do fluxo deste período. Um item entregue **dentro** do semestre (mesmo
+que criado antes dele) continua contando normalmente.
+
+- **Cenário de falha coberto** (melhoria pedida pelo usuário depois de ver a 1ª versão): sem esse
+  filtro, o CFD acumulava o histórico de Vazão **desde sempre** — um time com anos de itens entregues
+  mostrava a faixa de Vazão já dominando o gráfico inteiro desde a primeira semana, escondendo o
+  comportamento real de fluxo daquele semestre específico (o oposto do que motivou o usuário a pedir o
+  quadrante).
+- **Dado**: um item criado e entregue 30 dias antes do início do semestre selecionado, e um item criado
+  dentro do semestre.
+- **Então (sucesso)**: na primeira semana, `nenhum: 1, vazao: 0` — só o item novo conta; o item antigo
+  não aparece em nenhuma faixa.
+- **Teste**: `test_cfd_exclui_itens_ja_entregues_antes_do_semestre_selecionado`
+- **Teste do limite exato**: `test_cfd_nao_exclui_item_entregue_no_1o_dia_do_semestre` — uma entrega no
+  próprio primeiro dia do semestre (não antes) continua contando.
+- **Teste da consequência visível**: `test_cfd_vazao_comeca_em_zero_e_cresce_com_entregas_dentro_do_semestre`
+  — a série de Vazão começa em 0 e sobe só com as entregas que aconteceram dentro do semestre.
 
 ### Regra: aparece no painel com a legenda das 4 faixas e o gráfico de área
 

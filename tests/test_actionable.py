@@ -562,6 +562,69 @@ def test_cfd_conta_bugs_por_padrao_e_pode_ser_desligado(page):
     }""")
     assert r == {"comBugs": ["bug1", "us1"], "semBugs": ["us1"]}
 
+# Melhoria pedida pelo usuário depois de usar a 1ª versão (decisão 0046): um item já entregue (Vazão)
+# antes do semestre selecionado inflava a faixa de Vazão com histórico de negócio alheio ao período em
+# análise, dominando o gráfico inteiro. Reserva entregue e Distribuição Vazão por mês já restringem
+# "Vazão" ao semestre selecionado (via o.deploy); o CFD passou a seguir a mesma convenção.
+
+def test_cfd_exclui_itens_ja_entregues_antes_do_semestre_selecionado(page):
+    """Um item de negócio antigo — criado e entregue bem antes do semestre selecionado — não deve
+    aparecer em NENHUMA faixa do CFD (nem Nenhum, nem Vazão): ele já não faz parte do fluxo deste
+    período. Um item novo, criado dentro do semestre, continua contando normalmente."""
+    carregar(page, "f4p.xlsx")
+    sem = page.evaluate("semestre(TODAY)")
+    r = page.evaluate("""(sem)=>{
+      S.model.teamFlow.CFD_OLD = ["Backlog", "Discovery", "WIP", "Vazao"];
+      CFG.flow.cfd_old = {cat:{discovery:"disc", wip:"wip", vazao:"vazao"}, ct:[]};
+      const start = f4pSemStart(sem);
+      const antesDoSemestre = new Date(start.getFullYear(), start.getMonth(), start.getDate() - 30);
+      S.model.ops.set("old1", {team:"CFD_OLD", fd:{backlog:antesDoSemestre, discovery:antesDoSemestre, wip:antesDoSemestre, vazao:antesDoSemestre}});
+      S.model.ops.set("new1", {team:"CFD_OLD", fd:{backlog:start}});
+      S.model.teams.push("CFD_OLD");
+      S.f.team = "CFD_OLD"; S.f.exec = sem;
+      render();
+      const w0 = actCfdData("CFD_OLD", f4pSemesterState())[0];
+      return {nenhum: w0.nenhum, vazao: w0.vazao};
+    }""", sem)
+    assert r == {"nenhum": 1, "vazao": 0}
+
+def test_cfd_nao_exclui_item_entregue_no_1o_dia_do_semestre(page):
+    """Limite exato: um item entregue no PRÓPRIO 1º dia do semestre (não antes) continua contando —
+    só o que foi entregue estritamente antes do início do período sai do gráfico."""
+    carregar(page, "f4p.xlsx")
+    sem = page.evaluate("semestre(TODAY)")
+    r = page.evaluate("""(sem)=>{
+      S.model.teamFlow.CFD_EDGE = ["Backlog", "Vazao"];
+      CFG.flow.cfd_edge = {cat:{vazao:"vazao"}, ct:[]};
+      const start = f4pSemStart(sem);
+      S.model.ops.set("e1", {team:"CFD_EDGE", fd:{backlog:start, vazao:start}});
+      S.model.teams.push("CFD_EDGE");
+      S.f.team = "CFD_EDGE"; S.f.exec = sem;
+      render();
+      const w0 = actCfdData("CFD_EDGE", f4pSemesterState())[0];
+      return {nenhum: w0.nenhum, vazao: w0.vazao};
+    }""", sem)
+    assert r == {"nenhum": 1, "vazao": 1}
+
+def test_cfd_vazao_comeca_em_zero_e_cresce_com_entregas_dentro_do_semestre(page):
+    """Consequência direta da exclusão acima: a Vazão do gráfico começa em 0 no início do semestre e só
+    cresce conforme entregas acontecem dentro dele — em vez de já nascer alta com histórico acumulado."""
+    carregar(page, "f4p.xlsx")
+    sem = page.evaluate("semestre(TODAY)")
+    r = page.evaluate("""(sem)=>{
+      S.model.teamFlow.CFD_GROW = ["Backlog", "Vazao"];
+      CFG.flow.cfd_grow = {cat:{vazao:"vazao"}, ct:[]};
+      const start = f4pSemStart(sem);
+      const dia = n => new Date(start.getFullYear(), start.getMonth(), start.getDate() + n);
+      S.model.ops.set("g1", {team:"CFD_GROW", fd:{backlog:start, vazao:dia(10)}});
+      S.model.ops.set("g2", {team:"CFD_GROW", fd:{backlog:start, vazao:dia(20)}});
+      S.model.teams.push("CFD_GROW");
+      S.f.team = "CFD_GROW"; S.f.exec = sem;
+      render();
+      return actCfdData("CFD_GROW", f4pSemesterState()).map(d => d.vazao).slice(0, 4);
+    }""", sem)
+    assert r == [0, 1, 2, 2]
+
 def test_cfd_aparece_no_painel_com_legenda_e_grafico(page):
     carregar(page, "f4p.xlsx")
     _habilitar(page)
