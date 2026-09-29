@@ -1,7 +1,8 @@
 # Testes: Actionable (métricas acionáveis por time no período do roadmap)
 
-Cobre `tests/test_actionable.py` (17 testes). Ver `docs/regras-de-negocio.md` §13; decisões `0041`, `0042`.
-Primeira versão (MVP): só os quadrantes CycleTime e Burnup Reserva têm regra definida.
+Cobre `tests/test_actionable.py` (29 testes). Ver `docs/regras-de-negocio.md` §13; decisões `0041`, `0042`, `0044`.
+Primeira versão (MVP): CycleTime, Distribuição Vazão por mês e Burnup Reserva têm regra definida; o
+quarto quadrante segue "em definição".
 
 ## Regra: habilitado com Time + Roadmap, desabilitado num semestre futuro
 
@@ -40,6 +41,87 @@ mesmo P95 de `f4pMetrics`.
 resto do portal — clicar fecha o Actionable e preenche `#fBusca` com o ID do item.
 
 - **Teste**: `test_clique_no_ponto_do_scatter_fecha_o_painel_e_navega`
+
+## Regra: a Distribuição Vazão por mês sempre mostra os 6 meses inteiros do semestre (decisão 0044)
+
+**Garante que**: diferente do Burnup Reserva (que para em "hoje" num semestre em curso),
+`actDistMonths` sempre devolve os 6 meses do semestre selecionado, do início ao fim — os meses ainda
+não decorridos entram no gráfico como referência do que falta, não são escondidos.
+
+- **Teste**: `test_dist_meses_cobrem_o_semestre_inteiro_mesmo_em_curso`
+- **Cenário de falha coberto**: se o gráfico parasse em "hoje" como o Burnup, um semestre recém-começado
+  mostraria só 1 ou 2 meses, escondendo a visão do período inteiro que o usuário pediu para acompanhar.
+
+## Regra: cada item entregue no mês vira User Story, Technical Story ou "demais" (partição exata)
+
+**Garante que**: `actDistBuckets` reaproveita os mesmos critérios dos quadrantes homônimos do Report
+F4P — User Story = `CFG.f4p.usTypes` (§12.8); Technical Story = tipo fixo "technical story" (§12.5); o
+resto (sem bugs, já excluídos antes) vira "demais". As três fatias somam sempre o total da amostra do
+mês, sem sobreposição.
+
+- **Dado**: 3 User Story + 1 Technical Story entregues no mês.
+- **Então (sucesso)**: `{total: 4, usPct: 75, tsPct: 25, demaisPct: 0}`.
+- **Teste**: `test_dist_classifica_user_story_technical_story_e_demais`
+- **Teste do balde "demais"**: `test_dist_tipo_fora_de_user_story_e_technical_story_conta_como_demais`
+  — um tipo qualquer (ex.: Feature) que não é bug, User Story nem Technical Story cai em "demais",
+  confirmando que o balde é genuinamente residual (não restrito a `CFG.f4p.types`).
+
+## Regra: tipos de bug são excluídos por inteiro da amostra, e são configuráveis
+
+**Garante que**: itens cujo tipo está em `CFG.act.bugTypes` (padrão bug/internal bug/external bug) não
+entram nem no total do mês, nem em nenhuma das três fatias — e a lista é configurável, como toda outra
+lista de tipos do Report F4P.
+
+- **Teste (padrão)**: `test_dist_exclui_tipos_bug_da_amostra` — Bug, Internal Bug e External Bug somem
+  da amostra; só o User Story do mês conta.
+- **Teste (configurável)**: `test_dist_tipos_bug_sao_configuraveis` — trocar `CFG.act.bugTypes` para
+  `["custom bug"]` faz "Internal Bug" (não mais na lista) voltar a contar como "demais", e "Custom Bug"
+  (o novo tipo configurado) ser excluído no lugar.
+- **Cenário de falha coberto**: sem essa exclusão, um item de bug entraria no balde "demais" e distorceria
+  a leitura de "quanto da entrega do mês é trabalho planejado (US/TS) vs. o resto" — misturar bug com
+  "demais" tornaria a métrica pouco acionável, já que bug é outra categoria de trabalho.
+
+## Regra: mês sem nenhum item na amostra mostra uma barra cinza fraca com "0,00%"
+
+**Garante que**: um mês sem nenhuma entrega, ou cuja única entrega é de tipo bug (excluído por inteiro),
+renderiza uma única fatia cinza (`.act-dist-none`), não clicável, ocupando a barra inteira, rotulada
+"0,00%" — a mesma tratativa cobre, sem lógica extra, os meses ainda não decorridos de um semestre em
+curso (regra do print de inspiração do usuário).
+
+- **Teste**: `test_dist_mes_sem_registro_mostra_zero_porcento_cinza` — confirma as 6 linhas do gráfico,
+  cada uma com a fatia cinza "0,00%" e nenhum botão clicável, para um time sem nenhum dado no semestre.
+- **Teste (bug isolado)**: `test_dist_barra_sem_registro_nao_conta_bug_isolado_como_registro` — um mês
+  cuja única entrega é Bug tem `total === 0` (não `1`), confirmando que a exclusão de bug acontece antes
+  da contagem do total, não depois.
+
+## Regra: a porcentagem de cada fatia arredonda para 2 casas decimais (vírgula)
+
+**Garante que**: o rótulo usa `dec2` (nova função, mesmo padrão de `dec1` já existente) — 2 casas
+decimais sempre, mesmo numa dízima periódica, com vírgula como separador decimal (padrão pt-BR do
+resto do portal).
+
+- **Dado**: 1 item User Story de 3 no total (1/3 = 33,333...%).
+- **Então (sucesso)**: `"33,33"` — nem truncado, nem com mais ou menos casas decimais.
+- **Teste**: `test_dist_porcentagem_arredonda_para_duas_casas_decimais`
+
+## Regra: cada fatia é clicável separadamente, abrindo só os itens daquele tipo no mês
+
+**Garante que**: User Story, Technical Story e "demais" abrem listas independentes (`f4pItemsModal`) —
+clicar numa fatia não mistura itens dos outros tipos, mesmo mês.
+
+- **Teste**: `test_dist_clique_em_cada_fatia_abre_so_os_itens_daquele_tipo_no_mes`
+- **Cenário de falha coberto**: um clique único por mês (em vez de por fatia) obrigaria o usuário a abrir
+  a Visão analítica/Report F4P e filtrar manualmente por tipo para saber quais itens formam cada
+  porcentagem — quebrando o padrão de transparência por número já estabelecido no resto do portal.
+
+## Regra: o quadrante aparece no painel com a legenda dos 4 tipos de fatia
+
+**Teste**: `test_dist_aparece_no_painel_com_legenda`
+
+## Regra: `CFG.act.bugTypes` tem padrão e persiste na exportação
+
+**Testes**: `test_configuracao_act_bug_types_tem_padrao`,
+`test_configuracao_act_bug_types_persiste_e_entra_na_exportacao`
 
 ## Regra: "Reservado" do Burnup é o mesmo conjunto da Capacidade da Visão analítica
 
@@ -114,14 +196,14 @@ seguinte) conta em Faltam, não em Entregue.
 - **Teste**: `test_burnup_entrega_fora_do_periodo_do_semestre_conta_como_faltam`
 - **Relacionado**: decisão `0042`.
 
-## Regra: quadrantes 3 e 4 mostram "em definição"
+## Regra: o quarto quadrante mostra "em definição"
 
 **Garante que**: a estrutura fixa de 4 quadrantes em 2 colunas já existe desde a primeira versão,
-mesmo sem regra definida para os dois últimos — mesmo padrão do Report F4P para um quadrante sem
-regra fechada (`f4pCard`, "Regra de cálculo ainda em definição.").
+mesmo sem regra definida para o último — mesmo padrão do Report F4P para um quadrante sem regra
+fechada (`f4pCard`, "Regra de cálculo ainda em definição.").
 
-- **Teste**: `test_quadrantes_3_e_4_mostram_em_definicao`
-- **Relacionado**: decisão `0041` ("Próximos passos").
+- **Teste**: `test_quadrante_4_mostra_em_definicao`
+- **Relacionado**: decisões `0041` ("Próximos passos"), `0044` (o terceiro quadrante ganhou regra).
 
 ## Regra: os três painéis laterais são mutuamente exclusivos
 

@@ -250,14 +250,211 @@ def test_burnup_entrega_fora_do_periodo_do_semestre_conta_como_faltam(page):
     assert r["entreguesN"] == 0 and r["faltam"] == 1
     assert r["faltamIds"] == ["t1"] and r["entregueIds"] == []
 
-def test_quadrantes_3_e_4_mostram_em_definicao(page):
+def test_quadrante_4_mostra_em_definicao(page):
     carregar(page, "f4p.xlsx")
     _habilitar(page)
     page.click("#actTab")
     page.wait_for_timeout(200)
     titulos = page.evaluate("[...document.querySelectorAll('#actBody .f4p-card-h')].map(x=>x.textContent)")
-    assert titulos == ["CycleTime", "Em definição", "Burnup Reserva", "Em definição"]
-    assert page.locator("#actBody .an-empty", has_text="Regra de cálculo ainda em definição.").count() == 2
+    assert titulos == ["CycleTime", "Distribuição Vazão por mês", "Burnup Reserva", "Em definição"]
+    assert page.locator("#actBody .an-empty", has_text="Regra de cálculo ainda em definição.").count() == 1
+
+# ---------------- Quadrante 3 · Distribuição Vazão por mês (decisão 0044) ----------------
+# Para cada mês do semestre selecionado (do time em foco), dos itens ENTREGUES (Vazão) naquele mês —
+# de qualquer tipo, exceto os tipos de bug configurados (CFG.act.bugTypes) — quanto % é User Story
+# (mesmo critério do User Story do Report F4P, CFG.f4p.usTypes), quanto % é Technical Story (tipo fixo,
+# mesmo critério do Technical Story do Report F4P) e quanto % é "demais" (o resto, sem bugs). Um mês
+# sem nenhum item na amostra mostra uma barra cinza cheia com 0,00% — o gráfico sempre mostra os 6
+# meses do semestre inteiro (não só os já decorridos).
+
+def test_dist_meses_cobrem_o_semestre_inteiro_mesmo_em_curso(page):
+    """Diferente do Burnup (que para em 'hoje' num semestre em curso), a Distribuição sempre mostra os
+    6 meses inteiros do semestre selecionado — os ainda não decorridos entram como referência."""
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      const sem = semestre(TODAY);
+      S.f.exec = sem;
+      const start = f4pSemStart(sem);
+      const meses = actDistMonths(f4pSemesterState());
+      return {n: meses.length, primeiro: meses[0].getTime(), ultimoEsperado: new Date(start.getFullYear(), start.getMonth()+5, 1).getTime(), ultimo: meses[meses.length-1].getTime()};
+    }""")
+    assert r["n"] == 6
+    assert r["ultimo"] == r["ultimoEsperado"]
+
+def test_dist_classifica_user_story_technical_story_e_demais(page):
+    carregar(page, "f4p.xlsx")
+    sem = page.evaluate("semestre(TODAY)")
+    r = page.evaluate("""(sem)=>{
+      S.model.teamFlow.ACT_DIST1 = ["Backlog", "Vazao"];
+      CFG.flow.act_dist1 = {cat:{vazao:"vazao"}, ct:[]};
+      const start = f4pSemStart(sem), m0 = new Date(start.getFullYear(), start.getMonth(), 10);
+      S.model.ops.set("d1", {id:"d1", title:"D1", team:"ACT_DIST1", type:"User Story", stName:"Vazao", deploy:m0, tags:[]});
+      S.model.ops.set("d2", {id:"d2", title:"D2", team:"ACT_DIST1", type:"User Story", stName:"Vazao", deploy:m0, tags:[]});
+      S.model.ops.set("d3", {id:"d3", title:"D3", team:"ACT_DIST1", type:"User Story", stName:"Vazao", deploy:m0, tags:[]});
+      S.model.ops.set("d4", {id:"d4", title:"D4", team:"ACT_DIST1", type:"Technical Story", stName:"Vazao", deploy:m0, tags:[]});
+      S.model.teams.push("ACT_DIST1");
+      S.f.team = "ACT_DIST1"; S.f.exec = sem;
+      render();
+      const data = actDistData("ACT_DIST1", f4pSemesterState());
+      return {total: data[0].total, usPct: data[0].usPct, tsPct: data[0].tsPct, demaisPct: data[0].demaisPct};
+    }""", sem)
+    assert r == {"total": 4, "usPct": 75, "tsPct": 25, "demaisPct": 0}
+
+def test_dist_tipo_fora_de_user_story_e_technical_story_conta_como_demais(page):
+    carregar(page, "f4p.xlsx")
+    sem = page.evaluate("semestre(TODAY)")
+    r = page.evaluate("""(sem)=>{
+      S.model.teamFlow.ACT_DIST2 = ["Backlog", "Vazao"];
+      CFG.flow.act_dist2 = {cat:{vazao:"vazao"}, ct:[]};
+      const start = f4pSemStart(sem), m0 = new Date(start.getFullYear(), start.getMonth(), 10);
+      S.model.ops.set("e1", {id:"e1", title:"E1", team:"ACT_DIST2", type:"User Story", stName:"Vazao", deploy:m0, tags:[]});
+      S.model.ops.set("e2", {id:"e2", title:"E2", team:"ACT_DIST2", type:"Feature", stName:"Vazao", deploy:m0, tags:[]});
+      S.model.ops.set("e3", {id:"e3", title:"E3", team:"ACT_DIST2", type:"Feature", stName:"Vazao", deploy:m0, tags:[]});
+      S.model.teams.push("ACT_DIST2");
+      S.f.team = "ACT_DIST2"; S.f.exec = sem;
+      render();
+      const b = actDistBuckets("ACT_DIST2", start);
+      return {us: b.us.map(o=>o.id), ts: b.ts.map(o=>o.id), demais: b.demais.map(o=>o.id).sort()};
+    }""", sem)
+    assert r == {"us": ["e1"], "ts": [], "demais": ["e2", "e3"]}
+
+def test_dist_exclui_tipos_bug_da_amostra(page):
+    carregar(page, "f4p.xlsx")
+    sem = page.evaluate("semestre(TODAY)")
+    r = page.evaluate("""(sem)=>{
+      S.model.teamFlow.ACT_DIST3 = ["Backlog", "Vazao"];
+      CFG.flow.act_dist3 = {cat:{vazao:"vazao"}, ct:[]};
+      const start = f4pSemStart(sem), m0 = new Date(start.getFullYear(), start.getMonth(), 10);
+      S.model.ops.set("f1", {id:"f1", title:"F1", team:"ACT_DIST3", type:"User Story", stName:"Vazao", deploy:m0, tags:[]});
+      S.model.ops.set("f2", {id:"f2", title:"F2", team:"ACT_DIST3", type:"Internal Bug", stName:"Vazao", deploy:m0, tags:[]});
+      S.model.ops.set("f3", {id:"f3", title:"F3", team:"ACT_DIST3", type:"Bug", stName:"Vazao", deploy:m0, tags:[]});
+      S.model.ops.set("f4", {id:"f4", title:"F4", team:"ACT_DIST3", type:"External Bug", stName:"Vazao", deploy:m0, tags:[]});
+      S.model.teams.push("ACT_DIST3");
+      S.f.team = "ACT_DIST3"; S.f.exec = sem;
+      render();
+      const items = actDistItems("ACT_DIST3", start);
+      return items.map(o=>o.id);
+    }""", sem)
+    assert r == ["f1"]
+
+def test_dist_tipos_bug_sao_configuraveis(page):
+    carregar(page, "f4p.xlsx")
+    sem = page.evaluate("semestre(TODAY)")
+    r = page.evaluate("""(sem)=>{
+      S.model.teamFlow.ACT_DIST4 = ["Backlog", "Vazao"];
+      CFG.flow.act_dist4 = {cat:{vazao:"vazao"}, ct:[]};
+      CFG.act.bugTypes = ["custom bug"];
+      const start = f4pSemStart(sem), m0 = new Date(start.getFullYear(), start.getMonth(), 10);
+      S.model.ops.set("g1", {id:"g1", title:"G1", team:"ACT_DIST4", type:"Internal Bug", stName:"Vazao", deploy:m0, tags:[]});   // não é mais bug configurado: conta como "demais"
+      S.model.ops.set("g2", {id:"g2", title:"G2", team:"ACT_DIST4", type:"Custom Bug", stName:"Vazao", deploy:m0, tags:[]});      // agora é o tipo bug configurado: excluído
+      S.model.teams.push("ACT_DIST4");
+      S.f.team = "ACT_DIST4"; S.f.exec = sem;
+      render();
+      const items = actDistItems("ACT_DIST4", start).map(o=>o.id);
+      CFG.act.bugTypes = ["bug", "internal bug", "external bug"];
+      return items;
+    }""", sem)
+    assert r == ["g1"]
+
+def test_dist_mes_sem_registro_mostra_zero_porcento_cinza(page):
+    carregar(page, "f4p.xlsx")
+    sem = page.evaluate("semestre(TODAY)")
+    page.evaluate("""(sem)=>{
+      S.model.teams.push("ACT_DIST5");
+      S.f.team = "ACT_DIST5"; S.f.exec = sem;
+      render();
+    }""", sem)
+    page.click("#actTab")
+    page.wait_for_timeout(200)
+    rows = page.locator(".act-dist-row")
+    assert rows.count() == 6
+    for i in range(6):
+        row = rows.nth(i)
+        assert row.locator(".act-dist-none").count() == 1
+        assert "0,00%" in row.locator(".act-dist-none").inner_text()
+        assert row.locator("button.act-dist-seg").count() == 0   # sem registro não é clicável
+
+def test_dist_barra_sem_registro_nao_conta_bug_isolado_como_registro(page):
+    """Um mês onde a única entrega é de um tipo bug (excluído por inteiro) também é 'sem registro'."""
+    carregar(page, "f4p.xlsx")
+    sem = page.evaluate("semestre(TODAY)")
+    r = page.evaluate("""(sem)=>{
+      S.model.teamFlow.ACT_DIST6 = ["Backlog", "Vazao"];
+      CFG.flow.act_dist6 = {cat:{vazao:"vazao"}, ct:[]};
+      const start = f4pSemStart(sem), m0 = new Date(start.getFullYear(), start.getMonth(), 10);
+      S.model.ops.set("h1", {id:"h1", title:"H1", team:"ACT_DIST6", type:"Bug", stName:"Vazao", deploy:m0, tags:[]});
+      S.model.teams.push("ACT_DIST6");
+      S.f.team = "ACT_DIST6"; S.f.exec = sem;
+      render();
+      const data = actDistData("ACT_DIST6", f4pSemesterState());
+      return data[0].total;
+    }""", sem)
+    assert r == 0
+
+def test_dist_porcentagem_arredonda_para_duas_casas_decimais(page):
+    carregar(page, "f4p.xlsx")
+    sem = page.evaluate("semestre(TODAY)")
+    r = page.evaluate("""(sem)=>{
+      S.model.teamFlow.ACT_DIST7 = ["Backlog", "Vazao"];
+      CFG.flow.act_dist7 = {cat:{vazao:"vazao"}, ct:[]};
+      const start = f4pSemStart(sem), m0 = new Date(start.getFullYear(), start.getMonth(), 10);
+      S.model.ops.set("i1", {id:"i1", title:"I1", team:"ACT_DIST7", type:"User Story", stName:"Vazao", deploy:m0, tags:[]});
+      S.model.ops.set("i2", {id:"i2", title:"I2", team:"ACT_DIST7", type:"Feature", stName:"Vazao", deploy:m0, tags:[]});
+      S.model.ops.set("i3", {id:"i3", title:"I3", team:"ACT_DIST7", type:"Feature", stName:"Vazao", deploy:m0, tags:[]});
+      S.model.teams.push("ACT_DIST7");
+      S.f.team = "ACT_DIST7"; S.f.exec = sem;
+      render();
+      return dec2(actDistData("ACT_DIST7", f4pSemesterState())[0].usPct);
+    }""", sem)
+    assert r == "33,33"
+
+def test_dist_clique_em_cada_fatia_abre_so_os_itens_daquele_tipo_no_mes(page):
+    carregar(page, "f4p.xlsx")
+    sem = page.evaluate("semestre(TODAY)")
+    page.evaluate("""(sem)=>{
+      S.model.teamFlow.ACT_DIST8 = ["Backlog", "Vazao"];
+      CFG.flow.act_dist8 = {cat:{vazao:"vazao"}, ct:[]};
+      const start = f4pSemStart(sem), m0 = new Date(start.getFullYear(), start.getMonth(), 10);
+      S.model.ops.set("j1", {id:"j1", title:"J1", team:"ACT_DIST8", type:"User Story", stName:"Vazao", deploy:m0, tags:[]});
+      S.model.ops.set("j2", {id:"j2", title:"J2", team:"ACT_DIST8", type:"Technical Story", stName:"Vazao", deploy:m0, tags:[]});
+      S.model.ops.set("j3", {id:"j3", title:"J3", team:"ACT_DIST8", type:"Feature", stName:"Vazao", deploy:m0, tags:[]});
+      S.model.teams.push("ACT_DIST8");
+      S.f.team = "ACT_DIST8"; S.f.exec = sem;
+      render();
+    }""", sem)
+    page.click("#actTab")
+    page.wait_for_timeout(200)
+    page.click(".act-dist-seg.act-dist-us")
+    assert page.is_visible("#f4pItemsBg")
+    assert "j1" in page.inner_text("#f4pItemsBody") and "j2" not in page.inner_text("#f4pItemsBody") and "j3" not in page.inner_text("#f4pItemsBody")
+    page.click("#f4pItemsClose")
+    page.click(".act-dist-seg.act-dist-ts")
+    assert "j2" in page.inner_text("#f4pItemsBody") and "j1" not in page.inner_text("#f4pItemsBody")
+    page.click("#f4pItemsClose")
+    page.click(".act-dist-seg.act-dist-demais")
+    assert "j3" in page.inner_text("#f4pItemsBody") and "j1" not in page.inner_text("#f4pItemsBody")
+
+def test_dist_aparece_no_painel_com_legenda(page):
+    carregar(page, "f4p.xlsx")
+    _habilitar(page)
+    page.click("#actTab")
+    page.wait_for_timeout(200)
+    txt = page.inner_text("#actBody")
+    assert "Distribuição Vazão por mês" in txt
+    assert "User Story" in txt and "Technical Story" in txt and "Demais" in txt and "Sem registro" in txt
+
+def test_configuracao_act_bug_types_tem_padrao(page):
+    r = page.evaluate("()=>{ const c = normCfg({}); return c.act.bugTypes; }")
+    assert r == ["bug", "internal bug", "external bug"]
+
+def test_configuracao_act_bug_types_persiste_e_entra_na_exportacao(page):
+    carregar(page, "times.xlsx")
+    page.evaluate("()=>{ CFG.act.bugTypes = ['bug', 'defeito']; }")
+    page.click("#btnCfg")
+    with page.expect_download() as d:
+        page.click("#cfgExport")
+    txt = open(d.value.path(), encoding="utf-8").read()
+    assert '"bugTypes"' in txt and '"defeito"' in txt
 
 def test_abrir_visao_analitica_ou_f4p_fecha_o_actionable(page):
     """Os três painéis laterais (Visão analítica, Report F4P, Actionable) são mutuamente exclusivos —
