@@ -518,6 +518,20 @@ tr[data-cat="disc"] .fnb{background:var(--c-disc);color:#fff} tr[data-cat="wip"]
 .act-dist-seg.act-dist-demais{background:var(--rel)}
 .act-dist-seg.act-dist-none{background:#E3E6E9;color:var(--ink-3);cursor:default}
 .act-dist-xaxis{display:flex;justify-content:space-between;font-size:10px;color:var(--ink-3);padding:0 0 0 38px}
+.act-cfd-wrap{display:flex;flex-direction:column;gap:6px}
+.act-cfd-legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:11.5px;color:var(--ink-2)}
+.act-cfd-legend .act-leg::before{content:"■ ";font-size:10px}
+.act-cfd-legend .act-cfd-l-nenhum::before{color:var(--op)}
+.act-cfd-legend .act-cfd-l-disc::before{color:var(--epi)}
+.act-cfd-legend .act-cfd-l-wip::before{color:var(--ini)}
+.act-cfd-legend .act-cfd-l-vazao::before{color:#1E8E3E}
+.act-cfd-band{stroke:#fff;stroke-width:1}
+.act-cfd-nenhum{fill:var(--op)}
+.act-cfd-disc{fill:var(--epi)}
+.act-cfd-wip{fill:var(--ini)}
+.act-cfd-vazao{fill:#1E8E3E}
+.act-cfd-hit{fill:transparent}
+.act-cfd-hit:hover{fill:rgba(0,0,0,.05)}
 .az-badge{font-size:11px;font-weight:600;background:#FEF3C7;color:#92400E;border:1px solid #F4D58D;padding:1px 8px;border-radius:999px;vertical-align:2px}
 .az-ok{color:#2E7D5B;font-weight:600} .az-wait{color:#92400E;font-weight:600} .az-bad{color:var(--alert);font-weight:600}
 .az-msg{font-size:12.5px;margin:6px 0 0;color:var(--ink-2)} .az-msg.bad{color:var(--alert)}

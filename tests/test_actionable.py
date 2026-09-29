@@ -250,14 +250,14 @@ def test_burnup_entrega_fora_do_periodo_do_semestre_conta_como_faltam(page):
     assert r["entreguesN"] == 0 and r["faltam"] == 1
     assert r["faltamIds"] == ["t1"] and r["entregueIds"] == []
 
-def test_quadrante_4_mostra_em_definicao(page):
+def test_os_4_quadrantes_tem_regra_definida(page):
     carregar(page, "f4p.xlsx")
     _habilitar(page)
     page.click("#actTab")
     page.wait_for_timeout(200)
     titulos = page.evaluate("[...document.querySelectorAll('#actBody .f4p-card-h')].map(x=>x.textContent)")
-    assert titulos == ["CycleTime", "Distribuição Vazão por mês", "Burnup Reserva", "Em definição"]
-    assert page.locator("#actBody .an-empty", has_text="Regra de cálculo ainda em definição.").count() == 1
+    assert titulos == ["CycleTime", "Distribuição Vazão por mês", "Burnup Reserva", "CFD (Cumulative Flow Diagram)"]
+    assert page.locator("#actBody .an-empty", has_text="Regra de cálculo ainda em definição.").count() == 0
 
 # ---------------- Quadrante 3 · Distribuição Vazão por mês (decisão 0044) ----------------
 # Para cada mês do semestre selecionado (do time em foco), dos itens ENTREGUES (Vazão) naquele mês —
@@ -455,6 +455,161 @@ def test_configuracao_act_bug_types_persiste_e_entra_na_exportacao(page):
         page.click("#cfgExport")
     txt = open(d.value.path(), encoding="utf-8").read()
     assert '"bugTypes"' in txt and '"defeito"' in txt
+
+# ---------------- Quadrante 4 · CFD - Cumulative Flow Diagram (decisão 0045) ----------------
+# Para cada semana do semestre selecionado (blocos de 7 dias a partir do 1º dia, terminando exatamente
+# no último dia do semestre), reconstrói quantos itens do time já chegaram a cada categoria de fluxo —
+# Nenhum/Discovery/WIP/Vazão — usando as datas de entrada por coluna já guardadas no modelo (`o.fd`,
+# decisão 0006). Empilhamento estilo ActionableAgile: Vazão na base, Nenhum no topo (nunca diminui).
+
+def test_cfd_semanas_em_blocos_de_7_dias_cobrindo_o_semestre_inteiro(page):
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      const sem = semestre(TODAY);
+      S.f.exec = sem;
+      const st = f4pSemesterState();
+      const weeks = actCfdWeeks(st);
+      const totalDias = Math.round((st.end - st.start) / 864e5) + 1;
+      return {
+        n: weeks.length,
+        primeiroInicioBateComSemestre: weeks[0].from.getTime() === st.start.getTime(),
+        ultimoFimBateComSemestre: weeks[weeks.length - 1].to.getTime() === st.end.getTime(),
+        todasAsSemanasMenosAUltimaTem7Dias: weeks.slice(0, -1).every(w => Math.round((w.to - w.from) / 864e5) === 6),
+        nEsperado: Math.ceil(totalDias / 7),
+      };
+    }""")
+    assert r["primeiroInicioBateComSemestre"] is True
+    assert r["ultimoFimBateComSemestre"] is True
+    assert r["todasAsSemanasMenosAUltimaTem7Dias"] is True
+    assert r["n"] == r["nEsperado"]
+
+def test_cfd_categoria_em_data_usa_a_coluna_mais_avancada_ate_aquela_data(page):
+    """Reconstrução histórica: a categoria do item numa data T é a da coluna mais avançada cuja data de
+    entrada (o.fd) é menor ou igual a T — null se o item ainda não existia (nem a 1ª coluna bateu)."""
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.teamFlow.CFD_CAT1 = ["Backlog", "Discovery", "WIP", "Vazao"];
+      CFG.flow.cfd_cat1 = {cat:{discovery:"disc", wip:"wip", vazao:"vazao"}, ct:[]};
+      S.model.teams.push("CFD_CAT1");
+      render();
+      const c = teamCfg("CFD_CAT1");
+      const d1 = new Date(2026,0,1), d2 = new Date(2026,0,10), d3 = new Date(2026,0,20);
+      const o = {team:"CFD_CAT1", fd:{backlog:d1, wip:d2, vazao:d3}};   // pulou Discovery: sem data nessa coluna
+      return {
+        antesDeCriado: actCfdCategoriaEm(o, new Date(2025,11,31), c),
+        entreCriacaoEWip: actCfdCategoriaEm(o, new Date(2026,0,5), c),
+        entreWipEVazao: actCfdCategoriaEm(o, new Date(2026,0,15), c),
+        depoisDeVazao: actCfdCategoriaEm(o, new Date(2026,0,25), c),
+      };
+    }""")
+    assert r == {"antesDeCriado": None, "entreCriacaoEWip": "none", "entreWipEVazao": "wip", "depoisDeVazao": "vazao"}
+
+def test_cfd_bandas_somam_o_total_de_itens_ja_criados(page):
+    """As 4 faixas (Nenhum/Discovery/WIP/Vazão) formam uma partição exata do total de itens já criados
+    (nenhum) numa semana — nunca sobram nem faltam itens na soma das faixas."""
+    carregar(page, "f4p.xlsx")
+    sem = page.evaluate("semestre(TODAY)")
+    r = page.evaluate("""(sem)=>{
+      S.model.teamFlow.CFD_B1 = ["Backlog", "Discovery", "WIP", "Vazao"];
+      CFG.flow.cfd_b1 = {cat:{discovery:"disc", wip:"wip", vazao:"vazao"}, ct:[]};
+      const start = f4pSemStart(sem);
+      S.model.ops.set("b1", {team:"CFD_B1", fd:{backlog:start}});                                              // fica em Nenhum
+      S.model.ops.set("b2", {team:"CFD_B1", fd:{backlog:start, discovery:start}});                             // fica em Discovery
+      S.model.ops.set("b3", {team:"CFD_B1", fd:{backlog:start, discovery:start, wip:start}});                  // fica em WIP
+      S.model.ops.set("b4", {team:"CFD_B1", fd:{backlog:start, discovery:start, wip:start, vazao:start}});     // fica em Vazão
+      S.model.teams.push("CFD_B1");
+      S.f.team = "CFD_B1"; S.f.exec = sem;
+      render();
+      const w0 = actCfdData("CFD_B1", f4pSemesterState())[0];
+      return {bandNenhum:w0.bandNenhum, bandDisc:w0.bandDisc, bandWip:w0.bandWip, bandVazao:w0.bandVazao, nenhum:w0.nenhum};
+    }""", sem)
+    assert r == {"bandNenhum": 1, "bandDisc": 1, "bandWip": 1, "bandVazao": 1, "nenhum": 4}
+
+def test_cfd_total_criado_nunca_diminui_ao_longo_das_semanas(page):
+    """'Nenhum' (o total acumulado de itens já criados) só pode crescer ou ficar igual de uma semana pra
+    outra — é a propriedade que dá nome ao diagrama (cumulative flow)."""
+    carregar(page, "f4p.xlsx")
+    sem = page.evaluate("semestre(TODAY)")
+    r = page.evaluate("""(sem)=>{
+      S.model.teamFlow.CFD_MONO = ["Backlog", "Vazao"];
+      CFG.flow.cfd_mono = {cat:{vazao:"vazao"}, ct:[]};
+      const start = f4pSemStart(sem);
+      const dia = n => new Date(start.getFullYear(), start.getMonth(), start.getDate() + n);
+      S.model.ops.set("m1", {team:"CFD_MONO", fd:{backlog: dia(0)}});    // semana 0
+      S.model.ops.set("m2", {team:"CFD_MONO", fd:{backlog: dia(8)}});    // semana 1
+      S.model.ops.set("m3", {team:"CFD_MONO", fd:{backlog: dia(22)}});   // semana 3
+      S.model.teams.push("CFD_MONO");
+      S.f.team = "CFD_MONO"; S.f.exec = sem;
+      render();
+      const nenhum = actCfdData("CFD_MONO", f4pSemesterState()).map(d => d.nenhum);
+      const monotonico = nenhum.every((v, i) => i === 0 || v >= nenhum[i - 1]);
+      return {monotonico, primeiras4: nenhum.slice(0, 4)};
+    }""", sem)
+    assert r["monotonico"] is True
+    assert r["primeiras4"] == [1, 2, 2, 3]
+
+def test_cfd_conta_bugs_por_padrao_e_pode_ser_desligado(page):
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.ops.set("bug1", {id:"bug1", team:"CFD_BUG", type:"Bug", fd:{}});
+      S.model.ops.set("us1", {id:"us1", team:"CFD_BUG", type:"User Story", fd:{}});
+      S.model.teams.push("CFD_BUG");
+      const comBugs = actCfdOps("CFD_BUG").map(o=>o.id).sort();
+      CFG.act.cfdIncludeBugs = false;
+      const semBugs = actCfdOps("CFD_BUG").map(o=>o.id).sort();
+      CFG.act.cfdIncludeBugs = true;
+      return {comBugs, semBugs};
+    }""")
+    assert r == {"comBugs": ["bug1", "us1"], "semBugs": ["us1"]}
+
+def test_cfd_aparece_no_painel_com_legenda_e_grafico(page):
+    carregar(page, "f4p.xlsx")
+    _habilitar(page)
+    page.click("#actTab")
+    page.wait_for_timeout(200)
+    txt = page.inner_text("#actBody")
+    assert "CFD (Cumulative Flow Diagram)" in txt
+    assert "Nenhum" in txt and "Discovery" in txt and "WIP" in txt and "Vazão" in txt
+    assert page.locator(".act-cfd-band").count() == 4
+
+def test_cfd_tooltip_mostra_os_valores_da_semana_ao_passar_o_mouse(page):
+    carregar(page, "f4p.xlsx")
+    sem = page.evaluate("semestre(TODAY)")
+    page.evaluate("""(sem)=>{
+      S.model.teamFlow.CFD_TIP = ["Backlog", "Discovery", "WIP", "Vazao"];
+      CFG.flow.cfd_tip = {cat:{discovery:"disc", wip:"wip", vazao:"vazao"}, ct:[]};
+      const start = f4pSemStart(sem);
+      S.model.ops.set("t1", {team:"CFD_TIP", fd:{backlog:start}});
+      S.model.ops.set("t2", {team:"CFD_TIP", fd:{backlog:start, discovery:start}});
+      S.model.teams.push("CFD_TIP");
+      S.f.team = "CFD_TIP"; S.f.exec = sem;
+      render();
+    }""", sem)
+    page.click("#actTab")
+    page.wait_for_timeout(200)
+    tip = page.evaluate("document.querySelector('.act-cfd-hit').querySelector('title').textContent")
+    assert "Nenhum: 1" in tip and "Discovery: 1" in tip and "WIP: 0" in tip and "Vazão: 0" in tip
+
+def test_configuracao_cfd_include_bugs_tem_padrao_true(page):
+    r = page.evaluate("()=>{ const c = normCfg({}); return c.act.cfdIncludeBugs; }")
+    assert r is True
+
+def test_configuracao_cfd_include_bugs_tem_checkbox_e_persiste_ao_salvar(page):
+    carregar(page, "times.xlsx")
+    page.click("#btnCfg")
+    assert page.is_checked("#cfgActCfdBugs")   # padrão: contar bugs
+    page.uncheck("#cfgActCfdBugs")
+    page.click("#cfgSave"); page.wait_for_timeout(200)
+    assert page.evaluate("CFG.act.cfdIncludeBugs") is False
+
+def test_configuracao_cfd_include_bugs_entra_na_exportacao(page):
+    carregar(page, "times.xlsx")
+    page.click("#btnCfg")
+    page.uncheck("#cfgActCfdBugs")
+    with page.expect_download() as d:
+        page.click("#cfgExport")
+    txt = open(d.value.path(), encoding="utf-8").read()
+    assert '"cfdIncludeBugs": false' in txt
 
 def test_abrir_visao_analitica_ou_f4p_fecha_o_actionable(page):
     """Os três painéis laterais (Visão analítica, Report F4P, Actionable) são mutuamente exclusivos —

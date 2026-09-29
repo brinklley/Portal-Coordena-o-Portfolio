@@ -1,8 +1,7 @@
 # Testes: Actionable (métricas acionáveis por time no período do roadmap)
 
-Cobre `tests/test_actionable.py` (29 testes). Ver `docs/regras-de-negocio.md` §13; decisões `0041`, `0042`, `0044`.
-Primeira versão (MVP): CycleTime, Distribuição Vazão por mês e Burnup Reserva têm regra definida; o
-quarto quadrante segue "em definição".
+Cobre `tests/test_actionable.py` (39 testes). Ver `docs/regras-de-negocio.md` §13; decisões `0041`, `0042`, `0044`, `0045`.
+Os 4 quadrantes (CycleTime, Distribuição Vazão por mês, Burnup Reserva e CFD) têm regra definida.
 
 ## Regra: habilitado com Time + Roadmap, desabilitado num semestre futuro
 
@@ -196,14 +195,84 @@ seguinte) conta em Faltam, não em Entregue.
 - **Teste**: `test_burnup_entrega_fora_do_periodo_do_semestre_conta_como_faltam`
 - **Relacionado**: decisão `0042`.
 
-## Regra: o quarto quadrante mostra "em definição"
+## Regra: os 4 quadrantes têm regra definida
 
-**Garante que**: a estrutura fixa de 4 quadrantes em 2 colunas já existe desde a primeira versão,
-mesmo sem regra definida para o último — mesmo padrão do Report F4P para um quadrante sem regra
-fechada (`f4pCard`, "Regra de cálculo ainda em definição.").
+**Garante que**: a estrutura fixa de 4 quadrantes em 2 colunas já existe desde a primeira versão; com a
+decisão `0045` (CFD), nenhum quadrante mostra mais "Regra de cálculo ainda em definição.".
 
-- **Teste**: `test_quadrante_4_mostra_em_definicao`
-- **Relacionado**: decisões `0041` ("Próximos passos"), `0044` (o terceiro quadrante ganhou regra).
+- **Teste**: `test_os_4_quadrantes_tem_regra_definida`
+- **Relacionado**: decisões `0041` ("Próximos passos"), `0044`, `0045`.
+
+## CFD (Cumulative Flow Diagram) — decisão `0045`
+
+Reconstrução histórica (não um instantâneo do estado atual): eixo X = semanas do semestre selecionado
+em blocos fixos de 7 dias; eixo Y = contagem acumulada em cada categoria de fluxo (Nenhum/Discovery/
+WIP/Vazão), usando as datas de entrada por coluna já guardadas no modelo (`o.fd`, decisão `0006`).
+Empilhamento estilo ActionableAgile: Vazão na base, Nenhum no topo (nunca diminui).
+
+### Regra: as semanas cobrem o semestre inteiro em blocos fixos de 7 dias
+
+**Garante que**: `actCfdWeeks` sempre começa exatamente no 1º dia do semestre selecionado e termina
+exatamente no último dia — cada semana tem 7 dias, exceto possivelmente a última (que fecha no fim do
+semestre mesmo que sobrem menos de 7 dias).
+
+- **Teste**: `test_cfd_semanas_em_blocos_de_7_dias_cobrindo_o_semestre_inteiro`
+- **Cenário de falha coberto**: semanas de calendário reais (segunda a domingo) fariam a primeira/última
+  semana do gráfico incluir dias de fora do semestre selecionado — o usuário pediu explicitamente que o
+  gráfico comece na primeira semana e termine no último dia do semestre.
+
+### Regra: a categoria de um item numa data é a da coluna mais avançada já alcançada até lá
+
+**Garante que**: `actCfdCategoriaEm` reconstrói a categoria histórica de um item a partir de `o.fd`
+(datas de entrada por coluna) — `null` antes da criação do item, a categoria da coluna mais avançada
+com data `<=` à data consultada depois disso, mesmo quando uma coluna intermediária (aqui, Discovery)
+não tem data própria registrada (herdou a data da próxima, decisão `0006`).
+
+- **Teste**: `test_cfd_categoria_em_data_usa_a_coluna_mais_avancada_ate_aquela_data`
+- **Cenário de falha coberto**: sem esse critério, um item que pulou uma coluna intermediária poderia
+  ficar "preso" numa categoria antiga mesmo depois de avançar, ou aparecer antes de ter sido criado.
+
+### Regra: as 4 faixas formam uma partição exata do total de itens já criados
+
+**Garante que**: `bandNenhum + bandDisc + bandWip + bandVazao === nenhum` sempre — nenhum item conta em
+mais de uma faixa, nem fica de fora, na semana em que já existe.
+
+- **Teste**: `test_cfd_bandas_somam_o_total_de_itens_ja_criados`
+
+### Regra: o total de itens criados (topo do gráfico) nunca diminui
+
+**Garante que**: a série `nenhum` (a linha do topo, "quantos itens já existem até esta semana") é sempre
+não decrescente ao longo das semanas — é a propriedade que dá nome ao "fluxo cumulativo".
+
+- **Teste**: `test_cfd_total_criado_nunca_diminui_ao_longo_das_semanas`
+- **Cenário de falha coberto**: qualquer forma de contagem que dependesse do estado *atual* de um item
+  (em vez de "quando ele foi criado") poderia fazer o total cair numa semana em que um item saiu do
+  quadro ou mudou de tipo — quebrando a garantia central de um CFD.
+
+### Regra: conta itens do tipo bug por padrão; pode ser desligado (reaproveita `CFG.act.bugTypes`)
+
+**Garante que**: `actCfdOps` inclui itens de qualquer tipo, inclusive bug, quando
+`CFG.act.cfdIncludeBugs` é `true` (padrão); exclui os tipos cadastrados em `CFG.act.bugTypes` (mesma
+lista do quadrante Distribuição Vazão por mês) quando desligado.
+
+- **Teste**: `test_cfd_conta_bugs_por_padrao_e_pode_ser_desligado`
+
+### Regra: aparece no painel com a legenda das 4 faixas e o gráfico de área
+
+**Teste**: `test_cfd_aparece_no_painel_com_legenda_e_grafico`
+
+### Regra: passar o mouse mostra um tooltip com os valores da semana
+
+**Garante que**: cada semana do gráfico tem uma área de hover com um `<title>` nativo do SVG mostrando
+as 4 contagens daquela semana — mesmo mecanismo já usado pelos pontos do quadrante CycleTime.
+
+- **Teste**: `test_cfd_tooltip_mostra_os_valores_da_semana_ao_passar_o_mouse`
+
+### Regra: `CFG.act.cfdIncludeBugs` tem checkbox próprio, padrão marcado, e persiste ao salvar/exportar
+
+**Testes**: `test_configuracao_cfd_include_bugs_tem_padrao_true`,
+`test_configuracao_cfd_include_bugs_tem_checkbox_e_persiste_ao_salvar`,
+`test_configuracao_cfd_include_bugs_entra_na_exportacao`
 
 ## Regra: os três painéis laterais são mutuamente exclusivos
 

@@ -288,7 +288,7 @@ Mesmo critério de "entregue" do Technical Story/Vazão (categoria de fluxo Vaz�
 
 Painel lateral com o mesmo comportamento de habilitação da Visão analítica (§10) e do Report F4P (§12): habilitado com **Time** e **Roadmap** (interno ou executivo) no filtro, um time por vez (diferente do Report F4P, que sempre mostra todos os times). Semestre futuro: aba desabilitada, painel recolhe sozinho se já estiver aberto (mesma regra do Report F4P, `f4pEnabled`/`actEnabled`). Decisão: `docs/decisoes/0041-actionable-primeira-versao.md`.
 
-**Primeira versão (MVP)**: estrutura fixa de 4 quadrantes em 2 colunas, inspirada no layout do Report F4P — três já têm regra definida (CycleTime, Distribuição Vazão por mês e Burnup Reserva); o quarto aparece como "Regra de cálculo ainda em definição" (mesmo padrão do Report F4P para um quadrante sem regra fechada) até ser detalhado.
+Estrutura fixa de 4 quadrantes em 2 colunas, inspirada no layout do Report F4P — os 4 têm regra definida (CycleTime, Distribuição Vazão por mês, Burnup Reserva e CFD).
 
 ### 13.1 CycleTime (dispersão)
 
@@ -320,3 +320,18 @@ Para cada mês do semestre selecionado no filtro (roadmap interno ou executivo),
 - **Faltam**: o restante do Reservado que não é Entregue — complemento exato dentro do mesmo conjunto (Entregue + Faltam = Reservado sempre), não uma subtração à parte. Inclui, portanto, tanto os itens ainda não entregues quanto uma eventual entrega tardia fora do período (item acima).
 - **Limitação assumida**: o portal não guarda histórico de quando um item entrou no roadmap, então a linha do Reservado no gráfico é sempre a contagem **atual**, mostrada como uma reta constante — não uma evolução real do escopo ao longo do semestre.
 - **Transparência**: os números de Reservado, Entregue e **Faltam** são clicáveis e abrem a lista dos itens exatos de cada grupo, igual aos quadrantes calculados do Report F4P.
+
+### 13.4 CFD (Cumulative Flow Diagram)
+
+Diagrama de fluxo cumulativo clássico: eixo X = semanas do semestre selecionado, eixo Y = contagem acumulada de itens do time em cada categoria de fluxo. Diferente dos demais quadrantes do Actionable, não é um cálculo sobre um instantâneo do estado atual dos itens — é uma **reconstrução histórica**, usando as datas de entrada em cada coluna do quadro que o modelo já guarda por item (`o.fd`, decisão `0006`: a primeira coluna recebe a data de criação do item; colunas puladas herdam a data da próxima em que o item entrou). Decisão: `docs/decisoes/0045-actionable-cfd.md`.
+
+- **Semanas do gráfico** (eixo X): blocos fixos de **7 dias** a partir do **1º dia do semestre** selecionado (1/jan ou 1/jul), terminando exatamente no **último dia do semestre** — a última semana pode ter menos de 7 dias. Não depende do dia da semana em que o semestre começa (não são "semanas de calendário" segunda-a-domingo). Mesmo num semestre em curso, o gráfico cobre as 26 semanas inteiras (como a Distribuição Vazão por mês, §13.2) — as semanas ainda não decorridas simplesmente não têm dado novo (nenhuma data de coluna cai depois de hoje), então as faixas continuam achatadas nelas, refletindo o estado atual como projeção enquanto o tempo não passa.
+- **Categoria de um item numa data T**: a categoria (Nenhum/Discovery/WIP/Vazão) da coluna do fluxo do time mais avançada cuja data de entrada (`o.fd`) é menor ou igual a T; `null` (item ainda não existia) se nem a primeira coluna bateu essa condição.
+- **As 4 faixas, por semana** (partição exata do total de itens já criados até aquela semana):
+  - **Vazão**: itens cuja categoria naquela semana é Vazão.
+  - **WIP**: itens que já chegaram a WIP ou além, mas não chegaram a Vazão.
+  - **Discovery**: itens que já chegaram a Discovery ou além, mas não chegaram a WIP.
+  - **Nenhum**: os demais itens já criados (ainda não saíram do Backlog).
+- **Empilhamento** (estilo ActionableAgile, já citado no quadrante Eficiência de fluxo do Report F4P, §12.9): **Vazão na base**, crescendo pra cima; **Nenhum no topo** — a linha mais alta do gráfico é sempre o total de itens já criados até aquela semana, e **nunca diminui** (só a criação de itens novos aumenta o total; nada reduz o que já foi criado).
+- **Filtro de dados**: todos os itens do time, de **qualquer tipo** — configurável se conta itens do tipo bug (`CFG.act.cfdIncludeBugs`, booleano, **padrão `true`**: conta). Quando desligado, exclui os tipos cadastrados em `CFG.act.bugTypes` (a mesma lista do quadrante Distribuição Vazão por mês, §13.2) — sem lista própria.
+- **Transparência**: passar o mouse sobre o gráfico mostra um tooltip com os valores das 4 faixas daquela semana (mesmo padrão de transparência do portal, adaptado para um gráfico de área contínua em vez de números discretos clicáveis).
