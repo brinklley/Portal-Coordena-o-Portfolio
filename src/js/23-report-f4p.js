@@ -12,11 +12,11 @@ const F4P_QUADS = {
   var:   {title:"Variabilidade (min vs atual vs max)", side:"l", done:true},
   eff:   {title:"Eficiência de fluxo (min vs atual vs max)", side:"l", done:true, goal:"Meta mínima 30%"},
   road:  {title:"Roadmap – Épicos (roadmap vs roadmap entregue vs atual)", side:"l", done:true},
-  vazao: {title:"Vazão (reserva vs realizado)", side:"l", done:true},
+  vazao: {title:"Vazão (reserva vs reserva entregue vs realizado)", side:"l", done:true},
   ct:    {title:"CycleTime (reserva vs atual)", side:"r", done:true},
   urg:   {title:"Urgente (meta vs realizado)", side:"r", done:true},
   ts:    {title:"Technical Story (meta vs realizado)", side:"r", done:true},
-  us:    {title:"User Story (planejado vs não planejado)", side:"r", done:true}};
+  us:    {title:"User Story (reservado vs planejado outro semestre vs não planejado)", side:"r", done:true}};
 /* selo (imagem) por grupo de quadrantes, na ordem de exibição de cada coluna */
 const F4P_GROUPS = [
   {side:"l", badge:"healthyRange",     alt:"Healthy range", quads:["var", "eff"]},
@@ -205,6 +205,20 @@ function f4pTsItems(team, st){
   return f4pTsOps(team).filter(o => catOf(o) === "vazao" && o.deploy && o.deploy >= from && o.deploy <= to);
 }
 function f4pTsRealizado(team, st){ return f4pTsItems(team, st).length; }
+/* Compromisso de roadmap do épico batendo com o semestre selecionado (decisão `0043`): mesma
+   comparação já usada pelo quadrante Roadmap – Épicos (`f4pRoadmapEpis`, §12.7) para decidir se um
+   épico "está no Roadmap" do semestre em curso — reaproveitada aqui só como comparação, sem alterar
+   aquele quadrante. Interno: Target Date do próprio épico (`e.interno`). Executivo: sobe Épico →
+   Release → Iniciativa e compara o `AnoSemestreRoadmap` da iniciativa (`i.exec`). Um épico sem Target
+   Date (Interno) ou sem iniciativa/AnoSemestreRoadmap preenchido (Executivo) não bate com nenhum
+   semestre. */
+function f4pEpiCompromissoBate(e, sem){
+  if (!e || !sem) return false;
+  if (S.f.int) return norm(e.interno) === norm(sem);
+  const r = S.model.rels.get(e.parent); if (!r) return false;
+  const i = S.model.inis.get(r.parent); if (!i) return false;
+  return norm(i.exec) === norm(sem);
+}
 /* Quadrante 5 · Vazão: itens **entregues** (categoria de fluxo "Vazão", igual ao Technical Story —
    decisão 0022) dos tipos configurados para o CT (`CFG.f4p.types`, o mesmo campo de CycleTime/
    Variabilidade — não uma configuração própria), cuja saída caiu dentro do período exato do semestre
@@ -224,6 +238,14 @@ function f4pVazaoRealizadoItems(team, st){ return f4pVazaoOps(team, st); }
 function f4pVazaoReservaItems(team, st){
   const tag = f4pCapacityTag();
   return f4pVazaoOps(team, st).filter(o => (o.tags || []).map(norm).includes(tag));
+}
+/* Reserva entregue (decisão `0043`): subconjunto da Reserva cujo épico (`o.epicoId`) tem compromisso de
+   roadmap batendo com o semestre selecionado (`f4pEpiCompromissoBate`) — uma reserva cujo épico aponta
+   pra um compromisso de outro semestre (ou sem compromisso registrado) não conta aqui, mesmo contando
+   normalmente na Reserva e no Realizado. */
+function f4pVazaoReservaEntregueItems(team, st){
+  const sem = f4pSemester();
+  return f4pVazaoReservaItems(team, st).filter(o => f4pEpiCompromissoBate(S.model.epis.get(o.epicoId), sem));
 }
 /* itens do time (dos tipos configurados, mesmo filtro do Vazão) atualmente na categoria de fluxo WIP —
    contagem "ao vivo", sem filtro de período (WIP não tem uma data de saída pra filtrar por semestre;
@@ -262,10 +284,10 @@ function f4pVazaoTrend(team, st){
    (nunca maior, por construção), a cor de alerta é mais uma checagem de sanidade visual do que um cenário
    esperado no dia a dia. */
 function f4pVazaoCell(team){
-  const st = f4pSemesterState(), reserva = f4pVazaoReservaItems(team, st), realizado = f4pVazaoRealizadoItems(team, st), trend = f4pVazaoTrend(team, st);
+  const st = f4pSemesterState(), reserva = f4pVazaoReservaItems(team, st), reservaEntregue = f4pVazaoReservaEntregueItems(team, st), realizado = f4pVazaoRealizadoItems(team, st), trend = f4pVazaoTrend(team, st);
   const cls = realizado.length >= reserva.length ? "f4p-good" : "f4p-bad";
-  const tip = `Reserva: itens com a tag ${CFG.anTag || "ROADMAP"} · Realizado: itens dos tipos ${(CFG.f4p.types || []).join(", ") || "nenhum tipo marcado"} entregues (Vazão) em ${f4pExactSemesterLabel(st)} · tendência: mês corrente + itens em WIP vs. média (arredondada pra cima) dos meses anteriores do período · seta em ${cls === "f4p-good" ? "verde: Realizado ≥ Reserva" : "vermelho: Realizado < Reserva"} · clique nos números para ver os itens`;
-  return `<span title="${esc(tip)}"><button type="button" class="f4p-real" data-f4p-vazao-reserva-team="${esc(team)}">${reserva.length}</button><span class="f4p-sep">|</span><button type="button" class="f4p-real" data-f4p-vazao-realizado-team="${esc(team)}">${realizado.length}</button> <span class="f4p-trend ${cls}">${trend}</span></span>`;
+  const tip = `Reserva: itens com a tag ${CFG.anTag || "ROADMAP"} · Reserva entregue: subconjunto da Reserva cujo épico tem compromisso de roadmap (Interno ou Executivo, conforme o filtro) no mesmo semestre selecionado · Realizado: itens dos tipos ${(CFG.f4p.types || []).join(", ") || "nenhum tipo marcado"} entregues (Vazão) em ${f4pExactSemesterLabel(st)} · tendência: mês corrente + itens em WIP vs. média (arredondada pra cima) dos meses anteriores do período · seta em ${cls === "f4p-good" ? "verde: Realizado ≥ Reserva" : "vermelho: Realizado < Reserva"} · clique nos números para ver os itens`;
+  return `<span title="${esc(tip)}"><button type="button" class="f4p-real" data-f4p-vazao-reserva-team="${esc(team)}">${reserva.length}</button><span class="f4p-sep">|</span><button type="button" class="f4p-real" data-f4p-vazao-reserva-entregue-team="${esc(team)}">${reservaEntregue.length}</button><span class="f4p-sep">|</span><button type="button" class="f4p-real" data-f4p-vazao-realizado-team="${esc(team)}">${realizado.length}</button> <span class="f4p-trend ${cls}">${trend}</span></span>`;
 }
 /* Quadrante 7 · User Story (planejado vs. não planejado). Mesmo critério de "entregue" do Technical
    Story/Vazão (categoria de fluxo Vazão, decisão `0022`), mas com uma lista de tipos própria
@@ -281,7 +303,10 @@ function f4pUsOps(team, st){
 /* Planejado/Não planejado formam uma PARTIÇÃO do conjunto acima (ao contrário de Reserva/Realizado do
    Vazão, que é subconjunto/conjunto total): todo item entregue do tipo configurado está num dos dois,
    nunca nos dois. Planejado = tem a tag de capacidade do roadmap (mesma `CFG.anTag` do Vazão/Visão
-   analítica); Não planejado = não tem. */
+   analítica); Não planejado = não tem. Planejado, por sua vez, se divide em Reservado/Planejado (outro
+   semestre) — ver `f4pUsReservadoItems`/`f4pUsPlanejadoOutroSemestreItems`, logo abaixo de
+   `f4pUsNaoPlanejadoItems` — mas isso não muda esta partição em si, nem o total usado pela conferência
+   cruzada. */
 function f4pUsPlanejadoItems(team, st){
   const tag = f4pCapacityTag();
   return f4pUsOps(team, st).filter(o => (o.tags || []).map(norm).includes(tag));
@@ -289,6 +314,21 @@ function f4pUsPlanejadoItems(team, st){
 function f4pUsNaoPlanejadoItems(team, st){
   const tag = f4pCapacityTag();
   return f4pUsOps(team, st).filter(o => !(o.tags || []).map(norm).includes(tag));
+}
+/* Reservado / Planejado (outro semestre) (decisão `0043`): PARTIÇÃO do Planejado acima — mesma ideia da
+   Reserva entregue do Vazão, aplicada aqui como um recorte a mais dentro do Planejado (não do total
+   entregue: Não planejado continua com a mesma regra de sempre). Reservado é o subconjunto cujo épico
+   (`o.epicoId`) tem compromisso de roadmap batendo com o semestre selecionado (`f4pEpiCompromissoBate`);
+   Planejado (outro semestre) é o resto do Planejado — inclui tanto um compromisso de fato divergente
+   quanto um épico sem compromisso registrado. A soma dos dois é sempre igual ao Planejado total, então a
+   conferência cruzada (mais abaixo) não muda. */
+function f4pUsReservadoItems(team, st){
+  const sem = f4pSemester();
+  return f4pUsPlanejadoItems(team, st).filter(o => f4pEpiCompromissoBate(S.model.epis.get(o.epicoId), sem));
+}
+function f4pUsPlanejadoOutroSemestreItems(team, st){
+  const sem = f4pSemester();
+  return f4pUsPlanejadoItems(team, st).filter(o => !f4pEpiCompromissoBate(S.model.epis.get(o.epicoId), sem));
 }
 /* itens do tipo configurado atualmente em WIP — o equivalente ao WIP do Vazão (decisão `0023`), usado
    pela tendência deste quadrante. */
@@ -315,9 +355,9 @@ function f4pUsTrend(team, st){
   return atual > mediaAnteriores ? "▲" : atual < mediaAnteriores ? "▼" : "◆";
 }
 function f4pUsCell(team){
-  const st = f4pSemesterState(), planejado = f4pUsPlanejadoItems(team, st), naoPlanejado = f4pUsNaoPlanejadoItems(team, st), trend = f4pUsTrend(team, st);
-  const tip = `Planejado: itens ${(CFG.f4p.usTypes || []).join(", ") || "nenhum tipo marcado"} entregues (Vazão) em ${f4pExactSemesterLabel(st)} com a tag ${esc(CFG.anTag || "ROADMAP")} · Não planejado: os mesmos itens sem essa tag · tendência: mês corrente + itens em WIP vs. média (arredondada pra cima) dos meses anteriores · clique nos números para ver os itens`;
-  return `<span title="${esc(tip)}"><button type="button" class="f4p-real" data-f4p-us-team="${esc(team)}" data-f4p-us-set="planejado">${planejado.length}</button><span class="f4p-sep">|</span><button type="button" class="f4p-real" data-f4p-us-team="${esc(team)}" data-f4p-us-set="naoplanejado">${naoPlanejado.length}</button> <span class="f4p-trend">${trend}</span></span>`;
+  const st = f4pSemesterState(), reservado = f4pUsReservadoItems(team, st), planejadoOutro = f4pUsPlanejadoOutroSemestreItems(team, st), naoPlanejado = f4pUsNaoPlanejadoItems(team, st), trend = f4pUsTrend(team, st);
+  const tip = `Reservado: itens ${(CFG.f4p.usTypes || []).join(", ") || "nenhum tipo marcado"} entregues (Vazão) em ${f4pExactSemesterLabel(st)} com a tag ${esc(CFG.anTag || "ROADMAP")} e cujo épico tem compromisso de roadmap no mesmo semestre selecionado · Planejado (outro semestre): os mesmos itens com a tag, mas cujo épico aponta pra um compromisso de outro semestre (ou nenhum registrado) · Não planejado: itens sem essa tag · tendência: mês corrente + itens em WIP vs. média (arredondada pra cima) dos meses anteriores · clique nos números para ver os itens`;
+  return `<span title="${esc(tip)}"><button type="button" class="f4p-real" data-f4p-us-team="${esc(team)}" data-f4p-us-set="reservado">${reservado.length}</button><span class="f4p-sep">|</span><button type="button" class="f4p-real" data-f4p-us-team="${esc(team)}" data-f4p-us-set="planejadooutro">${planejadoOutro.length}</button><span class="f4p-sep">|</span><button type="button" class="f4p-real" data-f4p-us-team="${esc(team)}" data-f4p-us-set="naoplanejado">${naoPlanejado.length}</button> <span class="f4p-trend">${trend}</span></span>`;
 }
 /* Conferência cruzada (decisão `0030`): o usuário pediu uma validação explícita de que Vazão Realizado
    (todos os tipos configurados para o CT) deve ser sempre igual à soma de Technical Story Realizado +
@@ -340,8 +380,8 @@ function f4pReconciliacao(){
 function f4pReconciliacaoBanner(){
   const divergentes = f4pReconciliacao().filter(r => !r.ok);
   if (!divergentes.length) return "";
-  const linhas = divergentes.map(r => `<li><b>${esc(r.team)}</b>: Vazão Realizado <b>${r.vazao}</b> ≠ Technical Story (${r.ts}) + User Story Planejado (${r.planejado}) + User Story Não planejado (${r.naoPlanejado}) = <b>${r.soma}</b></li>`).join("");
-  return `<div class="f4p-recon"><b>Conferência divergente.</b> Vazão Realizado deveria ser sempre igual à soma de Technical Story Realizado + User Story Planejado + User Story Não planejado (mesmos itens entregues no período, recortados por tipo). Confira a configuração de tipos (CT/Vazão, Technical Story e User Story) — algo está contando itens de forma inconsistente entre os quadrantes:<ul>${linhas}</ul></div>`;
+  const linhas = divergentes.map(r => `<li><b>${esc(r.team)}</b>: Vazão Realizado <b>${r.vazao}</b> ≠ Technical Story (${r.ts}) + User Story Planejado (${r.planejado}, soma de Reservado + Planejado outro semestre) + User Story Não planejado (${r.naoPlanejado}) = <b>${r.soma}</b></li>`).join("");
+  return `<div class="f4p-recon"><b>Conferência divergente.</b> Vazão Realizado deveria ser sempre igual à soma de Technical Story Realizado + User Story Planejado (Reservado + Planejado outro semestre) + User Story Não planejado (mesmos itens entregues no período, recortados por tipo). Confira a configuração de tipos (CT/Vazão, Technical Story e User Story) — algo está contando itens de forma inconsistente entre os quadrantes:<ul>${linhas}</ul></div>`;
 }
 /* tipos de ÉPICO considerados por este quadrante (Report F4P, Roadmap – Épicos): configuração própria,
    `CFG.f4p.epiTypes` (padrão "Epic"), independente de `CFG.f4p.types` (que é dos itens operacionais dos
@@ -496,6 +536,8 @@ $("f4pBody").addEventListener("click", e => {
   if (btnT){ const team = btnT.dataset.f4pTsTeam; f4pItemsModal(`Technical Story · ${team} · ${f4pExactSemesterLabel(st)}`, f4pTsItems(team, st)); return; }
   const btnVR = e.target.closest("[data-f4p-vazao-reserva-team]");
   if (btnVR){ const team = btnVR.dataset.f4pVazaoReservaTeam; f4pItemsModal(`Vazão · ${team} · reserva · ${f4pExactSemesterLabel(st)}`, f4pVazaoReservaItems(team, st)); return; }
+  const btnVRE = e.target.closest("[data-f4p-vazao-reserva-entregue-team]");
+  if (btnVRE){ const team = btnVRE.dataset.f4pVazaoReservaEntregueTeam; f4pItemsModal(`Vazão · ${team} · reserva entregue · ${f4pExactSemesterLabel(st)}`, f4pVazaoReservaEntregueItems(team, st)); return; }
   const btnVZ = e.target.closest("[data-f4p-vazao-realizado-team]");
   if (btnVZ){ const team = btnVZ.dataset.f4pVazaoRealizadoTeam; f4pItemsModal(`Vazão · ${team} · realizado · ${f4pExactSemesterLabel(st)}`, f4pVazaoRealizadoItems(team, st)); return; }
   const btnRoad = e.target.closest("[data-f4p-road-set]");
@@ -509,8 +551,8 @@ $("f4pBody").addEventListener("click", e => {
   const btnUs = e.target.closest("[data-f4p-us-set]");
   if (btnUs){
     const team = btnUs.dataset.f4pUsTeam, set = btnUs.dataset.f4pUsSet;
-    const label = set === "planejado" ? "planejado" : "não planejado";
-    const items = set === "planejado" ? f4pUsPlanejadoItems(team, st) : f4pUsNaoPlanejadoItems(team, st);
+    const label = {reservado:"reservado", planejadooutro:"planejado (outro semestre)", naoplanejado:"não planejado"}[set];
+    const items = set === "reservado" ? f4pUsReservadoItems(team, st) : set === "planejadooutro" ? f4pUsPlanejadoOutroSemestreItems(team, st) : f4pUsNaoPlanejadoItems(team, st);
     f4pItemsModal(`User Story · ${team} · ${label} · ${f4pExactSemesterLabel(st)}`, items);
     return;
   }

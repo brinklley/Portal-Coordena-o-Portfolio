@@ -1,12 +1,16 @@
-# Testes: Report F4P — Quadrante 7 (User Story: planejado vs. não planejado) + conferência cruzada
+# Testes: Report F4P — Quadrante 7 (User Story: reservado vs. planejado outro semestre vs. não planejado) + conferência cruzada
 
 Ver `docs/testes/report-f4p/README.md` para as regras compartilhadas. Regras de negócio: §12.8.
-Decisão `0030`.
+Decisões `0030`, `0043`.
 
 Mesmo critério de "entregue" (categoria de fluxo Vazão) do Technical Story/Vazão, mas com **tipos
 próprios** (`CFG.f4p.usTypes`, padrão `["user story"]`, independentes de `CFG.f4p.types` do CT).
 **Diferença estrutural do Vazão**: Planejado + Não planejado são uma **partição exata** do conjunto
-entregue (com/sem a tag de capacidade) — não um subconjunto como Reserva ⊆ Realizado no Vazão.
+entregue (com/sem a tag de capacidade) — não um subconjunto como Reserva ⊆ Realizado no Vazão. O
+Planejado, por sua vez, se divide numa segunda partição (decisão `0043`): Reservado (o épico vinculado
+tem compromisso de roadmap no mesmo semestre selecionado) e Planejado (outro semestre) (o restante) —
+o mesmo critério da Reserva entregue do Vazão (§12.6), sem mudar o total de Planejado nem a conferência
+cruzada.
 
 ## Regra: conta só tipos configurados (próprios, independentes do CT) e já entregues
 
@@ -48,12 +52,34 @@ Não planejado é sempre igual ao total entregue.
 `test_us_wip_conta_so_tipos_configurados_do_time` (WIP usa `usTypes`, filtra por time).
 **Relacionado**: decisão `0023` (regra compartilhada, ver README).
 
-## Regra: clique no Planejado/Não planejado abre a lista correspondente, navegável
+## Regra: Reservado e Planejado (outro semestre) são uma partição exata do Planejado
 
-**Testes**: `test_us_clique_no_planejado_abre_lista_e_permite_navegar`,
+**Garante que**: `f4pUsReservadoItems`/`f4pUsPlanejadoOutroSemestreItems` reaproveitam o mesmo critério
+interno/executivo do Roadmap – Épicos (`f4pEpiCompromissoBate`, igual à Reserva entregue do Vazão,
+§12.6) para dividir o Planejado — sem tocar no quadrante Roadmap – Épicos nem no total de Planejado
+usado pela conferência cruzada (decisão `0043`).
+
+- **Dado**: Roadmap Interno selecionado; 1 item planejado cujo épico bate com o semestre (Reservado),
+  1 item planejado cujo épico aponta pra outro semestre, 1 item planejado **sem** `epicoId` (também cai
+  em "outro semestre" — caso de borda, decisão explícita do usuário), 1 item sem a tag (Não planejado).
+- **Então (sucesso)**: `{reservado: 1, planejadoOutro: 2, planejado: 3, naoPlanejado: 1}` — a soma
+  `reservado + planejadoOutro === planejado` sempre.
+- **Teste**: `test_us_reservado_e_planejado_outro_semestre_sao_particao_exata_do_planejado`
+- **Teste do critério Executivo**: `test_us_reservado_usa_compromisso_executivo_da_iniciativa` — sobe
+  Épico → Release → Iniciativa e compara `AnoSemestreRoadmap` (`i.exec`), igual ao Roadmap – Épicos no
+  critério Executivo.
+- **Cenário de falha coberto**: exatamente o problema de conceito reportado pelo usuário ao comparar
+  com o Analytics — um item com a tag de capacidade contaria como "reservado do semestre selecionado"
+  mesmo com o épico apontando pra um compromisso de roadmap diferente (ex.: entrega em agosto, 2º
+  semestre por data, mas roadmap mapeado no 1º semestre).
+
+## Regra: clique no Reservado/Planejado (outro semestre)/Não planejado abre a lista correspondente, navegável
+
+**Testes**: `test_us_clique_no_reservado_abre_lista_e_permite_navegar`,
+`test_us_clique_no_planejado_outro_semestre_mostra_os_com_compromisso_divergente`,
 `test_us_clique_no_nao_planejado_mostra_so_os_sem_a_tag`
 
-## Regra: o quadrante aparece calculado no painel; tipos configuráveis persistem e exportam
+## Regra: o quadrante aparece calculado no painel (3 números: Reservado | Planejado outro semestre | Não planejado); tipos configuráveis persistem e exportam
 
 **Testes**: `test_us_aparece_calculado_no_painel`,
 `test_configuracao_us_types_tem_padrao_user_story`,
@@ -66,7 +92,10 @@ Não planejado é sempre igual ao total entregue.
 **Garante que**: para qualquer time, Vazão Realizado é sempre igual à soma de Technical Story
 Realizado + User Story Planejado + User Story Não planejado — mesmo universo de itens entregues no
 período, só recortado por tipo em cada quadrante. Essa é uma validação explícita pedida pelo usuário
-para dar confiança de que os três quadrantes, calculados de forma independente, não divergem.
+para dar confiança de que os três quadrantes, calculados de forma independente, não divergem. Aqui
+"User Story Planejado" é o **total** (`f4pUsPlanejadoItems`, agregado interno usado só pelo cálculo,
+não exibido diretamente na UI desde a decisão `0043`) — a soma de Reservado + Planejado (outro
+semestre) não muda esse total, então a conferência continua batendo sem alteração de cálculo.
 
 - **Exemplo exato dado pelo usuário**: MOBILE com 38 no Vazão Realizado = 27 Technical Story + 4
   User Story planejado + 7 User Story não planejado (27+4+7=38).

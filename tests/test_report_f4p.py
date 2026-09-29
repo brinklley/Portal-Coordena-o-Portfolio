@@ -735,8 +735,104 @@ def test_vazao_aparece_calculado_no_painel(page):
     carregar(page, "f4p.xlsx")
     page.evaluate("()=>{ S.f.team='CORE'; S.f.exec=semestre(TODAY); render(); }")
     page.click("#f4pTab")
-    assert "Vazão (reserva vs realizado)" in page.inner_text("#f4pBody")
-    assert "f4p-sep" in page.evaluate("f4pVazaoCell('CORE')")
+    assert "Vazão (reserva vs reserva entregue vs realizado)" in page.inner_text("#f4pBody")
+    assert page.evaluate("f4pVazaoCell('CORE')").count("f4p-sep") == 2
+
+# Decisão 0043: Reserva entregue é o subconjunto da Reserva cujo épico vinculado tem compromisso de
+# roadmap (Interno ou Executivo, conforme o filtro) batendo com o semestre selecionado — mesmo critério
+# já usado pelo Roadmap – Épicos (f4pRoadmapEpis) para decidir se um épico "está no Roadmap" do
+# semestre, reaproveitado aqui sem alterar aquele quadrante.
+
+def test_vazao_reserva_entregue_bate_com_compromisso_interno_do_proprio_epico(page):
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.teamFlow.F4P_VZRE1 = ["Backlog", "Vazao"];
+      CFG.flow.f4p_vzre1 = {cat:{vazao:"vazao"}, ct:[]};
+      const sem = semestre(TODAY);
+      S.f.int = sem;
+      const hoje = new Date();
+      S.model.epis.set("evre1", {id:"evre1", parent:null, target:null, interno:sem, st:0, stDate:null, ops:[], type:"Epic"});
+      S.model.epis.set("evre2", {id:"evre2", parent:null, target:null, interno:"2099 1", st:0, stDate:null, ops:[], type:"Epic"});   // outro semestre
+      S.model.ops.set("v1", {team:"F4P_VZRE1", type:"User Story", stName:"Vazao", deploy:hoje, tags:["ROADMAP"], epicoId:"evre1"});   // compromisso bate
+      S.model.ops.set("v2", {team:"F4P_VZRE1", type:"User Story", stName:"Vazao", deploy:hoje, tags:["ROADMAP"], epicoId:"evre2"});   // compromisso de outro semestre
+      const st = f4pSemesterState();
+      return {reserva: f4pVazaoReservaItems("F4P_VZRE1", st).length, reservaEntregue: f4pVazaoReservaEntregueItems("F4P_VZRE1", st).length};
+    }""")
+    assert r == {"reserva": 2, "reservaEntregue": 1}
+
+def test_vazao_reserva_entregue_usa_iniciativa_quando_roadmap_executivo_ativo(page):
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.teamFlow.F4P_VZRE2 = ["Backlog", "Vazao"];
+      CFG.flow.f4p_vzre2 = {cat:{vazao:"vazao"}, ct:[]};
+      const sem = semestre(TODAY);
+      S.f.int = ""; S.f.exec = sem;
+      const hoje = new Date();
+      S.model.rels.set("rvre1", {id:"rvre1", parent:"ivre1", epis:[]});
+      S.model.inis.set("ivre1", {id:"ivre1", exec:sem, rels:["rvre1"]});
+      S.model.rels.set("rvre2", {id:"rvre2", parent:"ivre2", epis:[]});
+      S.model.inis.set("ivre2", {id:"ivre2", exec:"2099 1", rels:["rvre2"]});   // outro semestre
+      S.model.epis.set("evre3", {id:"evre3", parent:"rvre1", target:null, interno:"", st:0, stDate:null, ops:[], type:"Epic"});
+      S.model.epis.set("evre4", {id:"evre4", parent:"rvre2", target:null, interno:"", st:0, stDate:null, ops:[], type:"Epic"});
+      S.model.ops.set("v1", {team:"F4P_VZRE2", type:"User Story", stName:"Vazao", deploy:hoje, tags:["ROADMAP"], epicoId:"evre3"});
+      S.model.ops.set("v2", {team:"F4P_VZRE2", type:"User Story", stName:"Vazao", deploy:hoje, tags:["ROADMAP"], epicoId:"evre4"});
+      const st = f4pSemesterState();
+      const r = {reserva: f4pVazaoReservaItems("F4P_VZRE2", st).length, reservaEntregue: f4pVazaoReservaEntregueItems("F4P_VZRE2", st).length};
+      S.f.exec = "";
+      return r;
+    }""")
+    assert r == {"reserva": 2, "reservaEntregue": 1}
+
+def test_vazao_reserva_entregue_exclui_epico_sem_compromisso_registrado(page):
+    """Caso de borda (decisão 0043): um épico sem Target Date (Interno) não bate com nenhum semestre —
+    conta na Reserva normalmente, mas fica fora da Reserva entregue."""
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.teamFlow.F4P_VZRE3 = ["Backlog", "Vazao"];
+      CFG.flow.f4p_vzre3 = {cat:{vazao:"vazao"}, ct:[]};
+      S.f.int = semestre(TODAY);
+      const hoje = new Date();
+      S.model.epis.set("evre5", {id:"evre5", parent:null, target:null, interno:"", st:0, stDate:null, ops:[], type:"Epic"});   // sem Target Date
+      S.model.ops.set("v1", {team:"F4P_VZRE3", type:"User Story", stName:"Vazao", deploy:hoje, tags:["ROADMAP"], epicoId:"evre5"});
+      const st = f4pSemesterState();
+      return {reserva: f4pVazaoReservaItems("F4P_VZRE3", st).length, reservaEntregue: f4pVazaoReservaEntregueItems("F4P_VZRE3", st).length};
+    }""")
+    assert r == {"reserva": 1, "reservaEntregue": 0}
+
+def test_vazao_reserva_entregue_exclui_reserva_sem_epico_vinculado(page):
+    """Item reservado sem epicoId (ou apontando pra um épico inexistente) não tem como ter compromisso
+    de roadmap — fica fora da Reserva entregue, mas continua contando na Reserva."""
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.teamFlow.F4P_VZRE4 = ["Backlog", "Vazao"];
+      CFG.flow.f4p_vzre4 = {cat:{vazao:"vazao"}, ct:[]};
+      S.f.int = semestre(TODAY);
+      const hoje = new Date();
+      S.model.ops.set("v1", {team:"F4P_VZRE4", type:"User Story", stName:"Vazao", deploy:hoje, tags:["ROADMAP"]});   // sem epicoId
+      const st = f4pSemesterState();
+      return {reserva: f4pVazaoReservaItems("F4P_VZRE4", st).length, reservaEntregue: f4pVazaoReservaEntregueItems("F4P_VZRE4", st).length};
+    }""")
+    assert r == {"reserva": 1, "reservaEntregue": 0}
+
+def test_vazao_clique_na_reserva_entregue_mostra_so_os_com_compromisso_no_semestre(page):
+    carregar(page, "f4p.xlsx")
+    alvo_id = page.evaluate("""()=>{
+      S.f.team='CORE'; S.f.int=semestre(TODAY);
+      [...S.model.ops.values()].filter(o=>o.team==='CORE').forEach(o => { o.deploy = null; });
+      const dentro = new Date(f4pSemesterState().start.getTime() + 5 * 864e5);
+      const ops = [...S.model.ops.values()].filter(o=>o.team==='CORE').slice(0, 2);
+      S.model.epis.set("evreclick1", {id:"evreclick1", parent:null, target:null, interno:semestre(TODAY), st:0, stDate:null, ops:[], type:"Epic"});
+      S.model.epis.set("evreclick2", {id:"evreclick2", parent:null, target:null, interno:"2099 1", st:0, stDate:null, ops:[], type:"Epic"});
+      ops[0].type = 'User Story'; ops[0].deploy = dentro; ops[0].tags = ['ROADMAP']; ops[0].epicoId = 'evreclick1';
+      ops[1].type = 'User Story'; ops[1].deploy = dentro; ops[1].tags = ['ROADMAP']; ops[1].epicoId = 'evreclick2';
+      render();
+      return ops[0].id;
+    }""")
+    page.click("#f4pTab")
+    page.click('button[data-f4p-vazao-reserva-entregue-team="CORE"]')
+    assert page.is_visible("#f4pItemsBg")
+    assert page.locator("#f4pItemsBody tbody tr").count() == 1
+    assert alvo_id in page.inner_text("#f4pItemsBody")
 
 # ---------------- Quadrante 6 · Roadmap – Épicos (roadmap vs roadmap entregue vs atual) ----------------
 # Decisão 0025. Diferente dos demais quadrantes (que operam sobre S.model.ops), este opera sobre os
@@ -1101,6 +1197,53 @@ def test_us_planejado_e_nao_planejado_sao_particao_exata(page):
     }""")
     assert r == {"planejado": 2, "naoPlanejado": 1, "total": 3}
 
+# Decisão 0043: Reservado/Planejado (outro semestre) são uma segunda partição, desta vez dentro do
+# Planejado — mesmo critério de "compromisso de roadmap bate com o semestre selecionado" usado pela
+# Reserva entregue do Vazão (reaproveitando f4pEpiCompromissoBate/f4pRoadmapEpis).
+
+def test_us_reservado_e_planejado_outro_semestre_sao_particao_exata_do_planejado(page):
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.teamFlow.F4P_USRE1 = ["Backlog", "Vazao"];
+      CFG.flow.f4p_usre1 = {cat:{vazao:"vazao"}, ct:[]};
+      const sem = semestre(TODAY);
+      S.f.int = sem;
+      const hoje = new Date();
+      S.model.epis.set("eusre1", {id:"eusre1", parent:null, target:null, interno:sem, st:0, stDate:null, ops:[], type:"Epic"});
+      S.model.epis.set("eusre2", {id:"eusre2", parent:null, target:null, interno:"2099 1", st:0, stDate:null, ops:[], type:"Epic"});
+      S.model.ops.set("u1", {team:"F4P_USRE1", type:"User Story", stName:"Vazao", deploy:hoje, tags:["ROADMAP"], epicoId:"eusre1"});   // reservado
+      S.model.ops.set("u2", {team:"F4P_USRE1", type:"User Story", stName:"Vazao", deploy:hoje, tags:["ROADMAP"], epicoId:"eusre2"});   // outro semestre
+      S.model.ops.set("u3", {team:"F4P_USRE1", type:"User Story", stName:"Vazao", deploy:hoje, tags:["ROADMAP"]});                     // sem épico: outro semestre
+      S.model.ops.set("u4", {team:"F4P_USRE1", type:"User Story", stName:"Vazao", deploy:hoje, tags:[]});                              // não planejado
+      const st = f4pSemesterState();
+      return {
+        reservado: f4pUsReservadoItems("F4P_USRE1", st).length,
+        planejadoOutro: f4pUsPlanejadoOutroSemestreItems("F4P_USRE1", st).length,
+        planejado: f4pUsPlanejadoItems("F4P_USRE1", st).length,
+        naoPlanejado: f4pUsNaoPlanejadoItems("F4P_USRE1", st).length,
+      };
+    }""")
+    assert r == {"reservado": 1, "planejadoOutro": 2, "planejado": 3, "naoPlanejado": 1}
+
+def test_us_reservado_usa_compromisso_executivo_da_iniciativa(page):
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.teamFlow.F4P_USRE2 = ["Backlog", "Vazao"];
+      CFG.flow.f4p_usre2 = {cat:{vazao:"vazao"}, ct:[]};
+      const sem = semestre(TODAY);
+      S.f.int = ""; S.f.exec = sem;
+      const hoje = new Date();
+      S.model.rels.set("rusre1", {id:"rusre1", parent:"iusre1", epis:[]});
+      S.model.inis.set("iusre1", {id:"iusre1", exec:sem, rels:["rusre1"]});
+      S.model.epis.set("eusre3", {id:"eusre3", parent:"rusre1", target:null, interno:"", st:0, stDate:null, ops:[], type:"Epic"});
+      S.model.ops.set("u1", {team:"F4P_USRE2", type:"User Story", stName:"Vazao", deploy:hoje, tags:["ROADMAP"], epicoId:"eusre3"});
+      const st = f4pSemesterState();
+      const r = {reservado: f4pUsReservadoItems("F4P_USRE2", st).length, planejadoOutro: f4pUsPlanejadoOutroSemestreItems("F4P_USRE2", st).length};
+      S.f.exec = "";
+      return r;
+    }""")
+    assert r == {"reservado": 1, "planejadoOutro": 0}
+
 def test_us_usa_tag_de_capacidade_configuravel(page):
     carregar(page, "f4p.xlsx")
     r = page.evaluate("""()=>{
@@ -1243,19 +1386,20 @@ def test_us_wip_conta_so_tipos_configurados_do_time(page):
     }""")
     assert r == 1
 
-def test_us_clique_no_planejado_abre_lista_e_permite_navegar(page):
+def test_us_clique_no_reservado_abre_lista_e_permite_navegar(page):
     carregar(page, "f4p.xlsx")
     alvo_id = page.evaluate("""()=>{
-      S.f.team='CORE'; S.f.exec=semestre(TODAY);
+      S.f.team='CORE'; S.f.int=semestre(TODAY);
       [...S.model.ops.values()].filter(o=>o.team==='CORE').forEach(o => { o.deploy = null; });
       const alvo = [...S.model.ops.values()].find(o=>o.team==='CORE');
-      alvo.type = 'User Story'; alvo.tags = ['ROADMAP'];
+      S.model.epis.set("eusres1", {id:"eusres1", parent:null, target:null, interno:semestre(TODAY), st:0, stDate:null, ops:[], type:"Epic"});
+      alvo.type = 'User Story'; alvo.tags = ['ROADMAP']; alvo.epicoId = 'eusres1';
       alvo.deploy = new Date(f4pSemesterState().start.getTime() + 5 * 864e5);
       render();
       return alvo.id;
     }""")
     page.click("#f4pTab")
-    page.click('button[data-f4p-us-team="CORE"][data-f4p-us-set="planejado"]')
+    page.click('button[data-f4p-us-team="CORE"][data-f4p-us-set="reservado"]')
     assert page.is_visible("#f4pItemsBg")
     rows = page.locator("#f4pItemsBody tbody tr")
     assert rows.count() == 1
@@ -1264,6 +1408,25 @@ def test_us_clique_no_planejado_abre_lista_e_permite_navegar(page):
     assert not page.is_visible("#f4pItemsBg")
     assert not page.is_visible("#f4pPanel.open")
     assert page.evaluate("document.getElementById('fBusca').value") == alvo_id
+
+def test_us_clique_no_planejado_outro_semestre_mostra_os_com_compromisso_divergente(page):
+    """Decisão 0043: item com a tag mas cujo épico aponta compromisso pra outro semestre (ou sem
+    compromisso registrado) cai em 'Planejado (outro semestre)', não em 'Reservado'."""
+    carregar(page, "f4p.xlsx")
+    page.evaluate("""()=>{
+      S.f.team='CORE'; S.f.int=semestre(TODAY);
+      [...S.model.ops.values()].filter(o=>o.team==='CORE').forEach(o => { o.deploy = null; });
+      const dentro = new Date(f4pSemesterState().start.getTime() + 5 * 864e5);
+      const ops = [...S.model.ops.values()].filter(o=>o.team==='CORE').slice(0, 2);
+      S.model.epis.set("eusout1", {id:"eusout1", parent:null, target:null, interno:"2099 1", st:0, stDate:null, ops:[], type:"Epic"});
+      ops[0].type = 'User Story'; ops[0].deploy = dentro; ops[0].tags = ['ROADMAP']; ops[0].epicoId = 'eusout1';   // outro semestre
+      ops[1].type = 'User Story'; ops[1].deploy = dentro; ops[1].tags = ['ROADMAP'];   // sem epicoId: também conta como "outro semestre"
+      render();
+    }""")
+    page.click("#f4pTab")
+    page.click('button[data-f4p-us-team="CORE"][data-f4p-us-set="planejadooutro"]')
+    assert page.is_visible("#f4pItemsBg")
+    assert page.locator("#f4pItemsBody tbody tr").count() == 2
 
 def test_us_clique_no_nao_planejado_mostra_so_os_sem_a_tag(page):
     carregar(page, "f4p.xlsx")
@@ -1285,8 +1448,8 @@ def test_us_aparece_calculado_no_painel(page):
     carregar(page, "f4p.xlsx")
     page.evaluate("()=>{ S.f.team='CORE'; S.f.exec=semestre(TODAY); render(); }")
     page.click("#f4pTab")
-    assert "User Story (planejado vs não planejado)" in page.inner_text("#f4pBody")
-    assert "f4p-sep" in page.evaluate("f4pUsCell('CORE')")
+    assert "User Story (reservado vs planejado outro semestre vs não planejado)" in page.inner_text("#f4pBody")
+    assert page.evaluate("f4pUsCell('CORE')").count("f4p-sep") == 2
 
 def test_configuracao_us_types_tem_padrao_user_story(page):
     r = page.evaluate("()=>{ const c = normCfg({}); return c.f4p.usTypes; }")
