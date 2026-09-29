@@ -1,7 +1,8 @@
 # Testes: Actionable (métricas acionáveis por time no período do roadmap)
 
-Cobre `tests/test_actionable.py` (42 testes). Ver `docs/regras-de-negocio.md` §13; decisões `0041`, `0042`, `0044`, `0045`, `0046`.
-Os 4 quadrantes (CycleTime, Distribuição Vazão por mês, Burnup Reserva e CFD) têm regra definida.
+Cobre `tests/test_actionable.py` (45 testes). Ver `docs/regras-de-negocio.md` §13; decisões `0041`, `0042`, `0044`, `0045`, `0046`, `0047`.
+Os 4 quadrantes (CycleTime, Distribuição Vazão por mês, Burnup Reserva e CFD) têm regra definida,
+alinhados por linha (decisão `0047`).
 
 ## Regra: habilitado com Time + Roadmap, desabilitado num semestre futuro
 
@@ -203,6 +204,21 @@ decisão `0045` (CFD), nenhum quadrante mostra mais "Regra de cálculo ainda em 
 - **Teste**: `test_os_4_quadrantes_tem_regra_definida`
 - **Relacionado**: decisões `0041` ("Próximos passos"), `0044`, `0045`.
 
+## Regra: os quadrantes ficam alinhados por linha, não por coluna independente (decisão `0047`)
+
+**Garante que**: os 4 cards são itens diretos de uma única grade (`.act-quad-grid`), em ordem de
+leitura (CycleTime, Burnup Reserva, Distribuição Vazão por mês, CFD) — o alinhamento padrão do CSS Grid
+iguala a altura de cada linha, então o início da 2ª linha (Distribuição/CFD) não depende da diferença de
+altura entre os cards da 1ª linha (CycleTime/Burnup).
+
+- **Cenário de falha coberto**: antes, cada coluna empilhava seus dois quadrantes de forma
+  independente (`f4p-col`) — como o Burnup Reserva tem um texto bem mais longo que o CycleTime, o
+  quadrante 4 (CFD) começava bem mais abaixo que o quadrante 3 (Distribuição Vazão por mês), uma
+  diferença de ~400px que o usuário reportou como confusa.
+- **Teste**: `test_quadrantes_3_e_4_ficam_alinhados_na_mesma_altura` — compara o topo de cada card
+  (`getBoundingClientRect().top`); confirma que os dois primeiros têm o mesmo topo entre si, e os dois
+  últimos também.
+
 ## CFD (Cumulative Flow Diagram) — decisão `0045`
 
 Reconstrução histórica (não um instantâneo do estado atual): eixo X = semanas do semestre selecionado
@@ -278,6 +294,23 @@ que criado antes dele) continua contando normalmente.
   próprio primeiro dia do semestre (não antes) continua contando.
 - **Teste da consequência visível**: `test_cfd_vazao_comeca_em_zero_e_cresce_com_entregas_dentro_do_semestre`
   — a série de Vazão começa em 0 e sobe só com as entregas que aconteceram dentro do semestre.
+
+### Regra: num semestre em curso, o gráfico só desenha até a semana atual (decisão `0047`)
+
+**Garante que**: quando o semestre selecionado está em curso, o CFD não desenha as semanas futuras
+(nem como projeção achatada) — para na semana de hoje, marcada por uma linha vertical `.act-cfd-hoje`.
+O eixo X continua mostrando o semestre inteiro (mesmas marcas de início/fim); só a área e as caixas de
+hover (`.act-cfd-hit`) ficam restritas às semanas já decorridas. Num semestre já encerrado, não há
+"resto" a deixar de construir — o gráfico inteiro é desenhado, sem a linha "hoje".
+
+- **Teste (semestre em curso)**: `test_cfd_semestre_em_curso_mostra_linha_hoje_e_nao_desenha_alem_dela`
+  — confirma a linha "hoje" e que o número de caixas de hover é menor que o total de semanas do
+  semestre selecionado.
+- **Teste (semestre encerrado)**: `test_cfd_semestre_encerrado_nao_mostra_linha_hoje_e_desenha_tudo` —
+  confirma a ausência da linha "hoje" e que todas as semanas são desenhadas.
+- **Cenário de falha coberto**: a versão anterior desenhava as 26 semanas inteiras mesmo num semestre em
+  curso, com as faixas achatadas (repetindo o valor de hoje) nas semanas futuras como projeção — o
+  usuário considerou essa "continuação do morro" desnecessária e pediu para não construí-la.
 
 ### Regra: aparece no painel com a legenda das 4 faixas e o gráfico de área
 
