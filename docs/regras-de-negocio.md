@@ -281,3 +281,27 @@ Mesmo critério de "entregue" do Technical Story/Vazão (categoria de fluxo Vaz�
 - **Cor**: dentro da faixa MIN–MAX → verde; fora (acima do máximo ou abaixo do mínimo) → vermelho — sem uma terceira cor intermediária, diferente da Variabilidade.
 - **Tendência** (▲ melhora / ▼ piora / ◆ estável): compara a eficiência do período inteiro selecionado com a eficiência calculada só nos **últimos 2 meses** desse mesmo período — últimos 2 meses melhor → ▲; pior → ▼; igual (ou sem dado num dos dois lados) → ◆. Regra própria deste quadrante, não a mesma da tendência do Vazão (decisão `0023`).
 - **Transparência**: o número atual é clicável e abre a lista dos itens exatos do time no período; a coluna "Situação" mostra o Touch/Waiting (já recortado pela janela) que cada item contribuiu para a soma.
+
+## 13. Actionable
+
+Painel lateral com o mesmo comportamento de habilitação da Visão analítica (§10) e do Report F4P (§12): habilitado com **Time** e **Roadmap** (interno ou executivo) no filtro, um time por vez (diferente do Report F4P, que sempre mostra todos os times). Semestre futuro: aba desabilitada, painel recolhe sozinho se já estiver aberto (mesma regra do Report F4P, `f4pEnabled`/`actEnabled`). Decisão: `docs/decisoes/0041-actionable-primeira-versao.md`.
+
+**Primeira versão (MVP)**: estrutura fixa de 4 quadrantes em 2 colunas, inspirada no layout do Report F4P — só os dois primeiros têm regra definida; os outros dois aparecem como "Regra de cálculo ainda em definição" (mesmo padrão do Report F4P para um quadrante sem regra fechada) até serem detalhados.
+
+### 13.1 CycleTime (dispersão)
+
+Mesma amostra e mesma Reserva do quadrante CycleTime do Report F4P (§12.2) — não é um cálculo próprio: reaproveita `f4pSample` (itens concluídos, dos tipos configurados em `CFG.f4p.types`, dentro da janela do semestre selecionado — `f4pWindow`, §12.1) e o CT máximo do time (`limitsOf(time).max`) como Reserva.
+
+- Cada item da amostra vira um ponto do gráfico de dispersão: eixo X = data de entrega (`o.deploy`), eixo Y = CycleTime em dias.
+- Duas linhas de referência horizontais: **Reserva** (CT máximo do time) e **Atual** (P95 da amostra, mesmo cálculo do §12.2).
+- Pontos acima da Reserva ficam destacados (mesma convenção de cor do Report F4P — vermelho para acima do limite, verde para dentro).
+- **Transparência**: cada ponto é clicável e navega direto até o item (`gotoId`), fechando o painel.
+- Sem itens concluídos no período, mostra uma mensagem em vez de um gráfico vazio.
+
+### 13.2 Burnup Reserva
+
+- **Reservado** (escopo do burnup): o mesmo conjunto de itens da **Capacidade** da Visão analítica (§10) — itens com a tag de capacidade do roadmap (`CFG.anTag`, padrão "ROADMAP") nos épicos do roadmap do time+semestre selecionado, em **qualquer status** (Backlog, Discovery, WIP ou Vazão) — não só os já entregues. Essa é uma diferença deliberada da Reserva do quadrante Vazão do Report F4P (§12.6), que só existe dentro do que já foi entregue: sem incluir os itens ainda não entregues, não haveria "quanto falta" para calcular.
+- **Entregue**: subconjunto do Reservado cuja categoria de fluxo atual (`catOf`) é **Vazão**, acumulado mês a mês dentro do semestre selecionado (1/jan–30/jun ou 1/jul–31/dez) — um item entregue no último dia de um mês já conta dentro desse mês (limite inclusivo). No semestre em curso, só os meses até o mês corrente entram no gráfico (meses futuros não têm dado possível).
+- **Faltam**: Reservado − Entregue (nunca negativo).
+- **Limitação assumida**: o portal não guarda histórico de quando um item entrou no roadmap, então a linha do Reservado no gráfico é sempre a contagem **atual**, mostrada como uma reta constante — não uma evolução real do escopo ao longo do semestre.
+- **Transparência**: o número do Reservado e o do Entregue são clicáveis e abrem a lista dos itens exatos de cada contagem, igual aos quadrantes calculados do Report F4P.

@@ -104,6 +104,7 @@ function render(){
   markActiveFilters();
   renderAnalytics();
   renderF4P();
+  renderActionable();
   if (S.lastFilterEl){
     const el = S.lastFilterEl; S.lastFilterEl = null;
     if (!iniList.length && S.emptyDiag) requestAnimationFrame(() => showFmsg(el, diagHtml(S.emptyDiag)));
