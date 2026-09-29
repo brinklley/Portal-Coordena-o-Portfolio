@@ -59,6 +59,7 @@
 <div class="side-tabs">
   <button class="side-tab" id="anTab" disabled aria-expanded="false" aria-controls="anPanel" title="Selecione um Time e um Roadmap (interno ou executivo) nos filtros para habilitar"><span>Visão analítica</span></button>
   <button class="side-tab" id="f4pTab" disabled aria-expanded="false" aria-controls="f4pPanel" title="Selecione um Time e um Roadmap (interno ou executivo) nos filtros para habilitar"><span>Report F4P</span></button>
+  <button class="side-tab" id="actTab" disabled aria-expanded="false" aria-controls="actPanel" title="Selecione um Time e um Roadmap (interno ou executivo) nos filtros para habilitar"><span>Actionable</span></button>
 </div>
 <aside class="an-panel" id="anPanel" aria-hidden="true" aria-label="Visão analítica do roadmap">
   <div class="an-head">
@@ -73,6 +74,13 @@
     <div class="an-actions"><button class="x" id="f4pClose" aria-label="Recolher Report F4P">«</button></div>
   </div>
   <div class="an-body" id="f4pBody"></div>
+</aside>
+<aside class="an-panel f4p-panel" id="actPanel" aria-hidden="true" aria-label="Actionable">
+  <div class="an-head">
+    <div class="an-title" id="actTitle"></div>
+    <div class="an-actions"><button class="x" id="actClose" aria-label="Recolher Actionable">«</button></div>
+  </div>
+  <div class="an-body" id="actBody"></div>
 </aside>
 <aside class="drawer" id="drawer" aria-hidden="true">
   <header><h3 id="dTitle">Detalhes</h3><button class="x" id="dClose" aria-label="Fechar painel">×</button></header>

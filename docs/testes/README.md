@@ -73,6 +73,7 @@ aparecem juntos na mesma entrada, cada um citado pelo nome exato da função.
 | [`report-f4p/roadmap-epicos.md`](report-f4p/roadmap-epicos.md) | F4P Quadrante 6 | — | §12.7 |
 | [`report-f4p/user-story.md`](report-f4p/user-story.md) | F4P Quadrante 7 + conferência cruzada | — | §12.8 |
 | [`report-f4p/eficiencia-de-fluxo.md`](report-f4p/eficiencia-de-fluxo.md) | F4P Quadrante 8 | — | §12.9 |
+| [`actionable.md`](actionable.md) | Actionable: CycleTime (dispersão) e Burnup Reserva | 15 | §13 |
 
 O Report F4P (`tests/test_report_f4p.py`, 113 testes) é a maior suíte do projeto — por isso ganhou
 subpasta própria, com um `README.md` de regras compartilhadas (janelas de data, convenção de
