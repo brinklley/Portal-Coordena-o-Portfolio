@@ -1,6 +1,6 @@
 # Documentação dos testes
 
-Este é o contrato de regras que a suíte automatizada (`tests/`, 212 testes — pytest + Playwright)
+Este é o contrato de regras que a suíte automatizada (`tests/`, 215 testes — pytest + Playwright)
 protege. Cada arquivo aqui documenta, por domínio funcional, **o que cada regra garante, com que
 entrada, o resultado esperado no caso de sucesso e o cenário de falha (bug ou regressão) que o teste
 existe para impedir** — no estilo BDD (Dado/Quando/Então), citando a(s) função(ões) de teste que
@@ -73,7 +73,7 @@ aparecem juntos na mesma entrada, cada um citado pelo nome exato da função.
 | [`report-f4p/roadmap-epicos.md`](report-f4p/roadmap-epicos.md) | F4P Quadrante 6 | — | §12.7 |
 | [`report-f4p/user-story.md`](report-f4p/user-story.md) | F4P Quadrante 7 + conferência cruzada | — | §12.8 |
 | [`report-f4p/eficiencia-de-fluxo.md`](report-f4p/eficiencia-de-fluxo.md) | F4P Quadrante 8 | — | §12.9 |
-| [`actionable.md`](actionable.md) | Actionable: CycleTime, Distribuição Vazão por mês, Burnup Reserva e CFD | 39 | §13 |
+| [`actionable.md`](actionable.md) | Actionable: CycleTime, Distribuição Vazão por mês, Burnup Reserva e CFD | 42 | §13 |
 
 O Report F4P (`tests/test_report_f4p.py`, 121 testes) é a maior suíte do projeto — por isso ganhou
 subpasta própria, com um `README.md` de regras compartilhadas (janelas de data, convenção de
