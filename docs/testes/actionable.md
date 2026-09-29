@@ -1,6 +1,6 @@
 # Testes: Actionable (métricas acionáveis por time no período do roadmap)
 
-Cobre `tests/test_actionable.py` (15 testes). Ver `docs/regras-de-negocio.md` §13; decisão `0041`.
+Cobre `tests/test_actionable.py` (17 testes). Ver `docs/regras-de-negocio.md` §13; decisões `0041`, `0042`.
 Primeira versão (MVP): só os quadrantes CycleTime e Burnup Reserva têm regra definida.
 
 ## Regra: habilitado com Time + Roadmap, desabilitado num semestre futuro
@@ -81,13 +81,38 @@ um item entregue nessa data não fica empurrado para o mês seguinte.
   exatamente o tipo de erro de limite que passa despercebido sem um teste dedicado.
 - **Teste**: `test_burnup_entregue_no_ultimo_dia_do_mes_conta_nesse_mes`
 
-## Regra: resumo do Burnup e transparência por clique
+## Regra: resumo do Burnup e transparência por clique — inclusive em "faltam"
 
-**Garante que**: o resumo textual mostra Reservado/Entregue/Faltam, e os números de Reservado e
-Entregue são clicáveis, abrindo a lista dos itens exatos (mesmo modal `f4pItemsModal` do Report F4P).
+**Garante que**: o resumo textual mostra Reservado/Entregue/Faltam, e os **três** números são
+clicáveis, abrindo a lista dos itens exatos de cada grupo (mesmo modal `f4pItemsModal` do Report F4P)
+— não só Reservado e Entregue.
 
+- **Cenário de falha coberto** (melhoria pedida pelo usuário depois de usar a 1ª versão): "faltam"
+  ficava sem a mesma transparência dos outros dois números — o usuário via quantos itens faltavam mas
+  não tinha como saber **quais**, sem abrir a Visão analítica/Report F4P e cruzar manualmente.
 - **Testes**: `test_burnup_resumo_mostra_reservado_entregue_e_faltam`,
-  `test_burnup_clique_em_reservado_abre_lista_dos_itens_reservados`
+  `test_burnup_clique_em_reservado_abre_lista_dos_itens_reservados`,
+  `test_burnup_clique_em_faltam_abre_lista_dos_itens_ainda_nao_entregues`
+- **Relacionado**: decisão `0042-burnup-clique-em-faltam.md`.
+
+## Regra: uma entrega fora do período do semestre selecionado conta como Faltam, não como Entregue
+
+**Garante que**: Entregue e Faltam formam uma partição exata do Reservado (`entregues.length +
+faltamItems.length === capItems.length` sempre) — para isso, "Entregue" só considera itens cuja saída
+caiu **dentro do período do semestre selecionado** (mesmo limite que já valia para o número exibido);
+um item entregue depois desse período (ex.: um semestre encerrado cuja entrega só saiu no semestre
+seguinte) conta em Faltam, não em Entregue.
+
+- **Dado**: 1 item reservado de um semestre já encerrado, entregue no dia seguinte ao fim desse
+  semestre (já no semestre seguinte).
+- **Então (sucesso)**: `entreguesN === 0`, `faltam === 1`, o item aparece em `faltamItems`, não em
+  `entregues`.
+- **Cenário de falha coberto**: antes deste ajuste, a lista aberta ao clicar em "Entregue" não tinha
+  esse limite de período (só o número exibido tinha) — uma entrega tardia apareceria na lista de
+  "Entregue" mesmo não sendo contada no número, e ao mesmo tempo contaria como "falta" pelo número
+  exibido: o item "existia e não existia" em Entregue dependendo de onde o usuário olhasse.
+- **Teste**: `test_burnup_entrega_fora_do_periodo_do_semestre_conta_como_faltam`
+- **Relacionado**: decisão `0042`.
 
 ## Regra: quadrantes 3 e 4 mostram "em definição"
 

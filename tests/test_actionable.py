@@ -196,6 +196,60 @@ def test_burnup_clique_em_reservado_abre_lista_dos_itens_reservados(page):
     assert page.is_visible("#f4pItemsBg")
     assert "c1" in page.inner_text("#f4pItemsBody")
 
+def test_burnup_clique_em_faltam_abre_lista_dos_itens_ainda_nao_entregues(page):
+    """Melhoria pedida pelo usuário depois de usar a 1ª versão: "faltam" também precisa ser clicável,
+    igual a "reservado" e "entregue" — mostrando exatamente quais itens da Reserva ainda não chegaram
+    em Vazão."""
+    carregar(page, "f4p.xlsx")
+    sem = page.evaluate("semestre(TODAY)")
+    page.evaluate("""(sem)=>{
+      S.model.teamFlow.ACT_FALTAM = ["Backlog", "WIP", "Vazao"];
+      CFG.flow.act_faltam = {cat:{wip:"wip", vazao:"vazao"}, ct:[]};
+      S.model.ops.set("g1", {id:"g1", title:"G1", team:"ACT_FALTAM", type:"User Story", stName:"Vazao", deploy:new Date(), ready:new Date(), tags:["ROADMAP"]});
+      S.model.ops.set("g2", {id:"g2", title:"G2", team:"ACT_FALTAM", type:"User Story", stName:"Backlog", deploy:null, ready:null, tags:["ROADMAP"]});
+      S.model.ops.set("g3", {id:"g3", title:"G3", team:"ACT_FALTAM", type:"User Story", stName:"WIP", deploy:null, ready:null, tags:["ROADMAP"]});
+      S.model.inis.set("INI_G", {id:"INI_G", valid:true, title:"Ini", exec:sem, owner:null, rels:["REL_G"]});
+      S.model.rels.set("REL_G", {id:"REL_G", valid:true, title:"Rel", parent:"INI_G", epis:["EPI_G"]});
+      S.model.epis.set("EPI_G", {id:"EPI_G", valid:true, title:"Epi", parent:"REL_G", target:null, interno:null, st:0, ops:["g1","g2","g3"], type:"Epic"});
+      S.model.teams.push("ACT_FALTAM");
+      S.f.team = "ACT_FALTAM"; S.f.exec = sem;
+      render();
+    }""", sem)
+    page.click("#actTab")
+    page.wait_for_timeout(200)
+    txt = page.inner_text(".act-summary")
+    assert "3" in txt and "1" in txt and "2" in txt   # 3 reservados, 1 entregue, 2 faltam
+    page.click('[data-act-items="faltam"]')
+    assert page.is_visible("#f4pItemsBg")
+    body = page.inner_text("#f4pItemsBody")
+    assert "g2" in body and "g3" in body and "g1" not in body
+
+def test_burnup_entrega_fora_do_periodo_do_semestre_conta_como_faltam(page):
+    """Um item da Reserva entregue depois que o semestre selecionado (já encerrado) fechou não conta
+    como "entregue" DESTE período — ele estava previsto para este semestre, mas só saiu depois, então
+    entra em "faltam" (não em "entregue"), e some da lista de "entregue" que abre por clique."""
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      const curStart = f4pSemStart(semestre(TODAY));
+      const prevMid = new Date(curStart.getFullYear(), curStart.getMonth() - 3, 15);
+      const prevSem = semestre(prevMid);
+      const prevEnd = curStart;   // primeiro dia do semestre atual == dia seguinte ao fim do anterior
+      S.model.teamFlow.ACT_TARDIA = ["Backlog", "Vazao"];
+      CFG.flow.act_tardia = {cat:{vazao:"vazao"}, ct:[]};
+      S.model.ops.set("t1", {id:"t1", title:"T1", team:"ACT_TARDIA", type:"User Story", stName:"Vazao", deploy:prevEnd, ready:prevEnd, tags:["ROADMAP"]});   // entregue DEPOIS do fim do semestre anterior
+      S.model.inis.set("INI_T", {id:"INI_T", valid:true, title:"Ini", exec:prevSem, owner:null, rels:["REL_T"]});
+      S.model.rels.set("REL_T", {id:"REL_T", valid:true, title:"Rel", parent:"INI_T", epis:["EPI_T"]});
+      S.model.epis.set("EPI_T", {id:"EPI_T", valid:true, title:"Epi", parent:"REL_T", target:null, interno:prevSem, st:0, ops:["t1"], type:"Epic"});
+      S.model.teams.push("ACT_TARDIA");
+      S.f.team = "ACT_TARDIA"; S.f.int = prevSem;
+      render();
+      const bu = actBurnupData();
+      return {escopo: bu.escopo, entreguesN: bu.entreguesN, faltam: bu.faltam, faltamIds: bu.faltamItems.map(o=>o.id), entregueIds: bu.entregues.map(o=>o.id)};
+    }""")
+    assert r["escopo"] == 1
+    assert r["entreguesN"] == 0 and r["faltam"] == 1
+    assert r["faltamIds"] == ["t1"] and r["entregueIds"] == []
+
 def test_quadrantes_3_e_4_mostram_em_definicao(page):
     carregar(page, "f4p.xlsx")
     _habilitar(page)

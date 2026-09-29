@@ -73,14 +73,23 @@ function actBurnupMonths(st){
 function actBurnupData(st){
   st = st || f4pSemesterState();
   const capItems = anData().capItems;
-  const entregues = capItems.filter(o => catOf(o) === "vazao" && o.deploy);
   const months = actBurnupMonths(st);
+  // fim do último mês calculado (fim do semestre, se encerrado; hoje, se em curso) — um item entregue
+  // depois disso não conta como "entregue" DESTE semestre, mesmo já estando em Vazão: no burnup de um
+  // semestre já encerrado, uma entrega tardia (fora do período) entra em "faltam", não em "entregue"
+  // (era o esperado para este período, mas não chegou dentro dele).
+  const fimUltimoMes = months.length ? new Date(months[months.length - 1].getFullYear(), months[months.length - 1].getMonth() + 1, 0) : null;
+  const entreguesNoPeriodo = o => catOf(o) === "vazao" && o.deploy && (!fimUltimoMes || o.deploy <= fimUltimoMes);
+  const entregues = capItems.filter(entreguesNoPeriodo);
   const cumulative = months.map(m => {
     const fim = new Date(m.getFullYear(), m.getMonth() + 1, 0);
     return entregues.filter(o => o.deploy <= fim).length;
   });
   const escopo = capItems.length, entreguesN = cumulative.length ? cumulative[cumulative.length - 1] : 0;
-  return {months, escopo, cumulative, capItems, entregues, entreguesN, faltam: Math.max(0, escopo - entreguesN)};
+  // "faltam": o resto da Reserva que ainda não entrou em Vazão dentro do período — complemento exato
+  // de entregues dentro de capItems (entregues + faltamItems = capItems sempre, por construção).
+  const faltamItems = capItems.filter(o => !entreguesNoPeriodo(o));
+  return {months, escopo, cumulative, capItems, entregues, entreguesN, faltamItems, faltam: faltamItems.length};
 }
 function actBurnupSvg(data){
   const {months, escopo, cumulative} = data;
@@ -109,7 +118,7 @@ function actBurnupSummary(data){
     <span class="f4p-sep">·</span>
     <button type="button" class="f4p-real f4p-good" data-act-items="entregue">${data.entreguesN}</button> entregue${data.entreguesN === 1 ? "" : "s"}
     <span class="f4p-sep">·</span>
-    <b class="${data.faltam > 0 ? "f4p-warn" : "f4p-good"}">${data.faltam}</b> falta${data.faltam === 1 ? "" : "m"}
+    <button type="button" class="f4p-real ${data.faltam > 0 ? "f4p-warn" : "f4p-good"}" data-act-items="faltam">${data.faltam}</button> falta${data.faltam === 1 ? "" : "m"}
   </div>`;
 }
 
@@ -137,7 +146,7 @@ function renderActionable(){
   const ctCard = actCard("CycleTime", actScatterSvg(ctData) + actCtLegend(ctData),
     `Dispersão de CycleTime dos itens concluídos (${esc((CFG.f4p.types || []).join(", ") || "nenhum tipo marcado")}) no período <b>${esc(f4pPeriodLabel(st))}</b> — mesma amostra e Reserva (CT máximo do time) do quadrante CycleTime do Report F4P (§12.2); Atual é o P95 da amostra. Pontos acima da Reserva ficam em destaque. Clique num ponto para ir até o item.`);
   const buCard = actCard("Burnup Reserva", actBurnupSummary(buData) + actBurnupSvg(buData),
-    `Reservado: itens com a tag <b>${esc(CFG.anTag || "ROADMAP")}</b> nos épicos do roadmap ${esc(S.f.int ? "interno" : "executivo")} do time (mesmo conjunto da Capacidade da Visão analítica, §10) — inclui itens em qualquer status, não só os já entregues. Entregue: subconjunto já na categoria de fluxo Vazão, acumulado mês a mês. Sem histórico de quando cada item entrou no roadmap, a linha Reservado é sempre a contagem atual (uma reta), não uma evolução real do escopo. Clique em "reservado"/"entregue" para ver os itens.`);
+    `Reservado: itens com a tag <b>${esc(CFG.anTag || "ROADMAP")}</b> nos épicos do roadmap ${esc(S.f.int ? "interno" : "executivo")} do time (mesmo conjunto da Capacidade da Visão analítica, §10) — inclui itens em qualquer status, não só os já entregues. Entregue: subconjunto já na categoria de fluxo Vazão dentro do período do semestre selecionado, acumulado mês a mês. Faltam: o restante do Reservado que ainda não entrou em Vazão dentro do período (inclui uma entrega tardia, fora do semestre, se houver). Sem histórico de quando cada item entrou no roadmap, a linha Reservado é sempre a contagem atual (uma reta), não uma evolução real do escopo. Clique em "reservado", "entregue" ou "faltam" para ver os itens de cada grupo.`);
   $("actBody").innerHTML = `<div class="f4p-grid">
       <div class="f4p-col">${ctCard}${actPlaceholderCard("Em definição")}</div>
       <div class="f4p-col">${buCard}${actPlaceholderCard("Em definição")}</div>
@@ -157,7 +166,9 @@ $("actBody").addEventListener("click", e => {
   const btn = e.target.closest("[data-act-items]");
   if (btn){
     const buData = actBurnupData();
-    const which = btn.dataset.actItems, items = which === "reserva" ? buData.capItems : buData.entregues;
-    f4pItemsModal(`Burnup Reserva · ${S.f.team} · ${which === "reserva" ? "reservado" : "entregue"} · ${semLong(f4pSemester())}`, items);
+    const which = btn.dataset.actItems;
+    const items = which === "reserva" ? buData.capItems : which === "entregue" ? buData.entregues : buData.faltamItems;
+    const label = which === "reserva" ? "reservado" : which === "entregue" ? "entregue" : "faltam";
+    f4pItemsModal(`Burnup Reserva · ${S.f.team} · ${label} · ${semLong(f4pSemester())}`, items);
   }
 });
