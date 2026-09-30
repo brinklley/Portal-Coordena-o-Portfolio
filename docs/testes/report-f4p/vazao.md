@@ -1,15 +1,15 @@
 # Testes: Report F4P — Quadrante 5 (Vazão: reserva vs. reserva entregue vs. realizado)
 
 Ver `docs/testes/report-f4p/README.md` para as regras compartilhadas. Regras de negócio: §12.6.
-Decisões `0022`–`0024`, `0043`, `0048`.
+Decisões `0022`–`0024`, `0043`, `0048`, `0052`.
 
 Realizado usa o mesmo critério de "entregue" (categoria de fluxo Vazão) do Technical Story, com os
 **tipos configurados para o CT** do próprio Report F4P (`CFG.f4p.types`, padrão User Story e Technical
 Story). Reserva (decisão `0048`) é a **mesma capacidade do roadmap** da Visão analítica (§10) — itens
 dos tipos `CFG.ctTypes` com a tag de capacidade (`CFG.anTag`) cujo épico está comprometido com o
 roadmap selecionado, em **qualquer status**, não mais um subconjunto do Realizado. Reserva entregue
-(decisão `0043`) é um terceiro número, subconjunto do **Realizado** cujo épico vinculado tem
-compromisso de roadmap batendo com o semestre selecionado.
+(decisão `0043`, redefinida pela `0052`) é um terceiro número, subconjunto da própria **Reserva** já
+entregue (categoria Vazão) — **sem exigir data de entrega dentro do período exato do semestre**.
 
 ## Regra: Realizado conta só tipos configurados e já entregues
 
@@ -117,16 +117,14 @@ Reserva mostra só o subconjunto com a tag — cada item navega ao quadro como n
 - **Testes**: `test_vazao_clique_no_realizado_abre_lista_e_permite_navegar`,
   `test_vazao_clique_na_reserva_mostra_so_os_com_a_tag`
 
-## Regra: Reserva entregue é o subconjunto do Realizado cujo épico tem compromisso de roadmap no semestre selecionado
+## Regra: Reserva entregue é o subconjunto da Reserva já entregue (categoria Vazão)
 
-**Garante que**: `f4pVazaoReservaEntregueItems` reaproveita o mesmo critério interno/executivo do
-Roadmap – Épicos (`f4pRoadmapEpis`, via `f4pEpiCompromissoBate`) para decidir se o **épico vinculado**
-(`o.epicoId`) de cada item **entregue** tem compromisso de roadmap batendo com o semestre selecionado —
-sem alterar o quadrante Roadmap – Épicos em si, que continua intocado (decisão `0043`). Desde a decisão
-`0048`, a própria Reserva também passou a exigir esse compromisso (ela mudou de conjunto-base: agora é
-a capacidade do roadmap, não mais um subconjunto do Realizado) — por isso um item entregue cujo épico
-não bate o compromisso agora fica fora **dos dois** números, Reserva e Reserva entregue, não só da
-Reserva entregue como antes.
+**Garante que** (decisão `0043`, redefinida pela `0052`): `f4pVazaoReservaEntregueItems` filtra a
+própria `f4pVazaoReservaItems` (não mais o Realizado) pela categoria de fluxo Vazão — como a Reserva já
+exige tipo (`CFG.ctTypes`), tag de capacidade e épico comprometido com o semestre selecionado (via
+`f4pEpiCompromissoBate`, o mesmo critério interno/executivo do Roadmap – Épicos, sem alterar aquele
+quadrante), Reserva entregue passa a ser subconjunto da Reserva **por construção**, e um item entregue
+cujo épico não bate o compromisso continua fora **dos dois** números, Reserva e Reserva entregue.
 
 - **Dado**: Roadmap Interno selecionado, 2 itens entregues com a tag de capacidade, um cujo épico tem
   `interno` igual ao semestre selecionado (bate), outro cujo épico aponta para outro semestre.
@@ -158,6 +156,24 @@ entregue como antes. O item continua contando normalmente no Realizado (que não
   do usuário ao ser consultado sobre este caso de borda: conta como "outro semestre"/fora dos dois
   números.
 - **Relacionado**: decisões `0043`, `0048`.
+
+## Regra: Reserva entregue não exige entrega dentro do período exato do semestre
+
+**Garante que** (decisão `0052`): um item da Reserva (tag + tipo + épico comprometido com o semestre
+selecionado) já entregue (categoria Vazão) conta na Reserva entregue **mesmo que `o.deploy` caia fora
+do período exato do semestre** (`f4pExactSemesterWindow`) — diferente do Realizado, que continua
+exigindo a entrega dentro dessa janela.
+
+- **Dado**: item com a tag de capacidade, tipo em `CFG.ctTypes`, épico comprometido com o semestre
+  selecionado (Interno), entregue (Vazão) **antes** do início do período exato do semestre.
+- **Então (sucesso)**: `{reserva: 1, reservaEntregue: 1, realizado: 0}` — conta na Reserva e na Reserva
+  entregue, mas não no Realizado (que exige a data dentro da janela exata).
+- **Teste**: `test_vazao_reserva_entregue_inclui_item_entregue_fora_do_periodo_exato_do_semestre`
+- **Cenário de falha coberto**: o usuário reportou (via Report F4P) um item marcado como reserva do
+  roadmap, com status Vazão (entregue), que aparecia corretamente na Reserva mas sumia da Reserva
+  entregue por ter sido entregue fora do período filtrado — inconsistência com a Visão analítica, que
+  não aplica essa janela de data à Capacidade/entrega. Antes da `0052`, `f4pVazaoReservaEntregueItems`
+  delegava para `f4pVazaoOps` (que exige a janela exata), herdando essa restrição sem necessidade.
 
 ## Regra: clique na Reserva entregue mostra só os itens com compromisso no semestre selecionado
 

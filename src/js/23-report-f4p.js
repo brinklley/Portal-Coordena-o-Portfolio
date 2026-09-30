@@ -253,16 +253,17 @@ function f4pRoadmapCapacityItems(team, sem){
     && (o.tags || []).map(norm).includes(tag) && f4pEpiCompromissoBate(S.model.epis.get(o.epicoId), sem));
 }
 function f4pVazaoReservaItems(team, st){ return f4pRoadmapCapacityItems(team, f4pSemester()); }
-/* Reserva entregue (decisão `0043`): continua a mesma regra de antes — subconjunto do **Realizado**
-   (entregue no calendário exato do semestre, tipos de `CFG.f4p.types`) que tem a tag de capacidade E cujo
-   épico (`o.epicoId`) tem compromisso de roadmap batendo com o semestre selecionado
-   (`f4pEpiCompromissoBate`). Antes da decisão `0048` isso era escrito como "subconjunto da Reserva que
-   também bate o compromisso"; como a Reserva mudou de conjunto-base, a regra passou a ser escrita direto
-   sobre o Realizado — o resultado numérico não muda (é a mesma interseção tag ∩ compromisso ∩ entregue de
-   sempre), só a forma de calcular. */
+/* Reserva entregue (decisão `0043`, redefinida pela `0052`): agora é o subconjunto da própria **Reserva**
+   que já foi entregue (categoria de fluxo Vazão), **sem exigir que a entrega tenha caído dentro do
+   período exato do semestre** — só que o épico esteja comprometido com o semestre selecionado, que a
+   Reserva já garante. Antes (via `f4pVazaoOps`) um item reservado para o semestre mas entregue fora da
+   janela exata (ex.: adiantado, entregue no semestre anterior) ficava de fora da Reserva entregue mesmo
+   aparecendo na Reserva — inconsistência que o usuário reportou comparando com a Visão analítica, que não
+   tem essa restrição de data. Redefinida assim, Reserva entregue é subconjunto da Reserva por construção
+   (não só por coincidência de config, como antes). O Realizado continua com a janela exata — mede outra
+   coisa (vazão do calendário do semestre, não compromisso do roadmap) e não foi alterado. */
 function f4pVazaoReservaEntregueItems(team, st){
-  const sem = f4pSemester(), tag = f4pCapacityTag();
-  return f4pVazaoOps(team, st).filter(o => (o.tags || []).map(norm).includes(tag) && f4pEpiCompromissoBate(S.model.epis.get(o.epicoId), sem));
+  return f4pVazaoReservaItems(team, st).filter(o => catOf(o) === "vazao");
 }
 /* itens do time (dos tipos configurados, mesmo filtro do Vazão) atualmente na categoria de fluxo WIP —
    contagem "ao vivo", sem filtro de período (WIP não tem uma data de saída pra filtrar por semestre;
@@ -304,7 +305,7 @@ function f4pVazaoTrend(team, st){
 function f4pVazaoCell(team){
   const st = f4pSemesterState(), reserva = f4pVazaoReservaItems(team, st), reservaEntregue = f4pVazaoReservaEntregueItems(team, st), realizado = f4pVazaoRealizadoItems(team, st), trend = f4pVazaoTrend(team, st);
   const cls = realizado.length >= reserva.length ? "f4p-good" : "f4p-bad";
-  const tip = `Reserva: capacidade do roadmap selecionado para este time — itens dos tipos ${(CFG.ctTypes || []).join(", ") || "nenhum tipo marcado"} com a tag ${CFG.anTag || "ROADMAP"} cujo épico tem compromisso de roadmap (Interno ou Executivo, conforme o filtro) no semestre selecionado, em qualquer status — mesmos itens que compõem a Capacidade da Visão analítica (§10) · Reserva entregue: subconjunto do Realizado com a tag de capacidade cujo épico também bate esse compromisso · Realizado: itens dos tipos ${(CFG.f4p.types || []).join(", ") || "nenhum tipo marcado"} entregues (Vazão) em ${f4pExactSemesterLabel(st)} · tendência: mês corrente + itens em WIP vs. média (arredondada pra cima) dos meses anteriores do período · seta em ${cls === "f4p-good" ? "verde: Realizado ≥ Reserva" : "vermelho: Realizado < Reserva"} · clique nos números para ver os itens`;
+  const tip = `Reserva: capacidade do roadmap selecionado para este time — itens dos tipos ${(CFG.ctTypes || []).join(", ") || "nenhum tipo marcado"} com a tag ${CFG.anTag || "ROADMAP"} cujo épico tem compromisso de roadmap (Interno ou Executivo, conforme o filtro) no semestre selecionado, em qualquer status — mesmos itens que compõem a Capacidade da Visão analítica (§10) · Reserva entregue: subconjunto da Reserva já entregue (Vazão), mesmo que a entrega tenha caído fora do período exato do semestre — o que importa é o épico estar comprometido com o semestre selecionado · Realizado: itens dos tipos ${(CFG.f4p.types || []).join(", ") || "nenhum tipo marcado"} entregues (Vazão) em ${f4pExactSemesterLabel(st)} · tendência: mês corrente + itens em WIP vs. média (arredondada pra cima) dos meses anteriores do período · seta em ${cls === "f4p-good" ? "verde: Realizado ≥ Reserva" : "vermelho: Realizado < Reserva"} · clique nos números para ver os itens`;
   return `<span title="${esc(tip)}"><button type="button" class="f4p-real" data-f4p-vazao-reserva-team="${esc(team)}">${reserva.length}</button><span class="f4p-sep">|</span><button type="button" class="f4p-real" data-f4p-vazao-reserva-entregue-team="${esc(team)}">${reservaEntregue.length}</button><span class="f4p-sep">|</span><button type="button" class="f4p-real" data-f4p-vazao-realizado-team="${esc(team)}">${realizado.length}</button> <span class="f4p-trend ${cls}">${trend}</span></span>`;
 }
 /* Quadrante 7 · User Story (planejado vs. não planejado). Mesmo critério de "entregue" do Technical
@@ -567,7 +568,7 @@ $("f4pBody").addEventListener("click", e => {
   const btnVR = e.target.closest("[data-f4p-vazao-reserva-team]");
   if (btnVR){ const team = btnVR.dataset.f4pVazaoReservaTeam; f4pItemsModal(`Vazão · ${team} · reserva · ${semLong(f4pSemester())}`, f4pVazaoReservaItems(team, st)); return; }
   const btnVRE = e.target.closest("[data-f4p-vazao-reserva-entregue-team]");
-  if (btnVRE){ const team = btnVRE.dataset.f4pVazaoReservaEntregueTeam; f4pItemsModal(`Vazão · ${team} · reserva entregue · ${f4pExactSemesterLabel(st)}`, f4pVazaoReservaEntregueItems(team, st)); return; }
+  if (btnVRE){ const team = btnVRE.dataset.f4pVazaoReservaEntregueTeam; f4pItemsModal(`Vazão · ${team} · reserva entregue · ${semLong(f4pSemester())}`, f4pVazaoReservaEntregueItems(team, st)); return; }
   const btnVZ = e.target.closest("[data-f4p-vazao-realizado-team]");
   if (btnVZ){ const team = btnVZ.dataset.f4pVazaoRealizadoTeam; f4pItemsModal(`Vazão · ${team} · realizado · ${f4pExactSemesterLabel(st)}`, f4pVazaoRealizadoItems(team, st)); return; }
   const btnRoad = e.target.closest("[data-f4p-road-set]");

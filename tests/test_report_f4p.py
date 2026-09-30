@@ -942,6 +942,29 @@ def test_vazao_reserva_entregue_exclui_reserva_sem_epico_vinculado(page):
     }""")
     assert r == {"reserva": 0, "reservaEntregue": 0}
 
+def test_vazao_reserva_entregue_inclui_item_entregue_fora_do_periodo_exato_do_semestre(page):
+    """Decisão 0052: usuário reportou um item marcado como reserva do roadmap, com status Vazão
+    (entregue), mas cuja data de entrega caiu fora do período exato do semestre filtrado — mesmo assim
+    ele aparecia na Reserva (que não olha data desde a 0048) e deveria também contar na Reserva entregue,
+    já que Visão analítica e Report F4P precisam bater os dados entregues. Antes da 0052,
+    `f4pVazaoReservaEntregueItems` delegava para `f4pVazaoOps` (que exige entrega dentro da janela exata
+    do semestre) e excluía esse item; agora ela filtra sobre a própria Reserva, sem checar data."""
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.teamFlow.F4P_VZRE6 = ["Backlog", "Vazao"];
+      CFG.flow.f4p_vzre6 = {cat:{vazao:"vazao"}, ct:[]};
+      const sem = semestre(TODAY);
+      S.f.int = sem;
+      const foraDoPeriodo = new Date(f4pSemesterState().start.getTime() - 30 * 864e5);   // antes do semestre começar
+      S.model.epis.set("evre6", {id:"evre6", parent:null, target:null, interno:sem, st:0, stDate:null, ops:[], type:"Epic"});
+      S.model.ops.set("v1", {team:"F4P_VZRE6", type:"User Story", stName:"Vazao", deploy:foraDoPeriodo, tags:["ROADMAP"], epicoId:"evre6"});
+      const st = f4pSemesterState();
+      return {reserva: f4pVazaoReservaItems("F4P_VZRE6", st).length, reservaEntregue: f4pVazaoReservaEntregueItems("F4P_VZRE6", st).length, realizado: f4pVazaoRealizadoItems("F4P_VZRE6", st).length};
+    }""")
+    # entregue fora da janela exata do semestre: não conta no Realizado (que exige data dentro do
+    # período), mas conta na Reserva e, desde a 0052, também na Reserva entregue.
+    assert r == {"reserva": 1, "reservaEntregue": 1, "realizado": 0}
+
 def test_vazao_clique_na_reserva_entregue_mostra_so_os_com_compromisso_no_semestre(page):
     carregar(page, "f4p.xlsx")
     alvo_id = page.evaluate("""()=>{
