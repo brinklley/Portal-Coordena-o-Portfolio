@@ -1,6 +1,6 @@
 # Testes: Report F4P — regras compartilhadas
 
-O Report F4P (`tests/test_report_f4p.py`, 113 testes — a maior suíte do projeto) cobre 8 quadrantes,
+O Report F4P (`tests/test_report_f4p.py`, 129 testes — a maior suíte do projeto) cobre 8 quadrantes,
 todos com regra de cálculo fechada (decisões `0011` a `0031`, mais `0038`). Ver
 `docs/regras-de-negocio.md` §12, `docs/backlog/report-f4p.md`.
 
