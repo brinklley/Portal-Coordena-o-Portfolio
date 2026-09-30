@@ -231,21 +231,38 @@ function f4pVazaoOps(team, st){
 /* tag que marca a capacidade do roadmap — a mesma configuração já usada pela Visão analítica (§10,
    CFG.anTag, padrão "ROADMAP"); Reserva reaproveita essa tag em vez de ganhar uma configuração própria. */
 const f4pCapacityTag = () => norm(CFG.anTag || "ROADMAP");
-/* Reserva: subconjunto do Realizado com a tag de capacidade — nunca maior que o Realizado, por
-   construção (é um filtro sobre o mesmo conjunto, não uma contagem à parte). Realizado: todos os itens
-   do conjunto acima, com ou sem a tag. */
+/* Realizado: todos os itens entregues (função acima), com ou sem a tag de capacidade. */
 function f4pVazaoRealizadoItems(team, st){ return f4pVazaoOps(team, st); }
-function f4pVazaoReservaItems(team, st){
-  const tag = f4pCapacityTag();
-  return f4pVazaoOps(team, st).filter(o => (o.tags || []).map(norm).includes(tag));
+/* Reserva (decisão `0048`, revendo a decisão `0022`): passou a ser **a mesma capacidade do roadmap**
+   mostrada pela Visão analítica (§10, "Capacidade") para o time, não mais um subconjunto do Realizado.
+   O usuário reportou que os dois números deveriam bater e não batiam — o motivo era que a Reserva antiga
+   filtrava só pela tag, dentro do conjunto já **entregue no calendário exato do semestre**
+   (`f4pVazaoOps`, tipos de `CFG.f4p.types`), enquanto a Capacidade soma os itens **de qualquer status**
+   (Backlog/Discovery/WIP/Vazão) dos **épicos comprometidos com o roadmap selecionado** (tipos de
+   `CFG.ctTypes`) — dois recortes diferentes que raramente apontam pro mesmo conjunto de itens. Reserva
+   agora reaproveita exatamente essa segunda regra, só que parametrizada por `team` (o Report F4P mostra
+   todos os times lado a lado, não só o selecionado no filtro de Time da Visão analítica). Por não olhar
+   mais só o já entregue, Reserva **deixa de ser, por construção, um subconjunto do Realizado** — pode
+   ficar maior (reservado mas ainda não entregue) ou ter itens que o Realizado não tem (tipo diferente,
+   de `CFG.ctTypes`). */
+function f4pRoadmapCapacityItems(team, sem){
+  sem = sem === undefined ? f4pSemester() : sem;
+  if (!team || !sem) return [];
+  const types = anTypes(), tag = f4pCapacityTag();
+  return [...S.model.ops.values()].filter(o => o.team === team && o.type && (!types.size || types.has(norm(o.type)))
+    && (o.tags || []).map(norm).includes(tag) && f4pEpiCompromissoBate(S.model.epis.get(o.epicoId), sem));
 }
-/* Reserva entregue (decisão `0043`): subconjunto da Reserva cujo épico (`o.epicoId`) tem compromisso de
-   roadmap batendo com o semestre selecionado (`f4pEpiCompromissoBate`) — uma reserva cujo épico aponta
-   pra um compromisso de outro semestre (ou sem compromisso registrado) não conta aqui, mesmo contando
-   normalmente na Reserva e no Realizado. */
+function f4pVazaoReservaItems(team, st){ return f4pRoadmapCapacityItems(team, f4pSemester()); }
+/* Reserva entregue (decisão `0043`): continua a mesma regra de antes — subconjunto do **Realizado**
+   (entregue no calendário exato do semestre, tipos de `CFG.f4p.types`) que tem a tag de capacidade E cujo
+   épico (`o.epicoId`) tem compromisso de roadmap batendo com o semestre selecionado
+   (`f4pEpiCompromissoBate`). Antes da decisão `0048` isso era escrito como "subconjunto da Reserva que
+   também bate o compromisso"; como a Reserva mudou de conjunto-base, a regra passou a ser escrita direto
+   sobre o Realizado — o resultado numérico não muda (é a mesma interseção tag ∩ compromisso ∩ entregue de
+   sempre), só a forma de calcular. */
 function f4pVazaoReservaEntregueItems(team, st){
-  const sem = f4pSemester();
-  return f4pVazaoReservaItems(team, st).filter(o => f4pEpiCompromissoBate(S.model.epis.get(o.epicoId), sem));
+  const sem = f4pSemester(), tag = f4pCapacityTag();
+  return f4pVazaoOps(team, st).filter(o => (o.tags || []).map(norm).includes(tag) && f4pEpiCompromissoBate(S.model.epis.get(o.epicoId), sem));
 }
 /* itens do time (dos tipos configurados, mesmo filtro do Vazão) atualmente na categoria de fluxo WIP —
    contagem "ao vivo", sem filtro de período (WIP não tem uma data de saída pra filtrar por semestre;
@@ -279,14 +296,15 @@ function f4pVazaoTrend(team, st){
   const mediaAnteriores = Math.ceil(counts.slice(0, -1).reduce((a, b) => a + b, 0) / (nMonths - 1));
   return atual > mediaAnteriores ? "▲" : atual < mediaAnteriores ? "▼" : "◆";
 }
-/* A seta de tendência (não os números) é colorida por Realizado vs. Reserva (decisão 0024): Realizado ≥
-   Reserva → verde; Realizado < Reserva → vermelho. Como Reserva é sempre um subconjunto do Realizado
-   (nunca maior, por construção), a cor de alerta é mais uma checagem de sanidade visual do que um cenário
-   esperado no dia a dia. */
+/* A seta de tendência (não os números) é colorida por Realizado vs. Reserva (decisão 0024, atualizada
+   pela `0048`): Realizado ≥ Reserva → verde; Realizado < Reserva → vermelho. Antes da `0048` o vermelho
+   era inalcançável (Reserva era sempre um subconjunto do Realizado, por construção); agora que Reserva é
+   a capacidade do roadmap (item reservado em qualquer status, não só o entregue), o vermelho passou a ser
+   um alerta real: o time reservou mais do que já entregou dentro do semestre. */
 function f4pVazaoCell(team){
   const st = f4pSemesterState(), reserva = f4pVazaoReservaItems(team, st), reservaEntregue = f4pVazaoReservaEntregueItems(team, st), realizado = f4pVazaoRealizadoItems(team, st), trend = f4pVazaoTrend(team, st);
   const cls = realizado.length >= reserva.length ? "f4p-good" : "f4p-bad";
-  const tip = `Reserva: itens com a tag ${CFG.anTag || "ROADMAP"} · Reserva entregue: subconjunto da Reserva cujo épico tem compromisso de roadmap (Interno ou Executivo, conforme o filtro) no mesmo semestre selecionado · Realizado: itens dos tipos ${(CFG.f4p.types || []).join(", ") || "nenhum tipo marcado"} entregues (Vazão) em ${f4pExactSemesterLabel(st)} · tendência: mês corrente + itens em WIP vs. média (arredondada pra cima) dos meses anteriores do período · seta em ${cls === "f4p-good" ? "verde: Realizado ≥ Reserva" : "vermelho: Realizado < Reserva"} · clique nos números para ver os itens`;
+  const tip = `Reserva: capacidade do roadmap selecionado para este time — itens dos tipos ${(CFG.ctTypes || []).join(", ") || "nenhum tipo marcado"} com a tag ${CFG.anTag || "ROADMAP"} cujo épico tem compromisso de roadmap (Interno ou Executivo, conforme o filtro) no semestre selecionado, em qualquer status — mesmos itens que compõem a Capacidade da Visão analítica (§10) · Reserva entregue: subconjunto do Realizado com a tag de capacidade cujo épico também bate esse compromisso · Realizado: itens dos tipos ${(CFG.f4p.types || []).join(", ") || "nenhum tipo marcado"} entregues (Vazão) em ${f4pExactSemesterLabel(st)} · tendência: mês corrente + itens em WIP vs. média (arredondada pra cima) dos meses anteriores do período · seta em ${cls === "f4p-good" ? "verde: Realizado ≥ Reserva" : "vermelho: Realizado < Reserva"} · clique nos números para ver os itens`;
   return `<span title="${esc(tip)}"><button type="button" class="f4p-real" data-f4p-vazao-reserva-team="${esc(team)}">${reserva.length}</button><span class="f4p-sep">|</span><button type="button" class="f4p-real" data-f4p-vazao-reserva-entregue-team="${esc(team)}">${reservaEntregue.length}</button><span class="f4p-sep">|</span><button type="button" class="f4p-real" data-f4p-vazao-realizado-team="${esc(team)}">${realizado.length}</button> <span class="f4p-trend ${cls}">${trend}</span></span>`;
 }
 /* Quadrante 7 · User Story (planejado vs. não planejado). Mesmo critério de "entregue" do Technical
@@ -535,7 +553,7 @@ $("f4pBody").addEventListener("click", e => {
   const btnT = e.target.closest("[data-f4p-ts-team]");
   if (btnT){ const team = btnT.dataset.f4pTsTeam; f4pItemsModal(`Technical Story · ${team} · ${f4pExactSemesterLabel(st)}`, f4pTsItems(team, st)); return; }
   const btnVR = e.target.closest("[data-f4p-vazao-reserva-team]");
-  if (btnVR){ const team = btnVR.dataset.f4pVazaoReservaTeam; f4pItemsModal(`Vazão · ${team} · reserva · ${f4pExactSemesterLabel(st)}`, f4pVazaoReservaItems(team, st)); return; }
+  if (btnVR){ const team = btnVR.dataset.f4pVazaoReservaTeam; f4pItemsModal(`Vazão · ${team} · reserva · ${semLong(f4pSemester())}`, f4pVazaoReservaItems(team, st)); return; }
   const btnVRE = e.target.closest("[data-f4p-vazao-reserva-entregue-team]");
   if (btnVRE){ const team = btnVRE.dataset.f4pVazaoReservaEntregueTeam; f4pItemsModal(`Vazão · ${team} · reserva entregue · ${f4pExactSemesterLabel(st)}`, f4pVazaoReservaEntregueItems(team, st)); return; }
   const btnVZ = e.target.closest("[data-f4p-vazao-realizado-team]");

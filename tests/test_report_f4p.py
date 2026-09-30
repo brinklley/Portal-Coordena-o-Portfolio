@@ -435,11 +435,14 @@ def test_situacao_dos_itens_usa_categoria_do_fluxo_do_time(page):
     assert r["vazaoComData"] == "Vazão · 21/07/2026"
     assert r["semColuna"] == "Backlog"   # sem coluna reconhecida no fluxo do time: mesmo padrão de catOf ("none")
 
-# ---------------- Quadrante 5 · Vazão (reserva vs. realizado) ----------------
-# Decisão 0022. Mesmo critério de "entregue" do Technical Story (categoria de fluxo Vazão), mas usa os
-# tipos configurados para o CT (CFG.f4p.types, padrão User Story e Technical Story) em vez de um tipo
-# fixo. Reserva é o subconjunto do Realizado com a tag de capacidade do roadmap (CFG.anTag, já usada na
-# Visão analítica); Realizado é todo o conjunto, com ou sem a tag.
+# ---------------- Quadrante 5 · Vazão (reserva vs. reserva entregue vs. realizado) ----------------
+# Decisão 0022 (Realizado) e 0048 (Reserva). Realizado: itens **entregues** (categoria de fluxo Vazão)
+# dos tipos configurados para o CT (CFG.f4p.types, padrão User Story e Technical Story), cuja saída caiu
+# no calendário exato do semestre selecionado — com ou sem a tag de capacidade. Reserva: a mesma
+# capacidade do roadmap mostrada pela Visão analítica (§10) para o time — itens dos tipos CFG.ctTypes com
+# a tag de capacidade (CFG.anTag) cujo épico está comprometido com o roadmap selecionado, em **qualquer
+# status** (não só entregue). Por não depender mais do Realizado, Reserva deixou de ser, por construção,
+# um subconjunto dele (decisão 0048, revendo a 0022).
 
 def test_vazao_conta_so_tipos_configurados_e_entregues(page):
     carregar(page, "f4p.xlsx")
@@ -456,36 +459,82 @@ def test_vazao_conta_so_tipos_configurados_e_entregues(page):
     }""")
     assert r == 2
 
-def test_vazao_reserva_e_subconjunto_com_a_tag_de_capacidade(page):
+def test_vazao_reserva_conta_qualquer_status_do_epico_comprometido(page):
+    """Decisão 0048: diferente do Realizado, a Reserva não exige que o item já esteja entregue — conta
+    todo item do time com a tag de capacidade cujo épico está comprometido com o roadmap selecionado,
+    esteja ele em Backlog, WIP ou já em Vazão."""
     carregar(page, "f4p.xlsx")
     r = page.evaluate("""()=>{
-      S.model.teamFlow.F4P_VZ2 = ["Backlog", "Vazao"];
-      CFG.flow.f4p_vz2 = {cat:{vazao:"vazao"}, ct:[]};
-      const hoje = new Date();
-      S.model.ops.set("v1", {team:"F4P_VZ2", type:"User Story", stName:"Vazao", deploy:hoje, tags:["ROADMAP"]});
-      S.model.ops.set("v2", {team:"F4P_VZ2", type:"User Story", stName:"Vazao", deploy:hoje, tags:["Roadmap"]});   // mesma tag, outra caixa
-      S.model.ops.set("v3", {team:"F4P_VZ2", type:"User Story", stName:"Vazao", deploy:hoje, tags:[]});
-      S.f.exec = semestre(TODAY);
+      S.model.teamFlow.F4P_VZ2 = ["Backlog", "WIP", "Vazao"];
+      CFG.flow.f4p_vz2 = {cat:{wip:"wip", vazao:"vazao"}, ct:[]};
+      const sem = semestre(TODAY);
+      S.f.int = sem;
+      S.model.epis.set("evz2", {id:"evz2", valid:true, parent:null, target:null, interno:sem, st:0, stDate:null, ops:[], type:"Epic"});
+      S.model.ops.set("v1", {team:"F4P_VZ2", type:"User Story", stName:"Backlog", deploy:null, tags:["ROADMAP"], epicoId:"evz2"});
+      S.model.ops.set("v2", {team:"F4P_VZ2", type:"User Story", stName:"WIP", deploy:null, tags:["Roadmap"], epicoId:"evz2"});   // mesma tag, outra caixa
+      S.model.ops.set("v3", {team:"F4P_VZ2", type:"User Story", stName:"Vazao", deploy:new Date(), tags:[], epicoId:"evz2"});   // sem tag: não conta na reserva
       const st = f4pSemesterState();
       return {reserva: f4pVazaoReservaItems("F4P_VZ2", st).length, realizado: f4pVazaoRealizadoItems("F4P_VZ2", st).length};
     }""")
-    assert r == {"reserva": 2, "realizado": 3}
+    assert r == {"reserva": 2, "realizado": 1}
 
-def test_vazao_usa_tag_de_capacidade_configuravel(page):
+def test_vazao_reserva_usa_tag_de_capacidade_configuravel(page):
     carregar(page, "f4p.xlsx")
     r = page.evaluate("""()=>{
       S.model.teamFlow.F4P_VZ3 = ["Backlog", "Vazao"];
       CFG.flow.f4p_vz3 = {cat:{vazao:"vazao"}, ct:[]};
       CFG.anTag = "CAPACIDADE";
-      const hoje = new Date();
-      S.model.ops.set("v1", {team:"F4P_VZ3", type:"User Story", stName:"Vazao", deploy:hoje, tags:["CAPACIDADE"]});
-      S.model.ops.set("v2", {team:"F4P_VZ3", type:"User Story", stName:"Vazao", deploy:hoje, tags:["ROADMAP"]});   // tag antiga: não conta mais
-      S.f.exec = semestre(TODAY);
+      const sem = semestre(TODAY);
+      S.f.int = sem;
+      S.model.epis.set("evz3", {id:"evz3", valid:true, parent:null, target:null, interno:sem, st:0, stDate:null, ops:[], type:"Epic"});
+      S.model.ops.set("v1", {team:"F4P_VZ3", type:"User Story", stName:"Backlog", deploy:null, tags:["CAPACIDADE"], epicoId:"evz3"});
+      S.model.ops.set("v2", {team:"F4P_VZ3", type:"User Story", stName:"Backlog", deploy:null, tags:["ROADMAP"], epicoId:"evz3"});   // tag antiga: não conta mais
       const n = f4pVazaoReservaItems("F4P_VZ3", f4pSemesterState()).length;
       CFG.anTag = "ROADMAP";
       return n;
     }""")
     assert r == 1
+
+def test_vazao_reserva_bate_com_capacidade_da_visao_analitica(page):
+    """O pedido original do usuário (decisão 0048): a Reserva deste quadrante deve bater com a
+    Capacidade mostrada na Visão analítica (§10) para o mesmo time e semestre — as duas passaram a somar
+    exatamente o mesmo conjunto de itens."""
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      const team = "F4P_VZCAP", sem = semestre(TODAY);
+      S.model.teamFlow[team] = ["Backlog", "WIP", "Vazao"];
+      CFG.flow[team.toLowerCase()] = {cat:{wip:"wip", vazao:"vazao"}, ct:[]};
+      const opKeys = ["c0", "c1", "c2", "c3"];
+      S.model.ops.set("c0", {team, type:"User Story", stName:"Backlog", deploy:null, tags:["ROADMAP"], epicoId:"EPI_VZCAP"});
+      S.model.ops.set("c1", {team, type:"User Story", stName:"WIP", deploy:null, tags:["ROADMAP"], epicoId:"EPI_VZCAP"});
+      S.model.ops.set("c2", {team, type:"Technical Story", stName:"Vazao", deploy:new Date(2026,0,10), tags:["ROADMAP"], epicoId:"EPI_VZCAP"});
+      S.model.ops.set("c3", {team, type:"User Story", stName:"Backlog", deploy:null, tags:[], epicoId:"EPI_VZCAP"});   // sem tag: fora dos dois números
+      S.model.inis.set("INI_VZCAP", {id:"INI_VZCAP", valid:true, title:"Ini", exec:sem, owner:null, rels:["REL_VZCAP"]});
+      S.model.rels.set("REL_VZCAP", {id:"REL_VZCAP", valid:true, title:"Rel", parent:"INI_VZCAP", epis:["EPI_VZCAP"]});
+      S.model.epis.set("EPI_VZCAP", {id:"EPI_VZCAP", valid:true, title:"Epi", parent:"REL_VZCAP", target:null, interno:null, st:0, ops:opKeys, type:"Epic"});
+      S.f.team = team; S.f.exec = sem; S.f.int = "";
+      render();
+      return {cap: anData().cap, reserva: f4pVazaoReservaItems(team, f4pSemesterState()).length};
+    }""")
+    assert r["cap"] == 3
+    assert r["reserva"] == r["cap"]
+
+def test_vazao_reserva_exige_epico_comprometido_mas_realizado_nao(page):
+    """Diferente do Realizado (que só olha a data de entrega dentro do calendário do semestre), a
+    Reserva exige que o próprio épico do item esteja comprometido com o roadmap selecionado — um item
+    tagueado sem épico vinculado (ou cujo épico não bate esse compromisso) conta no Realizado normalmente,
+    mas fica fora da Reserva."""
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.teamFlow.F4P_VZ4B = ["Backlog", "Vazao"];
+      CFG.flow.f4p_vz4b = {cat:{vazao:"vazao"}, ct:[]};
+      S.f.int = semestre(TODAY);
+      const hoje = new Date();
+      S.model.ops.set("v1", {team:"F4P_VZ4B", type:"User Story", stName:"Vazao", deploy:hoje, tags:["ROADMAP"]});   // sem epicoId
+      const st = f4pSemesterState();
+      return {reserva: f4pVazaoReservaItems("F4P_VZ4B", st).length, realizado: f4pVazaoRealizadoItems("F4P_VZ4B", st).length};
+    }""")
+    assert r == {"reserva": 0, "realizado": 1}
 
 def test_vazao_ignora_itens_em_backlog_discovery_ou_wip(page):
     carregar(page, "f4p.xlsx")
@@ -660,21 +709,23 @@ def test_vazao_wip_conta_so_tipos_configurados_do_time(page):
     }""")
     assert r == 1
 
-# Decisão 0024: a seta de tendência (não os números) é colorida por Realizado vs. Reserva — verde
-# quando Realizado ≥ Reserva, vermelho quando Realizado < Reserva. Como Reserva é sempre um subconjunto
-# do Realizado (nunca maior, por construção — decisão 0022), a cor vermelha não é alcançável com o
-# pipeline normal; os testes cobrem os dois casos que a checagem >= realmente distingue: Realizado maior
-# e Realizado igual à Reserva (todos os itens com a tag).
+# Decisão 0024 (atualizada pela 0048): a seta de tendência (não os números) é colorida por Realizado vs.
+# Reserva — verde quando Realizado ≥ Reserva, vermelho quando Realizado < Reserva. Antes da 0048 o
+# vermelho era inalcançável (Reserva era sempre um subconjunto do Realizado, por construção — decisão
+# 0022); agora que Reserva é a capacidade do roadmap em qualquer status, os três casos passam a ser
+# testáveis: Realizado maior, igual e menor que a Reserva.
 
 def test_vazao_seta_de_tendencia_fica_verde_quando_realizado_maior_que_reserva(page):
     carregar(page, "f4p.xlsx")
     r = page.evaluate("""()=>{
       S.model.teamFlow.F4P_VZ10 = ["Backlog", "Vazao"];
       CFG.flow.f4p_vz10 = {cat:{vazao:"vazao"}, ct:[]};
+      const sem = semestre(TODAY);
+      S.f.int = sem;
+      S.model.epis.set("evz10", {id:"evz10", valid:true, parent:null, target:null, interno:sem, st:0, stDate:null, ops:[], type:"Epic"});
       const hoje = new Date();
-      S.model.ops.set("v1", {team:"F4P_VZ10", type:"User Story", stName:"Vazao", deploy:hoje, tags:["ROADMAP"]});
-      S.model.ops.set("v2", {team:"F4P_VZ10", type:"User Story", stName:"Vazao", deploy:hoje, tags:[]});
-      S.f.exec = semestre(TODAY);
+      S.model.ops.set("v1", {team:"F4P_VZ10", type:"User Story", stName:"Vazao", deploy:hoje, tags:["ROADMAP"], epicoId:"evz10"});
+      S.model.ops.set("v2", {team:"F4P_VZ10", type:"User Story", stName:"Vazao", deploy:hoje, tags:[], epicoId:"evz10"});
       return f4pVazaoCell("F4P_VZ10");
     }""")
     assert "f4p-trend f4p-good" in r
@@ -685,13 +736,31 @@ def test_vazao_seta_de_tendencia_fica_verde_quando_realizado_igual_reserva(page)
     r = page.evaluate("""()=>{
       S.model.teamFlow.F4P_VZ11 = ["Backlog", "Vazao"];
       CFG.flow.f4p_vz11 = {cat:{vazao:"vazao"}, ct:[]};
+      const sem = semestre(TODAY);
+      S.f.int = sem;
+      S.model.epis.set("evz11", {id:"evz11", valid:true, parent:null, target:null, interno:sem, st:0, stDate:null, ops:[], type:"Epic"});
       const hoje = new Date();
-      S.model.ops.set("v1", {team:"F4P_VZ11", type:"User Story", stName:"Vazao", deploy:hoje, tags:["ROADMAP"]});   // único item, com a tag: reserva == realizado
-      S.f.exec = semestre(TODAY);
+      S.model.ops.set("v1", {team:"F4P_VZ11", type:"User Story", stName:"Vazao", deploy:hoje, tags:["ROADMAP"], epicoId:"evz11"});   // único item, com a tag e o épico comprometido: reserva == realizado
       return f4pVazaoCell("F4P_VZ11");
     }""")
     assert "f4p-trend f4p-good" in r
     assert "f4p-bad" not in r
+
+def test_vazao_seta_de_tendencia_fica_vermelha_quando_realizado_menor_que_reserva(page):
+    """Caso novo, só alcançável depois da decisão 0048: um item reservado (tag + épico comprometido)
+    ainda em WIP conta na Reserva, mas nada foi entregue ainda — Realizado (0) < Reserva (1)."""
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.teamFlow.F4P_VZ12 = ["Backlog", "WIP", "Vazao"];
+      CFG.flow.f4p_vz12 = {cat:{wip:"wip", vazao:"vazao"}, ct:[]};
+      const sem = semestre(TODAY);
+      S.f.int = sem;
+      S.model.epis.set("evz12", {id:"evz12", valid:true, parent:null, target:null, interno:sem, st:0, stDate:null, ops:[], type:"Epic"});
+      S.model.ops.set("v1", {team:"F4P_VZ12", type:"User Story", stName:"WIP", deploy:null, tags:["ROADMAP"], epicoId:"evz12"});
+      return f4pVazaoCell("F4P_VZ12");
+    }""")
+    assert "f4p-trend f4p-bad" in r
+    assert "f4p-good" not in r
 
 def test_vazao_clique_no_realizado_abre_lista_e_permite_navegar(page):
     carregar(page, "f4p.xlsx")
@@ -716,14 +785,18 @@ def test_vazao_clique_no_realizado_abre_lista_e_permite_navegar(page):
     assert page.evaluate("document.getElementById('fBusca').value") == alvo_id
 
 def test_vazao_clique_na_reserva_mostra_so_os_com_a_tag(page):
+    """Decisão 0048: a Reserva não depende mais de data de entrega, então o item nem precisa estar
+    entregue — só precisa ter a tag de capacidade e um épico comprometido com o roadmap selecionado."""
     carregar(page, "f4p.xlsx")
     page.evaluate("""()=>{
       S.f.team='CORE'; S.f.exec=semestre(TODAY);
-      [...S.model.ops.values()].filter(o=>o.team==='CORE').forEach(o => { o.deploy = null; });
-      const dentro = new Date(f4pSemesterState().start.getTime() + 5 * 864e5);
+      const sem = semestre(TODAY);
+      S.model.inis.set("INI_VZCLICK", {id:"INI_VZCLICK", valid:true, title:"Ini", exec:sem, owner:null, rels:["REL_VZCLICK"]});
+      S.model.rels.set("REL_VZCLICK", {id:"REL_VZCLICK", valid:true, title:"Rel", parent:"INI_VZCLICK", epis:["EPI_VZCLICK"]});
+      S.model.epis.set("EPI_VZCLICK", {id:"EPI_VZCLICK", valid:true, title:"Epi", parent:"REL_VZCLICK", target:null, interno:null, st:0, ops:[], type:"Epic"});
       const ops = [...S.model.ops.values()].filter(o=>o.team==='CORE').slice(0, 2);
-      ops[0].type = 'User Story'; ops[0].deploy = dentro; ops[0].tags = ['ROADMAP'];
-      ops[1].type = 'User Story'; ops[1].deploy = dentro; ops[1].tags = [];
+      ops[0].type = 'User Story'; ops[0].tags = ['ROADMAP']; ops[0].epicoId = 'EPI_VZCLICK';
+      ops[1].type = 'User Story'; ops[1].tags = []; ops[1].epicoId = 'EPI_VZCLICK';
       render();
     }""")
     page.click("#f4pTab")
@@ -758,7 +831,9 @@ def test_vazao_reserva_entregue_bate_com_compromisso_interno_do_proprio_epico(pa
       const st = f4pSemesterState();
       return {reserva: f4pVazaoReservaItems("F4P_VZRE1", st).length, reservaEntregue: f4pVazaoReservaEntregueItems("F4P_VZRE1", st).length};
     }""")
-    assert r == {"reserva": 2, "reservaEntregue": 1}
+    # Desde a decisão 0048, a própria Reserva já exige compromisso do épico — v2 (compromisso de outro
+    # semestre) fica fora dos dois números, não só da Reserva entregue.
+    assert r == {"reserva": 1, "reservaEntregue": 1}
 
 def test_vazao_reserva_entregue_usa_iniciativa_quando_roadmap_executivo_ativo(page):
     carregar(page, "f4p.xlsx")
@@ -781,11 +856,13 @@ def test_vazao_reserva_entregue_usa_iniciativa_quando_roadmap_executivo_ativo(pa
       S.f.exec = "";
       return r;
     }""")
-    assert r == {"reserva": 2, "reservaEntregue": 1}
+    # Mesma observação da decisão 0048: v2 (iniciativa de outro semestre) já não entra na Reserva.
+    assert r == {"reserva": 1, "reservaEntregue": 1}
 
 def test_vazao_reserva_entregue_exclui_epico_sem_compromisso_registrado(page):
-    """Caso de borda (decisão 0043): um épico sem Target Date (Interno) não bate com nenhum semestre —
-    conta na Reserva normalmente, mas fica fora da Reserva entregue."""
+    """Caso de borda (decisões 0043/0048): um épico sem Target Date (Interno) não bate com nenhum
+    semestre — desde a 0048, isso já tira o item da Reserva (que também exige compromisso), não só da
+    Reserva entregue."""
     carregar(page, "f4p.xlsx")
     r = page.evaluate("""()=>{
       S.model.teamFlow.F4P_VZRE3 = ["Backlog", "Vazao"];
@@ -797,11 +874,11 @@ def test_vazao_reserva_entregue_exclui_epico_sem_compromisso_registrado(page):
       const st = f4pSemesterState();
       return {reserva: f4pVazaoReservaItems("F4P_VZRE3", st).length, reservaEntregue: f4pVazaoReservaEntregueItems("F4P_VZRE3", st).length};
     }""")
-    assert r == {"reserva": 1, "reservaEntregue": 0}
+    assert r == {"reserva": 0, "reservaEntregue": 0}
 
 def test_vazao_reserva_entregue_exclui_reserva_sem_epico_vinculado(page):
     """Item reservado sem epicoId (ou apontando pra um épico inexistente) não tem como ter compromisso
-    de roadmap — fica fora da Reserva entregue, mas continua contando na Reserva."""
+    de roadmap — desde a decisão 0048 isso já tira o item da Reserva, não só da Reserva entregue."""
     carregar(page, "f4p.xlsx")
     r = page.evaluate("""()=>{
       S.model.teamFlow.F4P_VZRE4 = ["Backlog", "Vazao"];
@@ -812,7 +889,7 @@ def test_vazao_reserva_entregue_exclui_reserva_sem_epico_vinculado(page):
       const st = f4pSemesterState();
       return {reserva: f4pVazaoReservaItems("F4P_VZRE4", st).length, reservaEntregue: f4pVazaoReservaEntregueItems("F4P_VZRE4", st).length};
     }""")
-    assert r == {"reserva": 1, "reservaEntregue": 0}
+    assert r == {"reserva": 0, "reservaEntregue": 0}
 
 def test_vazao_clique_na_reserva_entregue_mostra_so_os_com_compromisso_no_semestre(page):
     carregar(page, "f4p.xlsx")
