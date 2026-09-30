@@ -1,14 +1,15 @@
 # Testes: Report F4P — Quadrante 5 (Vazão: reserva vs. reserva entregue vs. realizado)
 
 Ver `docs/testes/report-f4p/README.md` para as regras compartilhadas. Regras de negócio: §12.6.
-Decisões `0022`–`0024`, `0043`.
+Decisões `0022`–`0024`, `0043`, `0048`.
 
-Mesmo critério de "entregue" (categoria de fluxo Vazão) do Technical Story, mas usa os **tipos
-configurados para o CT** (`CFG.f4p.types`, padrão User Story e Technical Story) em vez de um tipo
-fixo. Reserva é o **subconjunto** do Realizado com a tag de capacidade do roadmap (`CFG.anTag`, a
-mesma tag já usada na Visão analítica); Realizado é todo o conjunto, com ou sem a tag. Reserva
-entregue (decisão `0043`) é um terceiro número, subconjunto da própria Reserva, cujo épico vinculado
-tem compromisso de roadmap batendo com o semestre selecionado.
+Realizado usa o mesmo critério de "entregue" (categoria de fluxo Vazão) do Technical Story, com os
+**tipos configurados para o CT** do próprio Report F4P (`CFG.f4p.types`, padrão User Story e Technical
+Story). Reserva (decisão `0048`) é a **mesma capacidade do roadmap** da Visão analítica (§10) — itens
+dos tipos `CFG.ctTypes` com a tag de capacidade (`CFG.anTag`) cujo épico está comprometido com o
+roadmap selecionado, em **qualquer status**, não mais um subconjunto do Realizado. Reserva entregue
+(decisão `0043`) é um terceiro número, subconjunto do **Realizado** cujo épico vinculado tem
+compromisso de roadmap batendo com o semestre selecionado.
 
 ## Regra: Realizado conta só tipos configurados e já entregues
 
@@ -22,18 +23,47 @@ Bug) ou um item não entregue não contam.
 - **Teste**: `test_vazao_conta_so_tipos_configurados_e_entregues`
 - **Relacionado**: decisão `0022-report-f4p-quadrante-vazao.md`.
 
-## Regra: Reserva é subconjunto do Realizado (tag configurável, case-insensitive)
+## Regra: Reserva conta qualquer status do item, desde que o épico esteja comprometido (tag configurável, case-insensitive)
 
-**Garante que**: Reserva é sempre um subconjunto do Realizado — nunca maior, por construção — e a
-tag de capacidade (`CFG.anTag`) é comparada sem diferenciar maiúsculas/minúsculas.
+**Garante que** (decisão `0048`): Reserva não exige mais que o item já tenha sido entregue — conta
+Backlog, WIP e Vazão igualmente, desde que tenha a tag de capacidade (`CFG.anTag`, comparada sem
+diferenciar maiúsculas/minúsculas) E o épico vinculado esteja comprometido com o roadmap selecionado.
 
-- **Dado**: 2 itens com a tag `ROADMAP`/`Roadmap` (case diferente, ambos contam), 1 sem tag.
-- **Então (sucesso)**: `{reserva: 2, realizado: 3}`.
-- **Teste**: `test_vazao_reserva_e_subconjunto_com_a_tag_de_capacidade`
-- **Teste da tag configurável**: `test_vazao_usa_tag_de_capacidade_configuravel` — trocar
+- **Dado**: 1 item em Backlog e 1 em WIP, ambos com a tag `ROADMAP`/`Roadmap` (case diferente) e
+  vinculados a um épico comprometido com o semestre selecionado; 1 item já em Vazão, sem tag.
+- **Então (sucesso)**: `{reserva: 2, realizado: 1}` — a Reserva conta os dois reservados (qualquer
+  status); o Realizado conta só o entregue (com ou sem tag).
+- **Teste**: `test_vazao_reserva_conta_qualquer_status_do_epico_comprometido`
+- **Teste da tag configurável**: `test_vazao_reserva_usa_tag_de_capacidade_configuravel` — trocar
   `CFG.anTag` para `"CAPACIDADE"` faz só a nova tag contar (a antiga `ROADMAP` deixa de contar).
 - **Cenário de falha coberto**: um time que padronizou uma tag diferente do padrão `ROADMAP`
   continuaria vendo a Reserva contar pela tag antiga, subestimando a capacidade real reservada.
+
+## Regra: Reserva bate com a Capacidade da Visão analítica
+
+**Garante que** (decisão `0048`, o pedido original do usuário): a Reserva deste quadrante e a
+Capacidade da Visão analítica (§10) somam exatamente o mesmo conjunto de itens para o mesmo time e
+semestre — mesmos tipos (`CFG.ctTypes`), mesma tag (`CFG.anTag`) e mesmo critério de compromisso do
+épico com o roadmap selecionado.
+
+- **Dado**: um time com 3 itens reservados (Backlog, WIP e Vazão, todos com a tag e o épico
+  comprometido com o roadmap executivo selecionado) e 1 item sem tag (fora dos dois números).
+- **Então (sucesso)**: `anData().cap === f4pVazaoReservaItems(team, st).length` (ambos `3`).
+- **Teste**: `test_vazao_reserva_bate_com_capacidade_da_visao_analitica`
+- **Cenário de falha coberto**: antes da `0048`, a Reserva só contava itens já entregues no calendário
+  exato do semestre (`CFG.f4p.types`), enquanto a Capacidade soma itens de qualquer status dos épicos
+  comprometidos com o roadmap (`CFG.ctTypes`) — dois recortes diferentes que raramente convergiam,
+  gerando a divergência relatada pelo usuário (ex.: Capacidade 14 vs. Reserva 0 num time que ainda não
+  tinha entregue nada do que reservou).
+
+## Regra: Reserva exige épico comprometido; Realizado não
+
+**Garante que**: diferente do Realizado (que só olha a data de entrega dentro do calendário do
+semestre), a Reserva exige que o próprio épico do item esteja comprometido com o roadmap selecionado —
+um item tagueado sem `epicoId` (ou cujo épico não bate esse compromisso) conta no Realizado
+normalmente, mas fica fora da Reserva.
+
+- **Teste**: `test_vazao_reserva_exige_epico_comprometido_mas_realizado_nao`
 
 ## Regra: ignora itens não entregues; janela é o período exato do semestre
 
@@ -68,13 +98,16 @@ ao Vazão, com WIP contado só dos tipos configurados do time.
 ## Regra: a seta de tendência é colorida por Realizado vs. Reserva (não pela direção ▲▼◆)
 
 **Garante que**: a cor da seta é verde quando Realizado ≥ Reserva, vermelha quando Realizado <
-Reserva — uma dimensão de cor independente da direção ▲/▼/◆. Como Reserva é sempre subconjunto do
-Realizado (decisão `0022`), o caso vermelho não é alcançável no pipeline normal; os testes cobrem os
-dois casos que a checagem `>=` realmente distingue.
+Reserva — uma dimensão de cor independente da direção ▲/▼/◆. Antes da decisão `0048` o caso vermelho
+não era alcançável (Reserva era sempre subconjunto do Realizado, decisão `0022`); agora que Reserva é
+a capacidade do roadmap em qualquer status, os três casos (maior, igual e menor) são testáveis.
 
 - **Testes**: `test_vazao_seta_de_tendencia_fica_verde_quando_realizado_maior_que_reserva`,
-  `test_vazao_seta_de_tendencia_fica_verde_quando_realizado_igual_reserva`
-- **Relacionado**: decisão `0024-report-f4p-vazao-cor-da-seta-por-realizado-vs-reserva.md`.
+  `test_vazao_seta_de_tendencia_fica_verde_quando_realizado_igual_reserva`,
+  `test_vazao_seta_de_tendencia_fica_vermelha_quando_realizado_menor_que_reserva` — item reservado
+  (tag + épico comprometido) ainda em WIP: conta na Reserva, mas nada foi entregue ainda.
+- **Relacionado**: decisões `0024-report-f4p-vazao-cor-da-seta-por-realizado-vs-reserva.md` e
+  `0048-vazao-reserva-bate-com-capacidade-analitica.md`.
 
 ## Regra: clique no Realizado e na Reserva abrem listas distintas, cada uma navegável
 
@@ -84,39 +117,47 @@ Reserva mostra só o subconjunto com a tag — cada item navega ao quadro como n
 - **Testes**: `test_vazao_clique_no_realizado_abre_lista_e_permite_navegar`,
   `test_vazao_clique_na_reserva_mostra_so_os_com_a_tag`
 
-## Regra: Reserva entregue é o subconjunto da Reserva cujo épico tem compromisso de roadmap no semestre selecionado
+## Regra: Reserva entregue é o subconjunto do Realizado cujo épico tem compromisso de roadmap no semestre selecionado
 
 **Garante que**: `f4pVazaoReservaEntregueItems` reaproveita o mesmo critério interno/executivo do
 Roadmap – Épicos (`f4pRoadmapEpis`, via `f4pEpiCompromissoBate`) para decidir se o **épico vinculado**
-(`o.epicoId`) de cada item da Reserva tem compromisso de roadmap batendo com o semestre selecionado —
-sem alterar o quadrante Roadmap – Épicos em si, que continua intocado (decisão `0043`).
+(`o.epicoId`) de cada item **entregue** tem compromisso de roadmap batendo com o semestre selecionado —
+sem alterar o quadrante Roadmap – Épicos em si, que continua intocado (decisão `0043`). Desde a decisão
+`0048`, a própria Reserva também passou a exigir esse compromisso (ela mudou de conjunto-base: agora é
+a capacidade do roadmap, não mais um subconjunto do Realizado) — por isso um item entregue cujo épico
+não bate o compromisso agora fica fora **dos dois** números, Reserva e Reserva entregue, não só da
+Reserva entregue como antes.
 
-- **Dado**: Roadmap Interno selecionado, 2 itens reservados, um cujo épico tem `interno` igual ao
-  semestre selecionado (bate), outro cujo épico aponta para outro semestre.
-- **Então (sucesso)**: `{reserva: 2, reservaEntregue: 1}` — a Reserva continua contando os dois, só a
-  Reserva entregue exclui o que aponta pra outro semestre.
+- **Dado**: Roadmap Interno selecionado, 2 itens entregues com a tag de capacidade, um cujo épico tem
+  `interno` igual ao semestre selecionado (bate), outro cujo épico aponta para outro semestre.
+- **Então (sucesso)**: `{reserva: 1, reservaEntregue: 1}` — os dois números já excluem o item cujo
+  épico aponta pra outro semestre.
 - **Teste (critério Interno)**: `test_vazao_reserva_entregue_bate_com_compromisso_interno_do_proprio_epico`
 - **Teste (critério Executivo)**: `test_vazao_reserva_entregue_usa_iniciativa_quando_roadmap_executivo_ativo`
   — sobe Épico → Release → Iniciativa e compara `AnoSemestreRoadmap` (`i.exec`), ignorando o Target
   Date do próprio épico, exatamente como o Roadmap – Épicos faz no critério Executivo.
-- **Cenário de falha coberto**: sem esse filtro extra, um item entregue no período mas cujo compromisso
-  de roadmap é de outro semestre contaria como "reserva do semestre selecionado" só por ter a tag —
+- **Cenário de falha coberto**: sem esse filtro, um item entregue no período mas cujo compromisso de
+  roadmap é de outro semestre contaria como "reserva do semestre selecionado" só por ter a tag —
   exatamente o problema de conceito reportado pelo usuário ao comparar com o Analytics (um item entregue
   em agosto, encaixando no 2º semestre por data, mas mapeado no roadmap para o 1º semestre).
 
-## Regra: épico sem compromisso registrado, ou item sem épico vinculado, ficam fora da Reserva entregue (caso de borda)
+## Regra: épico sem compromisso registrado, ou item sem épico vinculado, ficam fora da Reserva e da Reserva entregue (caso de borda)
 
-**Garante que**: um épico sem Target Date preenchido (critério Interno) — ou um item reservado sem
-`epicoId`/apontando para um épico inexistente — não bate com nenhum semestre; continua contando
-normalmente na Reserva (e no Realizado), mas nunca soma à Reserva entregue.
+**Garante que**: um épico sem Target Date preenchido (critério Interno) — ou um item sem
+`epicoId`/apontando para um épico inexistente — não bate com nenhum semestre; desde a decisão `0048`
+isso já tira o item da própria Reserva (que também exige compromisso do épico), não só da Reserva
+entregue como antes. O item continua contando normalmente no Realizado (que não olha compromisso de
+épico, só data de entrega).
 
-- **Testes**: `test_vazao_reserva_entregue_exclui_epico_sem_compromisso_registrado`,
-  `test_vazao_reserva_entregue_exclui_reserva_sem_epico_vinculado`
+- **Testes**: `test_vazao_reserva_entregue_exclui_epico_sem_compromisso_registrado`
+  (`{reserva: 0, reservaEntregue: 0}`), `test_vazao_reserva_entregue_exclui_reserva_sem_epico_vinculado`
+  (idem)
 - **Cenário de falha coberto**: sem essa checagem explícita, um épico incompleto (dado ausente) poderia
   ser tratado como "bate com qualquer semestre" por uma comparação frouxa (`undefined === undefined`),
-  inflando a Reserva entregue com itens sem garantia real de compromisso — decisão explícita do usuário
-  ao ser consultado sobre este caso de borda: conta como "outro semestre"/fora da Reserva entregue.
-- **Relacionado**: decisão `0043`.
+  inflando a Reserva e a Reserva entregue com itens sem garantia real de compromisso — decisão explícita
+  do usuário ao ser consultado sobre este caso de borda: conta como "outro semestre"/fora dos dois
+  números.
+- **Relacionado**: decisões `0043`, `0048`.
 
 ## Regra: clique na Reserva entregue mostra só os itens com compromisso no semestre selecionado
 
