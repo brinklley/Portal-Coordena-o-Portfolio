@@ -33,6 +33,17 @@ def test_semestre_futuro_desabilita_e_fecha_o_painel(page):
     assert page.evaluate("actEnabled()") is False
     assert page.evaluate("ACT.open") is False
 
+def test_ignora_filtro_de_id_ou_descricao_so_roadmap_time_e_responsavel_afetam(page):
+    """Decisão 0054: Actionable (assim como Visão analítica e Report F4P) só deve ser afetado pelos
+    filtros de roadmap (interno ou executivo), time e responsável — o campo "ID ou descrição" (S.f.q)
+    não deve mudar os números deste painel."""
+    carregar(page, "f4p.xlsx")
+    _habilitar(page)
+    sem_q = page.evaluate("actCtScatterData('CORE').items.length")
+    page.evaluate("()=>{ S.f.q='999999'; render(); }")
+    com_q = page.evaluate("actCtScatterData('CORE').items.length")
+    assert sem_q == com_q and sem_q > 0
+
 def test_scatter_ct_usa_mesma_amostra_e_reserva_do_report_f4p(page):
     """A dispersão de CycleTime reaproveita f4pSample/limitsOf — mesma amostra e Reserva do quadrante
     CycleTime do Report F4P (§12.2), não um cálculo próprio."""

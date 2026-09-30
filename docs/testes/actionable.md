@@ -329,6 +329,17 @@ as 4 contagens daquela semana — mesmo mecanismo já usado pelos pontos do quad
 `test_configuracao_cfd_include_bugs_tem_checkbox_e_persiste_ao_salvar`,
 `test_configuracao_cfd_include_bugs_entra_na_exportacao`
 
+## Regra: ignora o filtro "ID ou descrição" — só roadmap, time e responsável afetam o painel
+
+**Garante que** (decisão `0054`): o Actionable, assim como a Visão analítica e o Report F4P, só deve ser
+afetado pelos filtros de roadmap (interno ou executivo), time e responsável. `S.f.q` ("ID ou descrição")
+nunca chegou a ser lido por nenhuma função do Actionable — todas iteram `S.model.ops` direto, sem passar
+por `computeVisible`/`S.V` — então este é um teste de regressão que trava esse comportamento.
+
+- **Teste**: `test_ignora_filtro_de_id_ou_descricao_so_roadmap_time_e_responsavel_afetam`
+- **Relacionado**: decisão `0054-analiticos-ignoram-filtro-de-id-so-destacam.md`; a mesma regra na Visão
+  analítica (`docs/testes/visao-analitica.md`) e no Report F4P (`docs/testes/report-f4p/README.md`).
+
 ## Regra: os três painéis laterais são mutuamente exclusivos
 
 **Garante que**: abrir a Visão analítica ou o Report F4P fecha o Actionable, e abrir o Actionable

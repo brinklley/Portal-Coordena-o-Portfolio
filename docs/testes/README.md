@@ -1,6 +1,6 @@
 # Documentação dos testes
 
-Este é o contrato de regras que a suíte automatizada (`tests/`, 239 testes — pytest + Playwright)
+Este é o contrato de regras que a suíte automatizada (`tests/`, 243 testes — pytest + Playwright)
 protege. Cada arquivo aqui documenta, por domínio funcional, **o que cada regra garante, com que
 entrada, o resultado esperado no caso de sucesso e o cenário de falha (bug ou regressão) que o teste
 existe para impedir** — no estilo BDD (Dado/Quando/Então), citando a(s) função(ões) de teste que

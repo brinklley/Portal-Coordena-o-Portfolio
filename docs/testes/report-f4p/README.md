@@ -1,6 +1,6 @@
 # Testes: Report F4P — regras compartilhadas
 
-O Report F4P (`tests/test_report_f4p.py`, 129 testes — a maior suíte do projeto) cobre 8 quadrantes,
+O Report F4P (`tests/test_report_f4p.py`, 130 testes — a maior suíte do projeto) cobre 8 quadrantes,
 todos com regra de cálculo fechada (decisões `0011` a `0031`, mais `0038`). Ver
 `docs/regras-de-negocio.md` §12, `docs/backlog/report-f4p.md`.
 
@@ -138,6 +138,17 @@ JSON exportado por `#cfgExport` — nunca fica só em memória.
 - **Teste**: `test_importar_configuracao_antiga_sem_f4p_usa_padrao`
 - **Cenário de falha coberto**: importar uma configuração de uma versão anterior do portal quebraria
   o painel F4P por falta de um campo esperado.
+
+## Regra: ignora o filtro "ID ou descrição" — só roadmap, time e responsável afetam o painel
+
+**Garante que** (decisão `0054`): o Report F4P, assim como a Visão analítica e o Actionable, só deve ser
+afetado pelos filtros de roadmap (interno ou executivo), time e responsável. `S.f.q` ("ID ou descrição")
+nunca chegou a ser lido por nenhuma função de quadrante — todas iteram `S.model.ops` direto, sem passar
+por `computeVisible`/`S.V` — então este é um teste de regressão que trava esse comportamento.
+
+- **Teste**: `test_ignora_filtro_de_id_ou_descricao_so_roadmap_time_e_responsavel_afetam`
+- **Relacionado**: decisão `0054-analiticos-ignoram-filtro-de-id-so-destacam.md`; a mesma regra na Visão
+  analítica (`docs/testes/visao-analitica.md`) e no Actionable (`docs/testes/actionable.md`).
 
 ## Regra: quadrante sem regra fechada mostra travessão e nota (mecanismo genérico)
 

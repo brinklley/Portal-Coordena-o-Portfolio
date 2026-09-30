@@ -358,6 +358,57 @@ def test_status_ordena_entregue_primeiro_depois_wip_discovery_backlog_e_sem_rese
     }""", sem)
     assert r == ["fechado", "wip", "discovery", "backlog", "vazio"]
 
+def test_id_ou_descricao_nao_filtra_epicos_so_destaca_a_linha_correspondente(page):
+    """Decisão 0054: pedido do usuário — a Visão analítica (assim como o Report F4P e o Actionable) só
+    deve filtrar por roadmap (interno ou executivo), time ou responsável; o campo "ID ou descrição"
+    (S.f.q) não deve reduzir a lista de épicos aqui, só destacar (hl) a linha correspondente."""
+    carregar(page, "f4p.xlsx")
+    sem = page.evaluate("semestre(TODAY)")
+    r = page.evaluate("""(sem)=>{
+      const team = "AN_Q1";
+      S.model.teamFlow[team] = ["Backlog", "Vazao"];
+      CFG.flow[norm(team)] = {cat:{vazao:"vazao"}, ct:[]};
+      ["a", "b"].forEach(suf => {
+        const iniId = `INI_Q_${suf}`, relId = `REL_Q_${suf}`, epiId = `EPI_Q_${suf}`, opId = `${team}_op_${suf}`;
+        S.model.ops.set(opId, {id:opId, title:"Item "+suf, team, type:"User Story", stName:"Backlog", deploy:null, ready:null, tags:[]});
+        S.model.inis.set(iniId, {id:iniId, valid:true, title:"Ini "+suf, exec:sem, owner:null, rels:[relId]});
+        S.model.rels.set(relId, {id:relId, valid:true, title:"Rel "+suf, parent:iniId, epis:[epiId]});
+        S.model.epis.set(epiId, {id:epiId, valid:true, title:"Epico "+suf, parent:relId, target:null, interno:null, st:0, ops:[opId], type:"Epic"});
+      });
+      S.f.team = team; S.f.exec = sem; S.f.q = "";
+      render();
+      const semQ = anData().rows.length;
+      S.f.q = "EPI_Q_a";
+      render();
+      const d = anData();
+      return {semQ, comQ: d.rows.length, hl: d.rows.map(row => ({id: row.e.id, hl: row.hl}))};
+    }""", sem)
+    assert r["semQ"] == 2
+    assert r["comQ"] == 2   # continua mostrando os dois épicos, não filtra
+    hl_map = {x["id"]: x["hl"] for x in r["hl"]}
+    assert hl_map["EPI_Q_a"] is True
+    assert hl_map["EPI_Q_b"] is False
+
+def test_id_de_item_do_time_tambem_destaca_o_epico_pai(page):
+    """O destaque (decisão 0054) reaproveita o mesmo alcance do filtro q do quadro: bater com o ID de um
+    item de time vinculado ao épico também destaca a linha do épico, não só um match direto no próprio
+    épico/iniciativa."""
+    carregar(page, "f4p.xlsx")
+    sem = page.evaluate("semestre(TODAY)")
+    r = page.evaluate("""(sem)=>{
+      const team = "AN_Q2";
+      S.model.teamFlow[team] = ["Backlog", "Vazao"];
+      CFG.flow[norm(team)] = {cat:{vazao:"vazao"}, ct:[]};
+      S.model.ops.set("AN_Q2_item", {id:"AN_Q2_item", title:"Item do time", team, type:"User Story", stName:"Backlog", deploy:null, ready:null, tags:[]});
+      S.model.inis.set("INI_Q2", {id:"INI_Q2", valid:true, title:"Ini", exec:sem, owner:null, rels:["REL_Q2"]});
+      S.model.rels.set("REL_Q2", {id:"REL_Q2", valid:true, title:"Rel", parent:"INI_Q2", epis:["EPI_Q2"]});
+      S.model.epis.set("EPI_Q2", {id:"EPI_Q2", valid:true, title:"Epico", parent:"REL_Q2", target:null, interno:null, st:0, ops:["AN_Q2_item"], type:"Epic"});
+      S.f.team = team; S.f.exec = sem; S.f.q = "AN_Q2_item";
+      render();
+      return anData().rows.map(row => ({id: row.e.id, hl: row.hl}));
+    }""", sem)
+    assert r == [{"id": "EPI_Q2", "hl": True}]
+
 def test_filtro_responsavel_utilizavel_com_o_painel_aberto(page):
     """Bug relatado pelo usuário: com o painel da Visão analítica aberto, o filtro "Time" e "Roadmap
     interno" (campos <select> nativos) funcionavam, mas "Responsável da iniciativa" (popup próprio,
