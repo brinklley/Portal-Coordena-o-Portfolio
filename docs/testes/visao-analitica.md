@@ -159,6 +159,24 @@ agora mostra.
 - **Teste**: `test_status_ordena_pela_fase_da_reserva_nao_pela_fase_de_todos_os_itens`
 - **Relacionado**: decisão `0049-status-usa-so-itens-reservados-e-cor-do-id-por-categoria.md`.
 
+### Ordem padrão prioriza Entregue, depois WIP, Discovery, Backlog e por último Sem reserva
+
+**Garante que** (decisão `0053`, pedido do usuário): a ordenação padrão da tabela (`AN.sort = "status"`,
+`AN.dir = 1`) prioriza visualmente o trabalho mais adiantado — Entregue primeiro, depois WIP, Discovery,
+Backlog e, por último, Sem reserva (nenhum item sequer reservado) — em vez da ordem antiga (WIP,
+Discovery, Backlog, Sem reserva e só depois Entregue), que não ajudava o usuário a focar no que estava
+mais perto da entrega.
+
+- **Dado**: 5 épicos do mesmo time, um em cada fase de Status possível (Entregue, WIP, Discovery,
+  Backlog, Sem reserva).
+- **Então (sucesso)**: `anSorted` retorna nessa ordem: `["fechado", "wip", "discovery", "backlog",
+  "vazio"]`.
+- **Teste**: `test_status_ordena_entregue_primeiro_depois_wip_discovery_backlog_e_sem_reserva_por_ultimo`
+- **Cenário de falha coberto**: com a ordem antiga, épicos já entregues apareciam no fim da tabela,
+  misturados/atrás de épicos sem nenhuma reserva — o usuário precisava rolar a tabela toda pra achar o
+  que já estava pronto, em vez de ver primeiro o que está em foco.
+- **Relacionado**: decisão `0053-status-prioriza-entregue-depois-wip-discovery-backlog.md`.
+
 ## Regra: épico órfão (sem release/iniciativa) aparece no roadmap interno, com aviso
 
 **Garante que**: um épico sem vínculo de release/iniciativa, mas com Target Date/semestre próprio

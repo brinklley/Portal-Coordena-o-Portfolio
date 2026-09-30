@@ -3,7 +3,12 @@ const AN = {open:false, sort:"status", dir:1};
 const anEnabled = () => !!(S.model && S.f.team && (S.f.exec || S.f.int));
 const semLong = s => { const m = /(\d{4})\s*(\d)/.exec(s || ""); return m ? `${m[2]}º semestre ${m[1]}` : (s || ""); };
 const semShort = s => { const m = /(\d{4})\s*(\d)/.exec(s || ""); return m ? `${m[2]}S/${m[1].slice(2)}` : "--"; };
-const PH_ORDER = {wip:0, discovery:1, backlog:2, vazio:3, fechado:4};
+/* Ordem de prioridade da coluna Status (decisão `0053`): Entregue primeiro (nada mais a fazer, só
+   conferir), depois WIP (em andamento, foco imediato), Discovery, Backlog e por último Sem reserva (sem
+   nenhum item reservado para acompanhar) — ajuda o usuário a priorizar visualmente o que está em foco,
+   do mais adiantado pro menos. Direção padrão (`AN.dir = 1`, ascendente) já resulta nessa ordem sem
+   precisar clicar na coluna. */
+const PH_ORDER = {fechado:0, wip:1, discovery:2, backlog:3, vazio:4};
 const PH_TXT = {vazio:"Sem itens", backlog:"Backlog", discovery:"Discovery", wip:"WIP", fechado:"Entregue"};
 /* Status (coluna da Visão analítica) usa a mesma fase, mas calculada só sobre a Reserva — "vazio" nesse
    caso nunca é "o épico não tem itens" (rowOf só existe para épicos com item do time), e sim "nenhum

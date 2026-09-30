@@ -321,6 +321,43 @@ def test_status_ordena_pela_fase_da_reserva_nao_pela_fase_de_todos_os_itens(page
     }""")
     assert r == ["backlog"]
 
+def test_status_ordena_entregue_primeiro_depois_wip_discovery_backlog_e_sem_reserva_por_ultimo(page):
+    """Decisão 0053: pedido do usuário para priorizar visualmente os épicos com trabalho mais adiantado
+    — a ordem padrão (AN.dir = 1, coluna Status) passa a ser Entregue, WIP, Discovery, Backlog e por
+    último Sem reserva, em vez da ordem antiga (WIP, Discovery, Backlog, Sem reserva, Entregue)."""
+    carregar(page, "f4p.xlsx")
+    sem = page.evaluate("semestre(TODAY)")
+    r = page.evaluate("""(sem)=>{
+      const team = "AN_ST_ORDEM";
+      S.model.teamFlow[team] = ["Backlog", "Discovery", "WIP", "Vazao"];
+      CFG.flow[norm(team)] = {cat:{discovery:"disc", wip:"wip", vazao:"vazao"}, ct:[]};
+      const fases = [
+        {sufixo:"backlog", itens:[{stName:"Backlog", tags:["ROADMAP"]}]},
+        {sufixo:"vazio", itens:[{stName:"Backlog", tags:[]}]},
+        {sufixo:"discovery", itens:[{stName:"Discovery", tags:["ROADMAP"]}]},
+        {sufixo:"fechado", itens:[{stName:"Vazao", deploy:new Date(2026,0,5), tags:["ROADMAP"]}]},
+        {sufixo:"wip", itens:[{stName:"WIP", tags:["ROADMAP"]}]},
+      ];
+      fases.forEach(f => {
+        const iniId = `INI_ORD_${f.sufixo}`, relId = `REL_ORD_${f.sufixo}`, epiId = `EPI_ORD_${f.sufixo}`;
+        const opKeys = f.itens.map((it, idx) => {
+          const k = `${team}_${f.sufixo}_op${idx}`;
+          S.model.ops.set(k, {id:k, title:"Item", team, type:"User Story", stName: it.stName, deploy: it.deploy || null,
+            ready: it.stName !== "Backlog" ? new Date(2026,0,1) : null, tags: it.tags || []});
+          return k;
+        });
+        S.model.inis.set(iniId, {id:iniId, valid:true, title:"Ini", exec:sem, owner:null, rels:[relId]});
+        S.model.rels.set(relId, {id:relId, valid:true, title:"Rel", parent:iniId, epis:[epiId]});
+        S.model.epis.set(epiId, {id:epiId, valid:true, title:"Epi "+f.sufixo, parent:relId, target:null, interno:null, st:0, ops:opKeys, type:"Epic"});
+      });
+      S.f.team = team; S.f.exec = sem;
+      render();
+      AN.sort = "status"; AN.dir = 1;
+      const d = anData();
+      return anSorted(d.rows).map(row => row.reservaPhase);
+    }""", sem)
+    assert r == ["fechado", "wip", "discovery", "backlog", "vazio"]
+
 def test_filtro_responsavel_utilizavel_com_o_painel_aberto(page):
     """Bug relatado pelo usuário: com o painel da Visão analítica aberto, o filtro "Time" e "Roadmap
     interno" (campos <select> nativos) funcionavam, mas "Responsável da iniciativa" (popup próprio,
