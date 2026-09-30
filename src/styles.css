@@ -418,6 +418,7 @@ tr[data-cat="disc"] .fnb{background:var(--c-disc);color:#fff} tr[data-cat="wip"]
 .an-table th[aria-sort="ascending"]::after{content:" ▴"}
 .an-table td{padding:9px 12px;border:1px solid #fff;vertical-align:middle;background:#E8E8E8}
 .an-table tr:nth-child(even) td{background:#DADADA}
+.an-table tr.hl td{background:#FEF3C7;outline:2px solid #F59E0B;outline-offset:-2px}
 .an-table td.c{text-align:center}
 .an-table .ev{line-height:1.4}
 .an-table .ev .ep{font-weight:600}

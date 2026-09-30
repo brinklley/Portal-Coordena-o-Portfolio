@@ -38,6 +38,17 @@ def test_todos_os_times_aparecem_mesmo_com_time_filtrado(page):
     cols = page.evaluate("document.querySelector('#f4pBody .f4p-tbl thead').querySelectorAll('th').length")
     assert n_teams > 1 and cols == n_teams
 
+def test_ignora_filtro_de_id_ou_descricao_so_roadmap_time_e_responsavel_afetam(page):
+    """Decisão 0054: Report F4P (assim como Visão analítica e Actionable) só deve ser afetado pelos
+    filtros de roadmap (interno ou executivo), time e responsável — o campo "ID ou descrição" (S.f.q)
+    não deve mudar os números deste painel."""
+    carregar(page, "f4p.xlsx")
+    page.evaluate("()=>{ S.f.team='CORE'; S.f.exec=semestre(TODAY); render(); }")
+    sem_q = page.evaluate("f4pMetrics('CORE').n")
+    page.evaluate("()=>{ S.f.q='999999'; render(); }")
+    com_q = page.evaluate("f4pMetrics('CORE').n")
+    assert sem_q == com_q and sem_q > 0
+
 def test_quadrante_em_definicao_mostra_travessao_e_nota(page):
     """Nenhum quadrante fica mais "em definição" no painel atual (os 8 têm regra fechada, decisão 0031),
     mas o código genérico que renderiza esse estado continua coberto — útil se um quadrante futuro for

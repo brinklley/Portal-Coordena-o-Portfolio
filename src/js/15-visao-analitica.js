@@ -25,13 +25,20 @@ function anDeadline(sem, max){
 function anTypes(){ return new Set((CFG.ctTypes || []).map(norm)); }
 /* Projetada e Capacidade são sempre a SOMA dos itens contados em cada linha de épico (não uma contagem
    à parte sobre S.V.visOp): garante que os dois números batem exatamente com o que a tabela mostra por
-   épico, sem risco de divergência entre o cabeçalho e as linhas (decisão 0027). */
+   épico, sem risco de divergência entre o cabeçalho e as linhas (decisão 0027).
+   Decisão `0054`: a Visão analítica (assim como o Report F4P e o Actionable) só filtra por
+   roadmap/time/responsável — o campo "ID ou descrição" (`S.f.q`) não reduz a lista de épicos aqui, só
+   destaca (`r.hl`) a linha correspondente, para não fazer o usuário perder a visão do conjunto inteiro
+   só por ter digitado um ID pra localizar um item específico. Por isso `V` é calculado ignorando `q`
+   (`{...S.f, q:""}`), diferente de `S.V` (que o quadro usa e continua respeitando `q` normalmente). */
 function anData(){
-  const M = S.model, V = S.V, team = S.f.team, types = anTypes(), tag = norm(CFG.anTag || "ROADMAP");
+  const M = S.model, V = computeVisible({...S.f, q:""}), team = S.f.team, types = anTypes(), tag = norm(CFG.anTag || "ROADMAP");
   const isType = o => o.type && (!types.size || types.has(norm(o.type)));
   const hasTag = o => o.tags.map(norm).includes(tag);
   const L = limitsOf(team);
   const classKey = norm(CFG.anClassCol || "");
+  const q = norm(S.f.q), qId = S.f.q ? nid(S.f.q) : null;
+  const qHit = (id, title) => !!q && (id === qId || norm(title || "").includes(q));
   const rowOf = (e, i) => {
     const m = epiMetrics(e, team);
     const itens = m.recs.filter(isType);          // itens do épico que entram na Projetada
@@ -47,7 +54,8 @@ function anData(){
     const reservaPhase = phaseOf({n: reservados.length, disc: rCats.filter(c => c === "disc").length, wip: rCats.filter(c => c === "wip").length, vaz: rCats.filter(c => c === "vazao").length});
     const pending = m.recs.filter(o => isType(o) && !o.ready);   // ainda não entraram no fluxo do CT
     const cls = classKey && i && i.x ? fmtField(classKey, i.x[classKey]) : "--";
-    return {e, i, m, itens, qtd: itens.length, reservados, farName, reservaPhase, pending, ref: e.interno || (i && i.exec), cls: cls === "--" ? "" : cls};
+    const hl = qHit(e.id, e.title) || (!!i && qHit(i.id, i.title)) || e.ops.some(k => { const o = M.ops.get(k); return qHit(o.id, o.title); });
+    return {e, i, m, itens, qtd: itens.length, reservados, farName, reservaPhase, pending, ref: e.interno || (i && i.exec), cls: cls === "--" ? "" : cls, hl};
   };
   const rows = [...V.visEpi].map(id => M.epis.get(id)).map(e => rowOf(e, M.inis.get(M.rels.get(e.parent).parent)));
   // épicos sem release/iniciativa válida (fora do quadro normal), mas com itens do time filtrado e
@@ -92,7 +100,7 @@ function renderAnalytics(){
   const th = (k, lab) => `<th data-sort="${k}" ${AN.sort === k ? `aria-sort="${AN.dir > 0 ? "ascending" : "descending"}"` : ""}>${lab}</th>`;
   const rows = anSorted(d.rows).map(r => {
     const m = r.m, bad = m.ct != null && d.L.max && m.ct > d.L.max;
-    return `<tr>
+    return `<tr class="${r.hl ? "hl" : ""}">
       <td class="c"><button type="button" class="f4p-real" data-an-epi-items="qtd" data-an-epi="${esc(r.e.id)}" title="Ver os itens deste épico">${r.qtd}</button><br>${r.qtd === 1 ? "item" : "itens"}</td>
       <td class="ev"><span class="ep">[EP][<button class="idb" data-an-go="${esc(r.e.id)}">${esc(r.e.id)}</button>] ${esc(r.e.title || "")} <button type="button" class="f4p-real res" data-an-epi-items="res" data-an-epi="${esc(r.e.id)}" title="Ver os itens deste épico com a tag ${esc(CFG.anTag || "ROADMAP")} (capacidade do roadmap)">${r.reservados.length} reservado${r.reservados.length === 1 ? "" : "s"}</button></span><br>
         ${r.orphan ? `<mark title="Este épico não tem release nem iniciativa vinculada no Azure DevOps — corrija o Parent dele.">OBS: SEM INICIATIVA e SEM RELEASE</mark>` : `[IN][<button class="idi" data-an-go="${esc(r.i.id)}">${esc(r.i.id)}</button>] ${esc(r.i.title)}`}</td>
@@ -103,6 +111,9 @@ function renderAnalytics(){
       <td class="c">${esc(semShort(r.ref))}<br>${esc(r.cls || "---")}</td></tr>`; }).join("");
   $("anBody").innerHTML = `<table class="an-table" id="anTable"><thead><tr>${th("qtd","QTD")}${th("ep","Evolução")}${th("status","Status")}${th("ct","Flow")}${th("ref","Ref.")}</tr></thead><tbody>${rows}</tbody></table>
     <div class="an-note">Épicos com itens do time ${esc(d.team)} dentro dos filtros atuais (${esc(rm)}). QTD, Capacidade e Projetada contam itens dos tipos ${esc(ctTypesLabel())}; Capacidade só os com a tag ${esc(CFG.anTag || "ROADMAP")}. Projetada é sempre a soma do QTD de cada épico da tabela; Capacidade é sempre a soma do "reservado" de cada épico. Os números do cabeçalho (Capacidade e Projetada) e os de cada linha (QTD e "reservado") são clicáveis e abrem a lista dos itens exatos que entram em cada soma (com a situação: Backlog, Discovery, WIP ou Vazão, com a data quando entregue). Status mostra a fase e a coluna do fluxo só dos itens reservados (com a tag ${esc(CFG.anTag || "ROADMAP")}) — não de todo o vínculo do time com o épico; o agrupador de categorias logo abaixo continua somando todos os itens, com ou sem a tag. Flow segue a configuração do fluxo do time; CycleTime em vermelho passa do CT máximo. Dead line = fim do semestre${CFG.anFreeze ? ` menos ${CFG.anFreeze} dias` : ""} menos o CT máximo; “itens fora do fluxo” ainda não chegaram na coluna de entrada do CT. Ref.: roadmap interno do épico (ou o executivo da iniciativa, se vazio) e ${esc(CFG.anClassCol || "classificação")} da iniciativa.</div>`;
+  // decisão 0054: "ID ou descrição" só destaca a linha aqui (não filtra) — rola até a primeira linha
+  // destacada pra ajudar a localizar visualmente, sem precisar procurar na tabela inteira.
+  if (S.f.q){ const hl = $("anBody").querySelector("tr.hl"); if (hl) hl.scrollIntoView({block:"center"}); }
 }
 const fmtDM = d => d ? d.toLocaleDateString("pt-BR", {day:"2-digit", month:"short"}).replace(".", "").replace(" de ", "/").toUpperCase() : "--";
 function placeAnalytics(){ const h = document.querySelector(".top").offsetHeight; $("anPanel").style.top = h + "px"; $("anPanel").style.height = `calc(100% - ${h}px)`; }

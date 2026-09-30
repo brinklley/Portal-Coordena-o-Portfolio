@@ -177,6 +177,34 @@ mais perto da entrega.
   que já estava pronto, em vez de ver primeiro o que está em foco.
 - **Relacionado**: decisão `0053-status-prioriza-entregue-depois-wip-discovery-backlog.md`.
 
+## Regra: "ID ou descrição" não filtra a tabela — só destaca a linha correspondente
+
+**Garante que** (decisão `0054`, pedido do usuário): esta tabela — assim como o Report F4P e o
+Actionable — só é afetada pelos filtros de roadmap (interno ou executivo), time e responsável. O campo
+"ID ou descrição" (`S.f.q`), que reduz a cadeia visível no quadro (whiteboard, §3.1), aqui **não** remove
+nenhum épico da lista: `anData()` calcula a visibilidade dos épicos ignorando `q`
+(`computeVisible({...S.f, q:""})`), e só marca `row.hl = true` na(s) linha(s) cujo épico, iniciativa ou
+algum item de time vinculado bate com o texto digitado — mesmo alcance de match do filtro `q` do quadro
+(ID exato ou parte do título), só que sem esconder o resto.
+
+- **Dado**: dois épicos do mesmo time+roadmap; `S.f.q` com o ID de um deles.
+- **Então (sucesso)**: `anData().rows.length` continua `2` (nenhum some), e só o épico que bate tem
+  `hl: true`.
+- **Teste**: `test_id_ou_descricao_nao_filtra_epicos_so_destaca_a_linha_correspondente`
+- **Bate por item de time, não só por épico/iniciativa**: um ID de item vinculado ao épico também marca
+  `hl: true` na linha do épico pai (o item em si não tem linha própria nesta tabela).
+  - **Teste**: `test_id_de_item_do_time_tambem_destaca_o_epico_pai`
+- **Cenário de falha coberto**: o usuário reportou (print da tabela "Roadmap MOBILE") que digitar um ID
+  reduzia a tabela a uma única linha, escondendo os outros épicos do time+roadmap selecionados — o
+  oposto do que essas telas devem fazer, já que aqui o objetivo é o panorama do time no roadmap, não uma
+  busca pontual (que já existe no quadro).
+- **Report F4P e Actionable**: nunca dependiam de `S.f.q` para nada — seus cálculos sempre iteraram
+  `S.model.ops` direto, sem passar por `computeVisible`/`S.V`. Testes de regressão confirmam o número de
+  itens de cada painel intacto com `S.f.q` preenchido:
+  `test_ignora_filtro_de_id_ou_descricao_so_roadmap_time_e_responsavel_afetam` (em
+  `tests/test_report_f4p.py` e em `tests/test_actionable.py`).
+- **Relacionado**: decisão `0054-analiticos-ignoram-filtro-de-id-so-destacam.md`.
+
 ## Regra: épico órfão (sem release/iniciativa) aparece no roadmap interno, com aviso
 
 **Garante que**: um épico sem vínculo de release/iniciativa, mas com Target Date/semestre próprio
