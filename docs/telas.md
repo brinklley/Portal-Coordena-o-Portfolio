@@ -24,6 +24,7 @@ interface e a aba "Configurações gerais" (ver `docs/configuracoes.md`). Ver de
 - **ID ou descrição**: casa por ID exato ou por texto no título, em qualquer nível (iniciativa, release, épico ou item de time) — quem casa revela a cadeia inteira até a iniciativa (só o item casado, quando o match é num item de time dentro de um épico que não casou por si). Ao digitar, filtra ao vivo; no Enter, também tenta rolar/abrir o item, se a busca for um ID. Fica salvo como filtro ativo, igual aos demais, até ser limpo. Limpar o campo (inclusive pelo "×" do próprio input) também desfaz a seleção que o Enter tinha aberto (decisão `0035`).
 - Filtros ativos ficam destacados; "Limpar filtros (N)".
 - **Diagnóstico de quadro vazio**: explica qual filtro zerou o resultado e quantas iniciativas aparecem sem cada um; para um ID que existe mas não aparece, diz se é cadeia inválida, regra de exibição ou outro filtro escondendo, com um botão para remover e ir até ele.
+- **"+N ocultos"** (decisão `0050`): com algum filtro ativo, um botão pequeno no cabeçalho das faixas de Iniciativas, Releases e Épicos avisa quando aquele nível tem irmãos que o filtro está escondendo — só aparece se houver de fato algo oculto ali. Clicar revela os irmãos ocultos esmaecidos (mesmo estilo das iniciativas fora de foco), com a linha de conexão até o pai; clicar de novo esconde. Fica ligado entre navegações. Clicar num card revelado abre o painel de detalhes, mas não navega até ele (continua fora do filtro).
 
 ## Investigação por ID
 

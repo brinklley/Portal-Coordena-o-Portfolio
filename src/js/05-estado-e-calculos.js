@@ -1,5 +1,5 @@
 /* ---------------- estado ---------------- */
-const S = {model:null, f:{exec:"",owners:new Set(),int:"",team:"",q:""}, path:{}, pathQueryId:null, expand:false, focus:null, links:[], animateLevel:null, showEmpty:true, showBare:true, anchored:true, offsets:{}, offsetsSig:null};
+const S = {model:null, f:{exec:"",owners:new Set(),int:"",team:"",q:""}, path:{}, pathQueryId:null, expand:false, focus:null, links:[], animateLevel:null, showEmpty:true, showBare:true, anchored:true, offsets:{}, offsetsSig:null, showHidden:{ini:false, rel:false, epi:false}};
 
 /* Fase do épico pelos itens vinculados:
    Fechado = todos em Vazão; WIP = algum em WIP (ou já entregou parte e o resto ainda não começou);
@@ -79,9 +79,11 @@ const iniCanAppear = i => i.rels.some(id => { const r = S.model.rels.get(id); re
 /* filtro único "ID ou descrição" (decisão 0034): substitui os antigos campos separados de
    Iniciativa (ID ou nome) e "Ir para qualquer ID". Casa por ID exato OU por texto no título,
    em qualquer nível (iniciativa, release, épico ou item de time) — quem casar revela a cadeia
-   inteira até a iniciativa; quando só um item de time casa, só ele aparece na lista do épico. */
-function computeVisible(){
-  const M = S.model, f = S.f;
+   inteira até a iniciativa; quando só um item de time casa, só ele aparece na lista do épico.
+   `f` é opcional (padrão `S.f`) — usado também por `computeVisibleAll()` (decisão `0050`) para
+   calcular "como ficaria sem nenhum filtro", sem duplicar esta função inteira. */
+function computeVisible(f){
+  const M = S.model; f = f || S.f;
   const q = norm(f.q), qId = f.q ? nid(f.q) : null;
   const visEpi = new Set(), visRel = new Set(), visIni = new Set(), visOp = new Set();
   const qHit = (id, title) => !q || id === qId || norm(title).includes(q);
@@ -113,6 +115,14 @@ function computeVisible(){
     M.inis.forEach(i => { if (!bareIni(i) || !passIni(i)) return; if (!qHit(i.id, i.title)) return; visIni.add(i.id); });
   }
   return {visEpi, visRel, visIni, visOp};
+}
+/* Visibilidade como se nenhum filtro estivesse ativo (decisão `0050`) — usada para descobrir quais
+   irmãos de um item visível estão ocultos só por causa do(s) filtro(s) atual(is) ("+N ocultos" no
+   quadro): um item presente aqui mas ausente em `computeVisible()` foi excluído pelo filtro; um item
+   ausente aqui também (épico inválido, sem itens, etc.) nunca apareceria de qualquer forma, então não
+   entra na contagem de "ocultos pelo filtro". `S.showBare` não é filtro, então é respeitado normalmente. */
+function computeVisibleAll(){
+  return computeVisible({exec:"", owners:new Set(), int:"", team:"", q:""});
 }
 
 /* Assinatura do que molda a forma do whiteboard (quais iniciativas/releases/épicos/itens aparecem e em

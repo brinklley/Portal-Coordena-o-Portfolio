@@ -1,6 +1,6 @@
 # Documentação dos testes
 
-Este é o contrato de regras que a suíte automatizada (`tests/`, 229 testes — pytest + Playwright)
+Este é o contrato de regras que a suíte automatizada (`tests/`, 237 testes — pytest + Playwright)
 protege. Cada arquivo aqui documenta, por domínio funcional, **o que cada regra garante, com que
 entrada, o resultado esperado no caso de sucesso e o cenário de falha (bug ou regressão) que o teste
 existe para impedir** — no estilo BDD (Dado/Quando/Então), citando a(s) função(ões) de teste que
@@ -62,6 +62,7 @@ aparecem juntos na mesma entrada, cada um citado pelo nome exato da função.
 | [`ct-alertas-tags.md`](ct-alertas-tags.md) | CycleTime do item/épico, alertas, tags | 4 | §6, §8, §9 |
 | [`filtros-e-busca.md`](filtros-e-busca.md) | Filtros e o campo único "ID ou descrição" | 7 | `docs/telas.md` |
 | [`quadro-e-selecao.md`](quadro-e-selecao.md) | Board de Iniciativas: recolher/manter visíveis | 6 | `docs/telas.md` |
+| [`itens-ocultos-pelo-filtro.md`](itens-ocultos-pelo-filtro.md) | "+N ocultos": revelar irmãos escondidos pelo filtro ativo | 8 | §3.2 |
 | [`ilhas-e-cadeia-completa.md`](ilhas-e-cadeia-completa.md) | Whiteboard: ilhas soltas manualmente | 3 | `docs/telas.md` |
 | [`configuracoes.md`](configuracoes.md) | Validações, exportação sem token, limpar tudo | 6 | `docs/configuracoes.md` |
 | [`visao-analitica.md`](visao-analitica.md) | Visão analítica do roadmap do time | 19 | §10 |

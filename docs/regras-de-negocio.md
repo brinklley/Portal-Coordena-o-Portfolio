@@ -63,6 +63,31 @@ Decisão: `docs/decisoes/0003-regra-b-itens-sem-desdobramento.md`.
 | Time | épicos com pelo menos um item do time; itens só daquele time; métricas do épico passam a considerar só o time |
 | ID ou descrição (decisão `0034`) | ID exato ou parte do título (sem acento, sem maiúsculas), em qualquer nível (iniciativa, release, épico ou item de time) — quem casa revela a cadeia até a iniciativa; quando só um item de time casa, os demais itens do épico continuam escondidos |
 
+### 3.2 "+N ocultos": revelar irmãos escondidos pelo filtro (decisão `0050`)
+
+Com pelo menos um filtro ativo, um card visível pode ter irmãos (mesmo nível, mesmo pai) que o filtro
+esconde sem deixar rastro — o usuário via só a cadeia filtrada, sem saber que existia mais coisa ali.
+
+- **Onde aparece**: um botão pequeno `+N ocultos` no cabeçalho da faixa de Iniciativas, Releases ou
+  Épicos — só quando aquela faixa, no recorte atual (a iniciativa selecionada, para Releases; a(s)
+  release(s) em foco, para Épicos; o quadro inteiro, para Iniciativas, que não tem "pai"), tem pelo
+  menos um irmão que apareceria sem o(s) filtro(s) ativo(s) mas está de fora com ele(s). Sem nada
+  oculto ali, o botão simplesmente não aparece — nunca "por via das dúvidas". Não existe para o nível
+  Operacional (itens de time).
+- **"Oculto pelo filtro" ≠ "não existe"**: comparado contra a visibilidade **sem nenhum filtro**
+  (`computeVisibleAll()`) — um item que não apareceria de qualquer forma (épico inválido, sem itens,
+  etc.) nunca entra nessa contagem, só o que é genuinamente um efeito do filtro atual.
+- **Clique**: alterna para `− N ocultos` e os irmãos ocultos passam a aparecer na faixa, esmaecidos
+  (mesmo estilo `.dim` já usado pelas iniciativas fora de foco), na coluna do fluxo que teriam se não
+  estivessem filtrados, com a linha de conexão até o pai igual aos cards normais. Clicar de novo
+  esconde. A contagem do cabeçalho da faixa (o número ao lado de "Iniciativas"/"Releases"/"Épicos") e
+  as estatísticas continuam baseadas só nos visíveis — revelar não infla esses números.
+- **Preferência, não estado da seleção**: fica ligado entre navegações (mesmo padrão de "Manter todas
+  as iniciativas visíveis") — só deixa de aparecer se o novo recorte não tiver mais nada oculto.
+- **Card revelado é clicável, mas não navegável**: clicar nele abre o painel de detalhes (o mesmo que
+  clicar em qualquer card), mas não tenta "entrar" nele — como ele continua fora do filtro ativo, virar
+  o item selecionado seria descartado de novo pela mesma regra que o esconde.
+
 ## 4. Fluxo e status
 
 - **Status** = a última coluna do fluxo que está preenchida (tem data) no registro.

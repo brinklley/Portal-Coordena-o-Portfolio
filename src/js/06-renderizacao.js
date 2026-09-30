@@ -23,16 +23,22 @@ function render(){
   S.links = [];
   let html = "";
   const team = S.f.team;
+  // itens ocultos só pelo(s) filtro(s) ativo(s) (decisão `0050`): comparado contra a visibilidade sem
+  // nenhum filtro — um item ausente dos dois (épico inválido, sem itens, etc.) nunca apareceria de
+  // qualquer forma, então não entra como "oculto pelo filtro". Só calculado quando há filtro ativo,
+  // pra não pagar o custo de rodar computeVisible() de novo à toa.
+  const VAll = activeFilters().length ? computeVisibleAll() : V;
 
   // Nível 1: Iniciativas
   const iniList = [...V.visIni].map(id => M.inis.get(id));
+  const iniHidden = VAll === V ? [] : [...VAll.visIni].filter(id => !V.visIni.has(id)).map(id => M.inis.get(id));
   const collapsed = !!S.path.ini && !S.showAllIni;
   const iniShown = collapsed ? iniList.filter(i => i.id === S.path.ini) : iniList;
   const iniOthers = iniList.length - 1;
   const iniCtx = !S.path.ini || !iniOthers ? null : collapsed
     ? `mostrando só a selecionada — marque “Manter todas as iniciativas visíveis” para ver as outras ${iniOthers}`
     : `mostrando todas — as outras ${iniOthers} ficam sem foco`;
-  html += lane("ini", iniShown, M.stages.ini, it => it.st >= 0 ? M.stages.ini[it.st] : null, iniCtx, statsIni(iniList, V));
+  html += lane("ini", iniShown, M.stages.ini, it => it.st >= 0 ? M.stages.ini[it.st] : null, iniCtx, statsIni(iniList, V), false, "", iniHidden);
 
   if (!iniList.length){
     S.emptyDiag = activeFilters().length ? diagnoseEmpty() : null;
@@ -45,21 +51,27 @@ function render(){
   if (S.path.ini){
     const ini = M.inis.get(S.path.ini);
     const relList = ini.rels.filter(id => V.visRel.has(id)).map(id => M.rels.get(id));
+    const relHidden = VAll === V ? [] : ini.rels.filter(id => VAll.visRel.has(id) && !V.visRel.has(id)).map(id => M.rels.get(id));
     relList.forEach(r => S.links.push(["ini:"+ini.id, "rel:"+r.id, healthRel(r,V)]));
+    if (S.showHidden.rel) relHidden.forEach(r => S.links.push(["ini:"+ini.id, "rel:"+r.id, healthRel(r,V)]));
     html += lane("rel", relList, M.stages.rel, it => it.st >= 0 ? M.stages.rel[it.st] : null,
       `da iniciativa #${esc(ini.id)} ${esc(ini.title)}`, statsRel(relList), false,
-      !ini.rels.length ? "Iniciativa sem release: nenhuma release tem esta iniciativa como Parent." : "");
+      !ini.rels.length ? "Iniciativa sem release: nenhuma release tem esta iniciativa como Parent." : "", relHidden);
 
     // Nível 3: Épicos
     const relSrc = S.expand ? relList : (S.path.rel ? [M.rels.get(S.path.rel)] : []);
     if (relSrc.length){
-      const epiList = [];
+      const epiList = [], epiHidden = [];
       relSrc.forEach(r => r.epis.filter(id => V.visEpi.has(id)).forEach(id => {
         const e = M.epis.get(id); epiList.push(e); S.links.push(["rel:"+r.id, "epi:"+e.id, healthEpi(e)]);
       }));
+      if (VAll !== V) relSrc.forEach(r => r.epis.filter(id => VAll.visEpi.has(id) && !V.visEpi.has(id)).forEach(id => {
+        const e = M.epis.get(id); epiHidden.push(e);
+        if (S.showHidden.epi) S.links.push(["rel:"+r.id, "epi:"+e.id, healthEpi(e)]);
+      }));
       const ctx = S.expand ? `de todas as releases da iniciativa #${esc(ini.id)}` : `da release #${esc(relSrc[0].id)} ${esc(relSrc[0].title)}`;
       html += lane("epi", epiList, M.stages.epi, it => it.st >= 0 ? M.stages.epi[it.st] : null, ctx, statsEpi(epiList), false,
-        relSrc.length === 1 && !relSrc[0].epis.length ? "Release sem épico: nenhum épico tem esta release como Parent." : "");
+        relSrc.length === 1 && !relSrc[0].epis.length ? "Release sem épico: nenhum épico tem esta release como Parent." : "", epiHidden);
 
       // Nível 4: Operacional
       const epiSrc = S.expand ? epiList : (S.path.epi ? [M.epis.get(S.path.epi)] : []);
@@ -156,8 +168,10 @@ function packIslands(isls){
   rows.forEach(r => { const out = []; r.items.forEach((it,k) => k % 2 ? out.unshift(it) : out.push(it)); r.items = out.reverse(); });
   return rows;
 }
-function lane(lvl, items, stages, stageOf, ctx, stats, swim, emptyMsg){
+function lane(lvl, items, stages, stageOf, ctx, stats, swim, emptyMsg, hidden){
   const M = S.model;
+  hidden = hidden || [];
+  const showingHidden = hidden.length && S.showHidden[lvl];
   if (swim){
     const teams = M.teams.filter(t => items.some(o => o.team === t));
     const rows = items.length ? packIslands(teams.map(t => island(t, items.filter(o => o.team === t)))) : [];
@@ -172,15 +186,22 @@ function lane(lvl, items, stages, stageOf, ctx, stats, swim, emptyMsg){
   const byStage = new Map(); stages.forEach(s => byStage.set(norm(s), []));
   const noStatus = [];
   items.forEach(it => { const s = stageOf(it); if (s && byStage.has(norm(s))) byStage.get(norm(s)).push(it); else noStatus.push(it); });
-  let cols = [...(noStatus.length ? [{name:"Sem status", items:noStatus}] : []), ...stages.map(s => ({name:s, items:byStage.get(norm(s))}))];
+  // itens ocultos pelo filtro (decisão `0050`), quando revelados: bucketados pela mesma coluna que
+  // teriam se não estivessem filtrados, e desenhados junto com os visíveis (com `.dim`) — não entram em
+  // `items`/`byStage`, então não afetam a contagem do cabeçalho nem as estatísticas da faixa.
+  const hByStage = new Map(); stages.forEach(s => hByStage.set(norm(s), []));
+  const hNoStatus = [];
+  if (showingHidden) hidden.forEach(it => { const s = stageOf(it); if (s && hByStage.has(norm(s))) hByStage.get(norm(s)).push(it); else hNoStatus.push(it); });
+  let cols = [...(noStatus.length || hNoStatus.length ? [{name:"Sem status", items:noStatus, hid:hNoStatus}] : []), ...stages.map(s => ({name:s, items:byStage.get(norm(s)), hid:hByStage.get(norm(s))}))];
   const nEmpty = cols.filter(c => !c.items.length).length;
-  if (!S.showEmpty && items.length) cols = cols.filter(c => c.items.length);
-  const widths = cols.map(c => c.items.length ? (lvl === "op" ? "200px" : "216px") : "40px");
+  const hasContent = c => c.items.length || c.hid.length;
+  if (!S.showEmpty && (items.length || showingHidden)) cols = cols.filter(hasContent);
+  const widths = cols.map(c => hasContent(c) ? (lvl === "op" ? "200px" : "216px") : "40px");
   const tmpl = (swim ? "86px " : "") + widths.join(" ");
 
   let g = `<div class="grid" style="grid-template-columns:${tmpl}">`;
   if (swim) g += `<div></div>`;
-  cols.forEach(c => g += `<div class="colhead ${c.items.length ? "" : "empty"}" title="${esc(c.name)}"><span>${esc(c.name)}</span><span class="n">${c.items.length || ""}</span></div>`);
+  cols.forEach(c => g += `<div class="colhead ${hasContent(c) ? "" : "empty"}" title="${esc(c.name)}"><span>${esc(c.name)}</span><span class="n">${c.items.length || ""}</span></div>`);
   if (swim){
     const teams = M.teams.filter(t => items.some(o => o.team === t));
     teams.forEach((t,ti) => {
@@ -189,24 +210,25 @@ function lane(lvl, items, stages, stageOf, ctx, stats, swim, emptyMsg){
       cols.forEach(c => { const its = c.items.filter(o => o.team === t); g += `<div class="cell ${c.items.length ? "" : "empty"}">${its.map(card).join("")}</div>`; });
     });
   } else {
-    cols.forEach(c => g += `<div class="cell ${c.items.length ? "" : "empty"}">${c.items.map(card).join("")}</div>`);
+    cols.forEach(c => g += `<div class="cell ${hasContent(c) ? "" : "empty"}">${c.items.map(it => card(it)).join("")}${c.hid.map(it => card(it, true)).join("")}</div>`);
   }
   g += `</div>`;
   const tf = S.f.team && lvl !== "ini" ? "" : "";
+  const hideToggle = hidden.length ? `<button type="button" class="hide-toggle" data-hide-toggle="${lvl}" title="${hidden.length} ${hidden.length === 1 ? "item ocultado" : "itens ocultados"} pelo(s) filtro(s) ativo(s)">${S.showHidden[lvl] ? `− ${hidden.length} ocultos` : `+ ${hidden.length} ocultos`}</button>` : "";
   return `<section class="lane" data-lvl="${lvl}" id="lane-${lvl}"><div class="lane-inner isle" data-move="lvl:${lvl}" style="--lc:${LVC[lvl]}">
     <header class="lane-head"><h2><span class="sw" style="background:${LVC[lvl]}"></span>${LV[lvl]} <span style="font-weight:400;color:var(--ink-3)">${items.length}</span></h2>
-    ${ctx ? `<span class="ctx">${ctx}</span>` : ""}${!S.showEmpty && items.length && nEmpty ? `<span class="hidden-note">${nEmpty} ${nEmpty === 1 ? "etapa vazia oculta" : "etapas vazias ocultas"}</span>` : ""}<div class="stats">${stats}</div></header>
-    <div class="lane-scroll">${items.length ? g : `<p class="hint" style="padding:6px 0">${emptyMsg || "Nenhum item vinculado com os filtros atuais."}</p>`}</div>${tf}</div></section>`;
+    ${ctx ? `<span class="ctx">${ctx}</span>` : ""}${hideToggle}${!S.showEmpty && items.length && nEmpty ? `<span class="hidden-note">${nEmpty} ${nEmpty === 1 ? "etapa vazia oculta" : "etapas vazias ocultas"}</span>` : ""}<div class="stats">${stats}</div></header>
+    <div class="lane-scroll">${items.length || showingHidden ? g : `<p class="hint" style="padding:6px 0">${emptyMsg || "Nenhum item vinculado com os filtros atuais."}</p>`}</div>${tf}</div></section>`;
 }
 
-function card(it){
+function card(it, forceDim){
   const M = S.model, V = S.V, team = S.f.team;
   if (it.lvl === "ini"){
     const nRel = it.rels.filter(id => V.visRel.has(id)).length;
     const interno = [...new Set(it.rels.flatMap(rid => M.rels.get(rid).epis.filter(e=>V.visEpi.has(e)).map(e => M.epis.get(e).interno).filter(Boolean)))].sort();
     const div = interno.some(s => it.exec && norm(s) !== norm(it.exec));
     const h = healthIni(it, V);
-    const sel = S.path.ini === it.id, dim = !sel && S.path.ini && S.showAllIni;
+    const sel = S.path.ini === it.id, dim = forceDim || (!sel && S.path.ini && S.showAllIni);
     return `<button class="card lvl-ini ${sel ? "sel" : dim ? "dim" : ""}" data-key="ini:${esc(it.id)}" style="${stripeStyle(it)}">
       <div class="c-top"><span class="c-id">#${esc(it.id)}</span>${it.type ? `<span class="c-type">${esc(it.type)}</span>` : ""}<span class="h ${h}" title="${hTitle(h)}"></span></div>
       <div class="c-title">${esc(it.title)}</div>
@@ -218,7 +240,7 @@ function card(it){
     const nEpi = it.epis.filter(id => V.visEpi.has(id)).length;
     const h = healthRel(it, V);
     const sel = S.path.rel === it.id && !S.expand;
-    return `<button class="card lvl-rel ${sel ? "sel" : ""}" data-key="rel:${esc(it.id)}" style="${stripeStyle(it)}">
+    return `<button class="card lvl-rel ${sel ? "sel" : forceDim ? "dim" : ""}" data-key="rel:${esc(it.id)}" style="${stripeStyle(it)}">
       <div class="c-top"><span class="c-id">#${esc(it.id)}</span>${it.type ? `<span class="c-type">${esc(it.type)}</span>` : ""}<span class="h ${h}" title="${hTitle(h)}"></span></div>
       <div class="c-title">${esc(it.title)}</div>
       <div class="c-meta">${it.owner ? `<span>${esc(it.owner)}</span>` : ""}</div>${extraHtml(it)}
@@ -228,7 +250,7 @@ function card(it){
     const m = epiMetrics(it, team);
     const h = healthEpi(it);
     const sel = S.path.epi === it.id && !S.expand;
-    return `<button class="card lvl-epi ${sel ? "sel" : ""}" data-key="epi:${esc(it.id)}" style="${stripeStyle(it)}">
+    return `<button class="card lvl-epi ${sel ? "sel" : forceDim ? "dim" : ""}" data-key="epi:${esc(it.id)}" style="${stripeStyle(it)}">
       <div class="c-top"><span class="c-id">#${esc(it.id)}</span>${it.type ? `<span class="c-type">${esc(it.type)}</span>` : ""}${team ? `<span class="tag team" title="Cálculos só com registros do time ${esc(team)}">visão ${esc(team)}</span>` : ""}<span class="h ${h}" title="${hTitle(h)}"></span></div>
       <div class="c-title">${esc(it.title)}</div>
       <div class="c-meta"><span>Target <b>${fmt(it.target)}</b></span><span title="${esc("CT" + ctRange(m) + ", " + ctTip(m))}">CT <b>${m.ct ?? "--"}</b>${m.ct != null ? " d" : ""}</span><span>Ag. Deploy <b>${fmt(m.ag)}</b></span>
