@@ -435,6 +435,57 @@ def test_situacao_dos_itens_usa_categoria_do_fluxo_do_time(page):
     assert r["vazaoComData"] == "Vazão · 21/07/2026"
     assert r["semColuna"] == "Backlog"   # sem coluna reconhecida no fluxo do time: mesmo padrão de catOf ("none")
 
+# ---------------- Cor do ID por categoria de fluxo nos modais de itens (decisão 0049) ----------------
+# O fundo do ID (.idb) no modal de itens (f4pItemsModal) era sempre verde (cor de Vazão), mesmo para
+# itens em Backlog/Discovery/WIP — dando a entender que tudo já tinha sido entregue. Passa a usar a mesma
+# paleta de categoria de fluxo (.fb, Configurações › Fluxo dos times) do resto do portal: neutro
+# (Backlog), azul claro (Discovery), azul escuro (WIP) e verde (Vazão). Épicos (Roadmap – Épicos) não têm
+# categoria de fluxo (catOf é de item operacional) — usam f4pEpiCatClass, uma regra própria.
+
+def test_idb_usa_a_cor_da_categoria_de_fluxo_do_item(page):
+    carregar(page, "times.xlsx")   # fluxo do CORE tem coluna de Discovery (Refinamento)
+    page.evaluate("""()=>{
+      const mk = (id, stName, deploy) => ({id, title:id, team:'CORE', stName, deploy: deploy || null});
+      f4pItemsModal('teste', [
+        mk('I1', 'Backlog'),
+        mk('I2', 'Refinamento'),
+        mk('I3', 'Em Desenvolvimento'),
+        mk('I4', 'Fechado', new Date(2026,6,21)),
+      ]);
+    }""")
+    classes = page.locator("#f4pItemsBody .idb").evaluate_all("els => els.map(e => e.className)")
+    assert classes == ["idb none", "idb disc", "idb wip", "idb vazao"]
+
+def test_idb_aceita_catFn_proprio_no_lugar_de_catOf(page):
+    """f4pItemsModal aceita um catFn próprio (4º parâmetro) — usado pelo Roadmap – Épicos, que lista
+    épicos, não itens operacionais (catOf não se aplica a eles)."""
+    carregar(page, "times.xlsx")
+    page.evaluate("""()=>{ f4pItemsModal('teste', [{id:'X1', title:'X1'}], null, () => 'wip'); }""")
+    assert page.locator("#f4pItemsBody .idb").get_attribute("class") == "idb wip"
+
+def test_f4pEpiCatClass_e_verde_so_quando_o_epico_esta_fechado(page):
+    carregar(page, "f4p.xlsx")
+    page.evaluate("""()=>{ S.model.stages.epi = ["Backlog", "Fechado"]; }""")
+    r = page.evaluate("""()=>{
+      return {aberto: f4pEpiCatClass({st:0}), fechado: f4pEpiCatClass({st:1}), semStatus: f4pEpiCatClass({st:-1})};
+    }""")
+    assert r == {"aberto": "none", "fechado": "vazao", "semStatus": "none"}
+
+def test_clique_no_roadmap_epicos_colore_o_id_pela_coluna_do_proprio_quadro(page):
+    carregar(page, "f4p.xlsx")
+    page.evaluate("""()=>{
+      S.model.stages.epi = ["Backlog", "Fechado"];
+      const sem = semestre(TODAY);
+      S.f.team = "CORE"; S.f.int = sem;
+      S.model.ops.set("repi1", {team:"CORE"});
+      S.model.epis.set("REPI1", {id:"REPI1", parent:null, target:null, interno:sem, st:1, stDate:null, ops:["repi1"], type:"Epic"});
+      render();
+    }""")
+    page.click("#f4pTab")
+    page.click('button[data-f4p-road-team="CORE"][data-f4p-road-set="roadmap"]')
+    assert page.is_visible("#f4pItemsBg")
+    assert page.locator("#f4pItemsBody .idb").get_attribute("class") == "idb vazao"   # épico fechado
+
 # ---------------- Quadrante 5 · Vazão (reserva vs. reserva entregue vs. realizado) ----------------
 # Decisão 0022 (Realizado) e 0048 (Reserva). Realizado: itens **entregues** (categoria de fluxo Vazão)
 # dos tipos configurados para o CT (CFG.f4p.types, padrão User Story e Technical Story), cuja saída caiu

@@ -119,6 +119,46 @@ usa `epiMetrics(e, team)`, a mesma fonte já usada por QTD/Capacidade/Projetada.
 - **Teste**: `test_status_agrupador_conta_so_os_itens_do_time_filtrado`
 - **Relacionado**: decisão `0029`.
 
+## Regra: a fase/coluna da Status considera só os itens reservados, não todo o vínculo do time (decisão 0049)
+
+**Garante que**: a fase mostrada em texto (Backlog/Discovery/WIP/Entregue/"Sem reserva") e a coluna do
+fluxo do item aberto mais avançado (`farName`) são calculadas só sobre a **Reserva** (itens com a tag
+de capacidade, `reservados`) — não sobre todo o vínculo do time com o épico como antes. O agrupador
+por categoria (regra acima) continua somando **todos** os itens, com ou sem a tag; só a fase/coluna em
+texto muda.
+
+- **Dado**: um item **reservado** (tag `ROADMAP`) em Backlog e um item **não reservado**, mais
+  avançado, em WIP.
+- **Então (sucesso)**: `reservaPhase === "backlog"` e `farName === "Backlog"` — o item em WIP (fora da
+  reserva) não influencia a fase/coluna exibida, mesmo sendo o mais avançado do épico.
+- **Cenário de falha coberto**: exatamente o problema relatado pelo usuário — um item fora da reserva
+  em WIP fazia o Status mostrar "WIP", dando a entender que o trabalho *reservado* já estava andando,
+  quando na verdade era outro item (fora do roadmap) que estava avançado.
+- **Teste**: `test_status_usa_so_o_item_reservado_mais_avancado_nao_qualquer_item_do_time`
+
+### Sem nenhum item reservado: "Sem reserva" (não "Sem itens")
+
+**Garante que**: um épico com itens vinculados, mas nenhum com a tag de capacidade, mostra "Sem
+reserva" na Status — rótulo próprio, diferente de "Sem itens" (que sugeriria um épico vazio).
+
+- **Teste**: `test_status_mostra_sem_reserva_quando_nenhum_item_tem_a_tag`
+
+### Todos os reservados já em Vazão: "Entregue", mesmo com item não reservado ainda aberto
+
+**Garante que**: se todo item reservado do épico já está em Vazão, a Status mostra "Entregue" — um
+item não reservado ainda aberto (Backlog/Discovery/WIP) não impede isso, só aparece no agrupador.
+
+- **Teste**: `test_status_mostra_entregue_quando_so_os_reservados_ja_estao_em_vazao`
+
+### Ordenação pela coluna Status usa a mesma fase exibida
+
+**Garante que**: `anSorted` (clique no cabeçalho "Status") ordena pela fase da Reserva
+(`reservaPhase`), não mais pela fase de todos os itens (`m.phase`) — consistente com o que a coluna
+agora mostra.
+
+- **Teste**: `test_status_ordena_pela_fase_da_reserva_nao_pela_fase_de_todos_os_itens`
+- **Relacionado**: decisão `0049-status-usa-so-itens-reservados-e-cor-do-id-por-categoria.md`.
+
 ## Regra: épico órfão (sem release/iniciativa) aparece no roadmap interno, com aviso
 
 **Garante que**: um épico sem vínculo de release/iniciativa, mas com Target Date/semestre próprio

@@ -1,6 +1,6 @@
 # Documentação dos testes
 
-Este é o contrato de regras que a suíte automatizada (`tests/`, 221 testes — pytest + Playwright)
+Este é o contrato de regras que a suíte automatizada (`tests/`, 229 testes — pytest + Playwright)
 protege. Cada arquivo aqui documenta, por domínio funcional, **o que cada regra garante, com que
 entrada, o resultado esperado no caso de sucesso e o cenário de falha (bug ou regressão) que o teste
 existe para impedir** — no estilo BDD (Dado/Quando/Então), citando a(s) função(ões) de teste que
@@ -64,7 +64,7 @@ aparecem juntos na mesma entrada, cada um citado pelo nome exato da função.
 | [`quadro-e-selecao.md`](quadro-e-selecao.md) | Board de Iniciativas: recolher/manter visíveis | 6 | `docs/telas.md` |
 | [`ilhas-e-cadeia-completa.md`](ilhas-e-cadeia-completa.md) | Whiteboard: ilhas soltas manualmente | 3 | `docs/telas.md` |
 | [`configuracoes.md`](configuracoes.md) | Validações, exportação sem token, limpar tudo | 6 | `docs/configuracoes.md` |
-| [`visao-analitica.md`](visao-analitica.md) | Visão analítica do roadmap do time | 15 | §10 |
+| [`visao-analitica.md`](visao-analitica.md) | Visão analítica do roadmap do time | 19 | §10 |
 | [`report-f4p/README.md`](report-f4p/README.md) | Report F4P — regras compartilhadas entre os 8 quadrantes | — | §12, §12.1 |
 | [`report-f4p/cycletime-e-variabilidade.md`](report-f4p/cycletime-e-variabilidade.md) | F4P Quadrantes 1–2 | — | §12.2, §12.3 |
 | [`report-f4p/urgente.md`](report-f4p/urgente.md) | F4P Quadrante 3 | — | §12.4 |
@@ -75,7 +75,7 @@ aparecem juntos na mesma entrada, cada um citado pelo nome exato da função.
 | [`report-f4p/eficiencia-de-fluxo.md`](report-f4p/eficiencia-de-fluxo.md) | F4P Quadrante 8 | — | §12.9 |
 | [`actionable.md`](actionable.md) | Actionable: CycleTime, Distribuição Vazão por mês, Burnup Reserva e CFD | 45 | §13 |
 
-O Report F4P (`tests/test_report_f4p.py`, 124 testes) é a maior suíte do projeto — por isso ganhou
+O Report F4P (`tests/test_report_f4p.py`, 128 testes) é a maior suíte do projeto — por isso ganhou
 subpasta própria, com um `README.md` de regras compartilhadas (janelas de data, convenção de
 tendência, padrão de clique-para-ver-itens) e um arquivo por quadrante.
 

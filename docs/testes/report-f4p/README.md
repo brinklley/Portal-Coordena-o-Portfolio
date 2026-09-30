@@ -98,15 +98,26 @@ que entraram naquele cálculo — nunca uma amostra ou aproximação — e cada 
   (`f4pItemSituacao`/`catOf`: Backlog/Discovery/WIP/Vazão, com a data quando aplicável) — decisão
   `0019`, **não** um "Aberto"/"Fechado" genérico do Report F4P. Para Roadmap–Épicos, que opera sobre
   o quadro de Épicos, a Situação é a própria coluna do quadro de Épicos.
+- **Cor do ID no modal** (decisão `0049`): o fundo do ID (`.idb`) segue a mesma categoria mostrada na
+  Situação — neutro (Backlog), azul (Discovery), azul escuro (WIP) ou verde (Vazão), mesma paleta de
+  `.fb` (Configurações › Fluxo dos times). Antes era sempre verde (cor de Vazão), mesmo para itens
+  ainda abertos, dando a entender que tudo já tinha sido entregue. `f4pItemsModal` aceita um `catFn`
+  (4º parâmetro, padrão `catOf`); Roadmap–Épicos passa `f4pEpiCatClass` (verde só quando o épico está
+  na última coluna do próprio quadro de Épicos, cinza neutro nas demais — `catOf` não existe pra
+  épico).
 - **Cenário de falha coberto**: o modal mostraria um subconjunto diferente do número clicado (quebra
   de confiança), ou a navegação deixaria o modal/painel aberto por cima do item encontrado, ou a
-  Situação mostrada não bateria com a categoria usada no resto do portal.
+  Situação mostrada não bateria com a categoria usada no resto do portal, ou o ID ficaria sempre verde
+  independente do status real do item.
 - **Teste dedicado à função de situação**: `test_situacao_dos_itens_usa_categoria_do_fluxo_do_time`
   confere `f4pItemSituacao(o)` para cada categoria (Backlog/Discovery/WIP/Vazão com e sem data/sem
   coluna reconhecida) contra `times.xlsx` (fluxo do CORE com coluna de Discovery).
+- **Testes da cor do ID**: `test_idb_usa_a_cor_da_categoria_de_fluxo_do_item`,
+  `test_idb_aceita_catFn_proprio_no_lugar_de_catOf`, `test_f4pEpiCatClass_e_verde_so_quando_o_epico_esta_fechado`,
+  `test_clique_no_roadmap_epicos_colore_o_id_pela_coluna_do_proprio_quadro`.
 - **Relacionado**: decisão `0016` (lista de itens do Urgente, depois generalizada), `0019` (situação
-  por categoria de fluxo); ver os testes `test_..._clique_no_numero_abre_lista_e_permite_navegar` em
-  cada arquivo de quadrante.
+  por categoria de fluxo), `0049` (cor do ID por categoria); ver os testes
+  `test_..._clique_no_numero_abre_lista_e_permite_navegar` em cada arquivo de quadrante.
 
 ## Regra: configuração de cada quadrante persiste e entra na exportação
 
