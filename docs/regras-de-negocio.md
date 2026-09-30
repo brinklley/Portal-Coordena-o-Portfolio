@@ -219,7 +219,7 @@ Uso em CycleTime/Variabilidade: itens **concluídos** (com `o.deploy` preenchido
 ### 12.2 CycleTime (reserva vs. atual)
 
 - **Reserva**: CT máximo do time (`limitsOf(time).max`); sem CT planejado, usa o limite geral e sinaliza no texto de apoio.
-- **Atual**: **P95** do CT da amostra, por **interpolação linear** (igual ao `PERCENTIL.INC` do Excel — função `percentil`).
+- **Atual**: **P95** do CT da amostra, por **interpolação linear** (igual ao `PERCENTIL.INC` do Excel — função `percentil`). Para uma amostra de N itens, a posição interpolada do P95 pode cair longe do próprio máximo da amostra — não é "o pior caso", é uma posição específica perto do topo (decisão `0051`, investigação de um caso onde o P95 pareceu alto demais para o número de itens acima da Reserva).
 - Indicador: P95 > reserva → ▼ vermelho; P95 ≤ reserva → ▲ verde. Sem amostra, mostra "--".
 
 ### 12.3 Variabilidade (min vs. atual vs. max)
