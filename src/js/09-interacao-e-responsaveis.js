@@ -2,6 +2,11 @@
 board.addEventListener("click", e => {
   const c = e.target.closest(".card"); if (!c) return;
   const key = c.dataset.key; const [lvl, ...rest] = key.split(":"); const id = rest.join(":");
+  // card revelado por "+N ocultos" (decisão 0050): está fora do filtro ativo (não em V), então só
+  // abre o painel de detalhes (openDetail olha direto no modelo, sem depender de V) — tentar navegar
+  // até ele setaria S.path pra um id que o guard de render() descarta de novo, por não estar em V.
+  const inFilter = lvl === "ini" ? S.V.visIni.has(id) : lvl === "rel" ? S.V.visRel.has(id) : lvl === "epi" ? S.V.visEpi.has(id) : true;
+  if (!inFilter){ openDetail(key); return; }
   const scrollNext = next => { S.animateLevel = next; };
   if (S.expand && lvl !== "ini"){
     S.focus = S.focus === key ? null : key;
@@ -20,6 +25,16 @@ board.addEventListener("click", e => {
   render(); openDetail(key);
   const next = {ini:"rel", rel:"epi", epi:"op"}[lvl];
   if (next) revealLane(next);
+});
+
+/* "+N ocultos"/"− N ocultos" por faixa (decisão `0050`): alterna S.showHidden[lvl], que controla se os
+   irmãos ocultados pelo filtro ativo entram (esmaecidos, .dim) na faixa daquele nível. Fica ligado entre
+   navegações (mesmo padrão de S.showAllIni) — só não aparece de novo se não houver mais nada oculto. */
+board.addEventListener("click", e => {
+  const t = e.target.closest("[data-hide-toggle]"); if (!t) return;
+  const lvl = t.dataset.hideToggle;
+  S.showHidden[lvl] = !S.showHidden[lvl];
+  render();
 });
 
 $("btnExpand").onclick = () => { S.expand = !S.expand; S.focus = null; if (!S.expand){ delete S.path.rel; delete S.path.epi; } S.animateLevel = S.expand ? "epi" : null; render(); };

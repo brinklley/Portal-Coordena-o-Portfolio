@@ -153,6 +153,10 @@ body.with-drawer .minimap,body.with-drawer .mm-open{right:436px}
 .lane-head h2{font-family:var(--display);font-size:17px;font-weight:650;margin:0;display:flex;align-items:center;gap:8px}
 .lane-head h2 .sw{width:10px;height:10px;border-radius:2px;display:inline-block}
 .lane-head .ctx{font-size:12.5px;color:var(--ink-2)}
+/* "+N ocultos" (decisão 0050): botão minimalista, mesmo tamanho de texto do .ctx ao lado — só aparece
+   quando o filtro ativo esconde irmãos do que está sendo mostrado nesta faixa. */
+.hide-toggle{all:unset;cursor:pointer;font-size:12.5px;font-weight:600;color:var(--ini)}
+.hide-toggle:hover{text-decoration:underline}
 .stats{display:flex;gap:16px;margin-left:auto;font-size:12.5px;color:var(--ink-2)}
 .stats b{color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
 .lane-scroll{padding:0 18px 6px}
