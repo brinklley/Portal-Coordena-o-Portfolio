@@ -523,12 +523,24 @@ function f4pEpiSituacao(e){
   const stages = S.model.stages.epi, lab = e.st >= 0 ? stages[e.st] : "Sem status";
   return e.st >= 0 && e.st === stages.length - 1 && e.stDate ? `${lab} · ${fmtL(e.stDate)}` : lab;
 }
+/* Cor do ID do épico no modal do Roadmap – Épicos (decisão `0049`): um épico não tem categoria de fluxo
+   (`catOf` é de item operacional, não de épico) — "vazao" (verde) só quando o épico está na última
+   coluna do próprio quadro de Épicos (fechado/entregue); "none" (neutro) nas demais colunas. */
+function f4pEpiCatClass(e){
+  const stages = S.model.stages.epi;
+  return e.st >= 0 && e.st === stages.length - 1 ? "vazao" : "none";
+}
 /* modal com a lista dos itens que compõem o Realizado (abre ao clicar no número). situacaoFn deixa a
    coluna Situação genérica: itens operacionais usam f4pItemSituacao (categoria de fluxo por time);
-   épicos (Roadmap – Épicos) usam f4pEpiSituacao (coluna do próprio quadro de Épicos). */
-function f4pItemsModal(title, items, situacaoFn){
+   épicos (Roadmap – Épicos) usam f4pEpiSituacao (coluna do próprio quadro de Épicos). catFn define a cor
+   de fundo do ID (decisão `0049`): por padrão, a categoria de fluxo do item (`catOf`) — antes o fundo era
+   sempre verde (cor de Vazão/entregue) mesmo pra itens em Backlog/Discovery/WIP, dando a entender que tudo
+   já tinha sido entregue. Épicos (Roadmap – Épicos) não têm uma categoria de fluxo — o call site passa um
+   catFn próprio baseado na coluna do quadro de Épicos. */
+function f4pItemsModal(title, items, situacaoFn, catFn){
   situacaoFn = situacaoFn || f4pItemSituacao;
-  const rows = items.length ? items.map(o => `<tr><td><button type="button" class="idb" data-f4p-go="${esc(o.id)}">${esc(o.id)}</button></td>
+  catFn = catFn || (o => catOf(o));
+  const rows = items.length ? items.map(o => `<tr><td><button type="button" class="idb ${esc(catFn(o))}" data-f4p-go="${esc(o.id)}">${esc(o.id)}</button></td>
       <td>${esc(o.title || "(sem título)")}</td>
       <td class="c">${esc(situacaoFn(o))}</td></tr>`).join("")
     : `<tr><td colspan="3" class="muted">Nenhum item nesta contagem.</td></tr>`;
@@ -563,7 +575,7 @@ $("f4pBody").addEventListener("click", e => {
     const team = btnRoad.dataset.f4pRoadTeam, set = btnRoad.dataset.f4pRoadSet;
     const label = {roadmap:"Roadmap", entregue:"Roadmap entregue", atual:"Atual"}[set];
     const items = set === "roadmap" ? f4pRoadmapEpis(team) : set === "entregue" ? f4pRoadmapEntregueEpis(team) : f4pAtualEpis(team, st);
-    f4pItemsModal(`Roadmap – Épicos · ${team} · ${label} · ${f4pExactSemesterLabel(st)}`, items, f4pEpiSituacao);
+    f4pItemsModal(`Roadmap – Épicos · ${team} · ${label} · ${f4pExactSemesterLabel(st)}`, items, f4pEpiSituacao, f4pEpiCatClass);
     return;
   }
   const btnUs = e.target.closest("[data-f4p-us-set]");

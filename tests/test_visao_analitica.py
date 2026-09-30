@@ -258,6 +258,69 @@ def test_status_agrupador_conta_so_os_itens_do_time_filtrado(page):
     assert "WIP 1" in txt
     assert "Vazão 0" in txt   # o item Vazão é do outro time (AN_DIST_B): não entra na contagem do AN_DIST_A
 
+# Decisão 0049. A fase/coluna mostradas na coluna Status passaram a considerar só os itens com a tag de
+# capacidade (Reserva) — antes olhavam qualquer item vinculado ao épico pelo time, o que podia mostrar
+# "WIP" (de um item fora da reserva) enquanto o item de fato reservado ainda estava em Discovery/Backlog,
+# levando o usuário a achar que o trabalho reservado já estava andando. O agrupador por categoria
+# (Backlog/Discovery/WIP/Vazão, logo abaixo) continua somando todos os itens, com ou sem a tag.
+
+def test_status_usa_so_o_item_reservado_mais_avancado_nao_qualquer_item_do_time(page):
+    carregar(page, "f4p.xlsx")
+    sem = page.evaluate("semestre(TODAY)")
+    _setup_epico(page, team="AN_ST_RES", sem=sem, itens=[
+        {"stName": "Backlog", "tags": ["ROADMAP"]},   # reservado: é este que deve valer no Status
+        {"stName": "WIP"},                            # não reservado, mais avançado — não deve valer
+    ])
+    d = page.evaluate("anData()")
+    row = d["rows"][0]
+    assert row["reservaPhase"] == "backlog"
+    assert row["farName"] == "Backlog"
+    page.click("#anTab")
+    assert "WIP 1" in page.inner_text("#anBody table tbody tr td:nth-child(3)")   # agrupador ainda conta o não reservado
+
+def test_status_mostra_sem_reserva_quando_nenhum_item_tem_a_tag(page):
+    carregar(page, "f4p.xlsx")
+    sem = page.evaluate("semestre(TODAY)")
+    _setup_epico(page, team="AN_ST_NORES", sem=sem, itens=[{"stName": "WIP"}])   # item existe, mas sem a tag
+    d = page.evaluate("anData()")
+    assert d["rows"][0]["reservaPhase"] == "vazio"
+    page.click("#anTab")
+    row_txt = page.inner_text("#anBody table tbody tr td:nth-child(3)")
+    assert "Sem reserva" in row_txt
+    assert "WIP 1" in row_txt   # o agrupador continua contando o item, só a fase muda
+
+def test_status_mostra_entregue_quando_so_os_reservados_ja_estao_em_vazao(page):
+    """O inverso do caso acima: se TODOS os itens reservados já estão em Vazão, o Status mostra
+    "Entregue" mesmo que exista um item não reservado ainda aberto (que só aparece no agrupador)."""
+    carregar(page, "f4p.xlsx")
+    sem = page.evaluate("semestre(TODAY)")
+    _setup_epico(page, team="AN_ST_ENT", sem=sem, itens=[
+        {"stName": "Vazao", "deploy": "2026-01-05", "tags": ["ROADMAP"]},
+        {"stName": "Backlog"},   # não reservado, ainda aberto — não deve impedir o "Entregue"
+    ])
+    d = page.evaluate("anData()")
+    assert d["rows"][0]["reservaPhase"] == "fechado"
+    page.click("#anTab")
+    row_txt = page.inner_text("#anBody table tbody tr td:nth-child(3)")
+    assert "Entregue" in row_txt
+    assert "Backlog 1" in row_txt
+
+def test_status_ordena_pela_fase_da_reserva_nao_pela_fase_de_todos_os_itens(page):
+    """anSorted ordena a coluna Status pela mesma fase agora exibida (reservaPhase) — um épico cuja
+    fase "de todos os itens" seria WIP, mas cuja Reserva está só em Backlog, ordena como Backlog."""
+    carregar(page, "f4p.xlsx")
+    sem = page.evaluate("semestre(TODAY)")
+    _setup_epico(page, team="AN_ST_SORT", sem=sem, itens=[
+        {"stName": "Backlog", "tags": ["ROADMAP"]},   # reservado: fase real é Backlog
+        {"stName": "WIP"},                            # não reservado: não deve valer pro sort
+    ])
+    r = page.evaluate("""()=>{
+      AN.sort = "status"; AN.dir = 1;
+      const d = anData();
+      return anSorted(d.rows).map(row => row.reservaPhase);
+    }""")
+    assert r == ["backlog"]
+
 def test_filtro_responsavel_utilizavel_com_o_painel_aberto(page):
     """Bug relatado pelo usuário: com o painel da Visão analítica aberto, o filtro "Time" e "Roadmap
     interno" (campos <select> nativos) funcionavam, mas "Responsável da iniciativa" (popup próprio,
