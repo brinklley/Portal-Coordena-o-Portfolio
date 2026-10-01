@@ -374,6 +374,57 @@ def test_status_sem_alerta_quando_todos_os_itens_do_epico_estao_em_vazao(page):
     page.click("#anTab")
     assert page.locator("#anBody .st-alert").count() == 0
 
+def test_entregue_nao_conta_item_de_tipo_fora_do_ct_epico_orfao(page):
+    """Decisão 0056 (correção): o usuário reportou um épico órfão (#737129) com QTD "0 itens" mas Status
+    "Entregue" e o agrupador mostrando "Vazão 1" — o único item vinculado é de um tipo fora de
+    `CFG.ctTypes` (ex.: Spike), então não entra em `itens`/QTD, mas o cálculo de "Entregue" da decisão
+    0055 olhava `m` (todos os tipos) e acabava contando esse item mesmo assim. A hipótese do usuário era
+    que o problema fosse o épico não ter release/iniciativa — não é: o bug reproduz igual num épico
+    normal (ver `test_entregue_nao_conta_item_de_tipo_fora_do_ct_epico_normal`)."""
+    carregar(page, "f4p.xlsx")
+    sem = page.evaluate("semestre(TODAY)")
+    page.evaluate("""(args)=>{
+      const {team, sem} = args;
+      S.model.teamFlow[team] = ["Backlog", "WIP", "Vazao"];
+      CFG.flow[norm(team)] = {cat:{wip:"wip", vazao:"vazao"}, ct:[]};
+      S.model.ops.set(team+"_op0", {id:team+"_op0", title:"Item fora do CT", team, type:"Spike", stName:"Vazao", deploy:new Date(2026,0,5), ready:new Date(2026,0,1), tags:[]});
+      S.model.epis.set("EPIFORACT_"+team, {id:"EPIFORACT_"+team, valid:false, title:"Épico órfão "+team, parent:null, target:null, interno:sem, st:0, ops:[team+"_op0"], type:"Epic"});
+      S.f.team = team; S.f.int = sem; S.f.exec = "";
+      render();
+    }""", {"team": "AN_FORACT_ORF", "sem": sem})
+    d = page.evaluate("anData()")
+    assert d["rows"][0]["qtd"] == 0
+    assert d["rows"][0]["reservaPhase"] == "vazio"
+    page.click("#anTab")
+    row_txt = page.inner_text("#anBody table tbody tr td:nth-child(3)")
+    assert "Entregue" not in row_txt
+    assert "Sem reserva" in row_txt
+
+def test_entregue_nao_conta_item_de_tipo_fora_do_ct_epico_normal(page):
+    """Mesmo cenário do teste acima, mas num épico normal (com release e iniciativa) — confirma que o
+    bug (e a correção da decisão 0056) não tem relação com o épico ser órfão."""
+    carregar(page, "f4p.xlsx")
+    sem = page.evaluate("semestre(TODAY)")
+    page.evaluate("""(args)=>{
+      const {team, sem} = args;
+      S.model.teamFlow[team] = ["Backlog", "WIP", "Vazao"];
+      CFG.flow[norm(team)] = {cat:{wip:"wip", vazao:"vazao"}, ct:[]};
+      S.model.ops.set(team+"_op0", {id:team+"_op0", title:"Item fora do CT", team, type:"Spike", stName:"Vazao", deploy:new Date(2026,0,5), ready:new Date(2026,0,1), tags:[]});
+      const iniId = `INI_${team}`, relId = `REL_${team}`, epiId = `EPI_${team}`;
+      S.model.inis.set(iniId, {id:iniId, valid:true, title:"Iniciativa "+team, exec:sem, owner:null, rels:[relId]});
+      S.model.rels.set(relId, {id:relId, valid:true, title:"Release "+team, parent:iniId, epis:[epiId]});
+      S.model.epis.set(epiId, {id:epiId, valid:true, title:"Épico "+team, parent:relId, target:null, interno:null, st:0, ops:[team+"_op0"], type:"Epic"});
+      S.f.team = team; S.f.exec = sem;
+      render();
+    }""", {"team": "AN_FORACT_NORM", "sem": sem})
+    d = page.evaluate("anData()")
+    assert d["rows"][0]["qtd"] == 0
+    assert d["rows"][0]["reservaPhase"] == "vazio"
+    page.click("#anTab")
+    row_txt = page.inner_text("#anBody table tbody tr td:nth-child(3)")
+    assert "Entregue" not in row_txt
+    assert "Sem reserva" in row_txt
+
 def test_status_ordena_pela_fase_da_reserva_nao_pela_fase_de_todos_os_itens(page):
     """anSorted ordena a coluna Status pela mesma fase agora exibida (reservaPhase) — um épico cuja
     fase "de todos os itens" seria WIP, mas cuja Reserva está só em Backlog, ordena como Backlog."""

@@ -190,7 +190,30 @@ com ou sem a tag) do agrupador por categoria:
 - **Sem alerta quando está tudo entregue (reservado ou não)**: dois itens em Vazão, um com a tag e
   outro sem — a regra 1 (caso limpo) prevalece, `alert === false`.
   - **Teste**: `test_status_sem_alerta_quando_todos_os_itens_do_epico_estao_em_vazao`
-- **Relacionado**: decisão `0055-status-entregue-considera-todos-os-itens-com-alerta.md`.
+- **Relacionado**: decisão `0055-status-entregue-considera-todos-os-itens-com-alerta.md`, corrigida pela
+  `0056` (ver regra seguinte).
+
+### "Entregue" exige pelo menos um item dos tipos configurados para o CT (decisão 0056, correção)
+
+**Garante que**: a regra 1 da decisão `0055` ("todos os itens do épico em Vazão" → "Entregue") só vale
+se existir **pelo menos um item dos tipos configurados para o CT** (`CFG.ctTypes`, os mesmos tipos de
+QTD/Capacidade/Projetada) entre os itens do épico. Sem essa exigência, um épico cujo **único** item do
+time é de um tipo fora da lista (ex.: Spike) ficava "Entregue" com QTD "0 itens" — informação
+desalinhada, já que a tabela não considera aquele tipo de item relevante para nada além do agrupador por
+categoria.
+
+- **Dado**: um único item, tipo `Spike` (fora de `CFG.ctTypes`), em Vazão, sem a tag — testado tanto num
+  épico órfão (sem release/iniciativa) quanto num épico normal.
+- **Então (sucesso)**: `qtd === 0` e `reservaPhase === "vazio"` ("Sem reserva") nos dois casos — não
+  "Entregue".
+- **Testes**: `test_entregue_nao_conta_item_de_tipo_fora_do_ct_epico_orfao`,
+  `test_entregue_nao_conta_item_de_tipo_fora_do_ct_epico_normal`
+- **Cenário de falha coberto**: relatado pelo usuário num épico órfão (#737129, QTD "0 itens" mas
+  Status "Entregue" com o agrupador mostrando "Vazão 1") — a hipótese do usuário era que a causa fosse o
+  épico não ter release/iniciativa; a investigação mostrou que **não é** (o segundo teste reproduz o
+  mesmo bug num épico normal) — a causa real é `m.n`/`m.vaz` (usados pela regra 1 da `0055`) contarem
+  itens de **qualquer tipo**, enquanto QTD só conta os tipos do CT.
+- **Relacionado**: decisão `0056-entregue-exige-item-de-tipo-do-ct.md`.
 
 ### Ordenação pela coluna Status usa a mesma fase exibida
 

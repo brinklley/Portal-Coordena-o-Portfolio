@@ -62,8 +62,15 @@ function anData(){
           selo (que continua verde — o compromisso do roadmap foi cumprido, só avisa que o épico como um
           todo não fechou).
        2) Nenhum item tem a tag (reservaPhaseBase seria "vazio"/"Sem reserva"), mas TODOS os itens vinculados
-          já estão em Vazão → não há nada pendente a acompanhar, então mostra "Entregue" mesmo sem reserva. */
-    const allVazao = m.n > 0 && m.vaz === m.n;
+          já estão em Vazão → não há nada pendente a acompanhar, então mostra "Entregue" mesmo sem reserva.
+       Decisão `0056` (correção): exige também `itens.length > 0` — pelo menos um item dos **tipos
+       configurados para o CT** (`CFG.ctTypes`, o mesmo filtro da QTD/Capacidade/Projetada). Sem essa
+       exigência, um épico cujo único item do time é de um tipo fora da lista (ex.: Spike) — portanto QTD
+       0, de fora do que esta tabela mede — ainda assim virava "Entregue" só por esse item (de tipo não
+       monitorado) estar em Vazão, mostrando "0 itens" ao lado de "Entregue": informação desalinhada
+       reportada pelo usuário. Não tem relação com o épico ser órfão (sem release/iniciativa) — acontece
+       igual num épico normal cujo único vínculo do time seja de um tipo fora de `CFG.ctTypes`. */
+    const allVazao = itens.length > 0 && m.n > 0 && m.vaz === m.n;
     const reservaPhase = allVazao ? "fechado" : reservaPhaseBase;
     const alert = !allVazao && reservaPhaseBase === "fechado";
     const pending = m.recs.filter(o => isType(o) && !o.ready);   // ainda não entraram no fluxo do CT
