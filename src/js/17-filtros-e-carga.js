@@ -10,9 +10,17 @@ function fillFilters(){
   S.ownerList = [...om.values()].sort((a,b) => a.k === "__none__" ? 1 : b.k === "__none__" ? -1 : a.label.localeCompare(b.label,"pt-BR"));
   $("fOwnerBox").hidden = !M.hasIniOwner;
   $("msSearch").value = ""; closeMs();
-  $("fExec").innerHTML = opt(exec, "Todos"); $("fInt").innerHTML = opt(intr, "Todos"); fillTeamFilter();
+  $("fExec").innerHTML = opt(exec, "Todos"); $("fInt").innerHTML = opt(intr, "Todos");
   $("fBusca").value = "";
-  S.f = {exec:"", owners:new Set(), int:"", team:"", q:""}; S.path = {}; S.pathQueryId = null; S.expand = false; S.focus = null; S.offsets = {}; S.offsetsSig = null; msLabel();
+  S.f = {exec:"", owners:new Set(), int:"", team:"", q:""}; S.path = {}; S.pathQueryId = null; S.expand = false; S.focus = null; S.offsets = {}; S.offsetsSig = null;
+  /* decisão 0057: fillTeamFilter() roda por ÚLTIMO — ela decide sozinha o valor final de S.f.team
+     (preserva a seleção anterior do <select> de Time se o time ainda existir nos dados recarregados,
+     limpa senão). Chamá-la antes do reset acima deixava o <select> mostrando o time de antes enquanto
+     S.f.team virava "" por baixo — depois de uma atualização do Azure DevOps com Time já selecionado,
+     os painéis (Visão analítica/Report F4P/Actionable) ficavam presos desabilitados mesmo escolhendo
+     um Roadmap em seguida, porque faltava o Time "de verdade" no estado. */
+  fillTeamFilter();
+  msLabel();
 }
 function loadTables(tables, label, imp){
   S.tables = tables;

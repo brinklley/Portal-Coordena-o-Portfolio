@@ -78,12 +78,17 @@ function withFilters(patch, fn){
   const saved = S.f; S.f = {...saved, owners:new Set(saved.owners), ...patch};
   try { return fn(); } finally { S.f = saved; }
 }
-/* filtro de Time: times com dados + times cadastrados como fonte (marcados "sem carga"); mantém a seleção */
+/* filtro de Time: times com dados + times cadastrados como fonte (marcados "sem carga"); mantém a
+   seleção anterior do <select> se o time ainda existir na lista recalculada, limpa senão — e SEMPRE
+   atribui o resultado a S.f.team (decisão `0057`), que é a única fonte de verdade: nunca deixa o
+   <select> e o estado divergirem, nenhuma chamada precisa prometer não tocar em S.f entre ler `cur` e
+   chamar esta função (antes, `fillFilters()` chamava isto e, duas linhas depois, resetava `S.f` inteiro
+   por cima, deixando o <select> com o time antigo mas `S.f.team` vazio por baixo). */
 function fillTeamFilter(){
   const sel = $("fTeam"), cur = sel.value;
   sel.innerHTML = `<option value="">Todos os times</option>` + cfgTeams(CFG).map(tm => `<option value="${esc(tm)}">${esc(tm)}${hasData(tm) ? "" : " (sem carga)"}</option>`).join("");
   sel.value = [...sel.options].some(o => o.value === cur) ? cur : "";
-  if (sel.value !== cur){ S.f.team = ""; }
+  S.f.team = sel.value;
 }
 function diagnoseEmpty(){
   const M = S.model, act = activeFilters(), res = {items:[], hint:null};
