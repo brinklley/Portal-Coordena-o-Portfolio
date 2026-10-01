@@ -93,3 +93,26 @@ anterior tinha criado.
   filtro de texto, misturando dois estados inconsistentes.
 - **Teste**: `test_trocar_a_busca_por_outro_id_tambem_desfaz_a_selecao_anterior`
 - **Relacionado**: decisão `0035`.
+
+## Regra: recarregar os dados preserva o filtro de Time, sem travar os painéis
+
+**Garante que**: depois de uma nova carga (Azure DevOps "atualizar os dados", ou uma nova importação)
+com o filtro de **Time** já selecionado, se aquele time ainda existir nos dados recarregados, o
+`<select>` continua mostrando o time **e** `S.f.team` continua de fato preenchido com ele — os dois
+nunca ficam dessincronizados. Selecionar um Roadmap (interno ou executivo) logo depois já habilita
+Visão analítica, Report F4P e Actionable normalmente, sem precisar reselecionar o Time.
+
+- **Dado**: `f4p.xlsx` carregado; filtro de Time = `CORE` (via `<select>`); recarrega os mesmos dados
+  (`carregar()` de novo, simulando "atualizar os dados" do Azure DevOps); depois seleciona um Roadmap
+  interno.
+- **Então (sucesso)**: `<select>#fTeam` e `S.f.team` continuam `"CORE"` depois da recarga;
+  `activeFilters().length === 2` depois de selecionar o Roadmap; `#anTab`, `#f4pTab` e `#actTab` ficam
+  habilitados.
+- **Cenário de falha coberto** (bug relatado pelo usuário): `fillTeamFilter()` preservava o valor do
+  `<select>` de Time entre uma carga e outra, mas rodava **antes** do reset de `S.f` em
+  `fillFilters()`, que zerava `S.f.team` por baixo — o `<select>` continuava mostrando o time
+  selecionado, mas o estado interno não tinha mais nenhum time, então escolher um Roadmap em seguida
+  não bastava para habilitar os painéis (eles exigem Time **e** Roadmap): o usuário via "1 filtro
+  ativo" mesmo com o Time aparentemente selecionado na tela.
+- **Teste**: `test_recarregar_dados_com_time_selecionado_nao_trava_os_paineis`
+- **Relacionado**: decisão `0057-filtro-de-time-sincroniza-apos-recarga.md`.

@@ -63,6 +63,12 @@ Decisão: `docs/decisoes/0003-regra-b-itens-sem-desdobramento.md`.
 | Time | épicos com pelo menos um item do time; itens só daquele time; métricas do épico passam a considerar só o time |
 | ID ou descrição (decisão `0034`) | ID exato ou parte do título (sem acento, sem maiúsculas), em qualquer nível (iniciativa, release, épico ou item de time) — quem casa revela a cadeia até a iniciativa; quando só um item de time casa, os demais itens do épico continuam escondidos |
 
+**Recarregar os dados (nova importação ou "atualizar os dados" do Azure DevOps) preserva o filtro de
+Time** (decisão `0057`) se o time selecionado ainda existir nos dados recarregados — Roadmap executivo,
+Roadmap interno, Responsável e ID/descrição sempre são limpos numa recarga. O `<select>` de Time e
+`S.f.team` nunca ficam dessincronizados: ou os dois mantêm o time selecionado, ou os dois voltam para
+"Todos os times" juntos.
+
 ### 3.2 "+N ocultos": revelar irmãos escondidos pelo filtro (decisão `0050`)
 
 Com pelo menos um filtro ativo, um card visível pode ter irmãos (mesmo nível, mesmo pai) que o filtro

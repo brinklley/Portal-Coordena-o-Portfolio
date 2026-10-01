@@ -76,3 +76,22 @@ def test_trocar_a_busca_por_outro_id_tambem_desfaz_a_selecao_anterior(page):
     page.fill("#fBusca", b); page.wait_for_timeout(500)
     assert page.evaluate("JSON.stringify(S.path)") == "{}"
     assert page.evaluate("S.f.q") == b
+
+def test_recarregar_dados_com_time_selecionado_nao_trava_os_paineis(page):
+    """Decisão 0057: o usuário relatou que, depois de atualizar os dados do Azure DevOps com o filtro
+    de Time já selecionado, o <select> continuava mostrando o time, mas escolher um Roadmap em seguida
+    não habilitava Visão analítica/Report F4P/Actionable — "1 filtro ativo" aparecia (só o Roadmap),
+    como se o Time tivesse sumido do estado sem sumir da tela. Causa: `fillTeamFilter()` preservava o
+    valor do <select>, mas rodava ANTES do reset de `S.f` em `fillFilters()`, que zerava `S.f.team` por
+    baixo — o <select> e o estado ficavam dessincronizados."""
+    carregar(page, "f4p.xlsx")
+    page.select_option("#fTeam", "CORE")
+    assert page.evaluate("S.f.team") == "CORE"
+    carregar(page, "f4p.xlsx")   # simula "atualizar os dados" do Azure DevOps (recarga do mesmo time)
+    assert page.eval_on_selector("#fTeam", "el => el.value") == "CORE"
+    assert page.evaluate("S.f.team") == "CORE"
+    page.evaluate("()=>{ S.f.int = semestre(TODAY); render(); }")
+    assert page.evaluate("activeFilters().length") == 2
+    assert not page.is_disabled("#anTab")
+    assert not page.is_disabled("#f4pTab")
+    assert not page.is_disabled("#actTab")
