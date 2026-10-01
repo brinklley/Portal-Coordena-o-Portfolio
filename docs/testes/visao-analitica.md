@@ -136,19 +136,61 @@ texto muda.
   quando na verdade era outro item (fora do roadmap) que estava avançado.
 - **Teste**: `test_status_usa_so_o_item_reservado_mais_avancado_nao_qualquer_item_do_time`
 
-### Sem nenhum item reservado: "Sem reserva" (não "Sem itens")
+### Sem nenhum item reservado: "Sem reserva" (não "Sem itens") — só quando ainda há pendência
 
 **Garante que**: um épico com itens vinculados, mas nenhum com a tag de capacidade, mostra "Sem
-reserva" na Status — rótulo próprio, diferente de "Sem itens" (que sugeriria um épico vazio).
+reserva" na Status — rótulo próprio, diferente de "Sem itens" (que sugeriria um épico vazio). Desde a
+decisão `0055`, isso só vale enquanto existe pelo menos um item pendente (nem todos em Vazão); sem
+nenhum reservado mas com tudo já entregue, a regra abaixo assume (`test_status_entregue_sem_nenhum_item_reservado_quando_tudo_ja_esta_em_vazao`).
 
 - **Teste**: `test_status_mostra_sem_reserva_quando_nenhum_item_tem_a_tag`
 
-### Todos os reservados já em Vazão: "Entregue", mesmo com item não reservado ainda aberto
+### Todos os reservados já em Vazão: "Entregue", mesmo com item não reservado ainda aberto — mas com alerta
 
 **Garante que**: se todo item reservado do épico já está em Vazão, a Status mostra "Entregue" — um
-item não reservado ainda aberto (Backlog/Discovery/WIP) não impede isso, só aparece no agrupador.
+item não reservado ainda aberto (Backlog/Discovery/WIP) não impede isso, só aparece no agrupador. Desde
+a decisão `0055`, esse mesmo cenário também liga um **alerta** (ver seção dedicada abaixo), já que o
+épico como um todo ainda não fechou.
 
 - **Teste**: `test_status_mostra_entregue_quando_so_os_reservados_ja_estao_em_vazao`
+
+### "Entregue" (decisão `0055`): três regras, não só a Reserva — com alerta quando há pendência fora dela
+
+**Garante que**: diferente das fases WIP/Discovery/Backlog (que olham só a Reserva, regra acima),
+"Entregue" é decidido por três regras, nesta ordem, usando o mesmo total `m` (todos os itens do time,
+com ou sem a tag) do agrupador por categoria:
+
+1. **Todos os itens do épico em Vazão** (`m.n > 0 && m.vaz === m.n`) → "Entregue", sem alerta —
+   nada pendente em lugar nenhum, com ou sem reserva.
+2. **Só os reservados em Vazão**, mas o épico tem item pendente fora da reserva → "Entregue" **com
+   alerta** (ícone `⚠`, classe `st-alert`, com `title` dizendo quantos itens faltam) — o compromisso do
+   roadmap foi cumprido, mas o épico não fechou de verdade.
+3. **Sem nenhum item reservado**, mas todos os itens do épico já em Vazão → "Entregue", sem alerta
+   (não há nada pendente para justificar "Sem reserva").
+
+- **Regra 1 (caso limpo, sem reserva nenhuma)**: item único, sem tag, já em Vazão.
+  - **Então (sucesso)**: `reservaPhase === "fechado"`, `alert === false`; UI mostra "Entregue", não
+    "Sem reserva".
+  - **Teste**: `test_status_entregue_sem_nenhum_item_reservado_quando_tudo_ja_esta_em_vazao`
+  - **Cenário de falha coberto**: pedido explícito do usuário (print de um épico órfão com "0
+    reservados" e todos os itens em Vazão, mostrando "Sem reserva" incorretamente) — não faz sentido
+    pedir atenção a um épico que já entregou tudo só porque nada tinha a tag.
+- **Regra 2 (alerta)**: um item reservado (tag `ROADMAP`) já em Vazão + um item não reservado ainda em
+  Backlog.
+  - **Então (sucesso)**: `reservaPhase === "fechado"`, `alert === true`; a UI tem exatamente 1
+    `.st-alert` na linha, com `title` citando "1 item pendente".
+  - **Teste**: `test_status_alerta_quando_reserva_entregue_mas_epico_tem_pendencia_fora_dela`
+  - **Cenário de falha coberto**: exatamente o relatado pelo usuário (print do épico #612581, "2
+    reservados" todos entregues, mas agrupador mostrando "Backlog 1") — a Status dizia "Entregue" sem
+    nenhum aviso de que o épico, como um todo, ainda tinha trabalho pendente.
+- **Sem alerta quando a Reserva ainda está aberta**: um item reservado em WIP (não em Vazão) + um item
+  não reservado em Backlog não liga o alerta nem muda a fase (continua "wip") — o alerta é exclusivo do
+  caso "reserva 100% entregue, resto pendente".
+  - **Teste**: `test_status_sem_alerta_quando_reserva_ainda_tem_item_aberto`
+- **Sem alerta quando está tudo entregue (reservado ou não)**: dois itens em Vazão, um com a tag e
+  outro sem — a regra 1 (caso limpo) prevalece, `alert === false`.
+  - **Teste**: `test_status_sem_alerta_quando_todos_os_itens_do_epico_estao_em_vazao`
+- **Relacionado**: decisão `0055-status-entregue-considera-todos-os-itens-com-alerta.md`.
 
 ### Ordenação pela coluna Status usa a mesma fase exibida
 
