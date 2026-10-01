@@ -291,7 +291,9 @@ def test_status_mostra_sem_reserva_quando_nenhum_item_tem_a_tag(page):
 
 def test_status_mostra_entregue_quando_so_os_reservados_ja_estao_em_vazao(page):
     """O inverso do caso acima: se TODOS os itens reservados já estão em Vazão, o Status mostra
-    "Entregue" mesmo que exista um item não reservado ainda aberto (que só aparece no agrupador)."""
+    "Entregue" mesmo que exista um item não reservado ainda aberto (que só aparece no agrupador) — mas
+    desde a decisão `0055` esse caso também liga um alerta (`alert`), já que nem todo o vínculo do épico
+    está em Vazão (ver `test_status_alerta_quando_reserva_entregue_mas_epico_tem_pendencia_fora_dela`)."""
     carregar(page, "f4p.xlsx")
     sem = page.evaluate("semestre(TODAY)")
     _setup_epico(page, team="AN_ST_ENT", sem=sem, itens=[
@@ -304,6 +306,73 @@ def test_status_mostra_entregue_quando_so_os_reservados_ja_estao_em_vazao(page):
     row_txt = page.inner_text("#anBody table tbody tr td:nth-child(3)")
     assert "Entregue" in row_txt
     assert "Backlog 1" in row_txt
+
+def test_status_entregue_sem_nenhum_item_reservado_quando_tudo_ja_esta_em_vazao(page):
+    """Decisão 0055 (pedido do usuário): "Sem reserva" só faz sentido quando existe algo pendente para
+    acompanhar — se TODOS os itens vinculados ao épico (mesmo sem nenhum com a tag ROADMAP) já estão em
+    Vazão, não há nada pendente, então o Status mostra "Entregue" em vez de "Sem reserva"."""
+    carregar(page, "f4p.xlsx")
+    sem = page.evaluate("semestre(TODAY)")
+    _setup_epico(page, team="AN_ST_SEMRES_ENT", sem=sem, itens=[
+        {"stName": "Vazao", "deploy": "2026-01-05"},   # entregue, mas sem a tag ROADMAP
+    ])
+    d = page.evaluate("anData()")
+    assert d["rows"][0]["reservaPhase"] == "fechado"
+    assert d["rows"][0]["alert"] is False
+    page.click("#anTab")
+    row_txt = page.inner_text("#anBody table tbody tr td:nth-child(3)")
+    assert "Entregue" in row_txt
+    assert "Sem reserva" not in row_txt
+
+def test_status_alerta_quando_reserva_entregue_mas_epico_tem_pendencia_fora_dela(page):
+    """Decisão 0055 (pedido do usuário, cenário do print do épico #612581): quando os itens Reservados
+    (tag ROADMAP) já estão todos em Vazão mas o épico como um todo ainda tem item pendente fora da
+    reserva (Backlog/Discovery/WIP sem a tag), o Status continua mostrando "Entregue" (o compromisso do
+    roadmap foi cumprido) mas liga um alerta (ícone ⚠, classe `st-alert`) avisando que o épico não fechou
+    de verdade."""
+    carregar(page, "f4p.xlsx")
+    sem = page.evaluate("semestre(TODAY)")
+    _setup_epico(page, team="AN_ST_ALERTA", sem=sem, itens=[
+        {"stName": "Vazao", "deploy": "2026-01-05", "tags": ["ROADMAP"]},
+        {"stName": "Backlog"},   # não reservado, ainda pendente
+    ])
+    d = page.evaluate("anData()")
+    assert d["rows"][0]["reservaPhase"] == "fechado"
+    assert d["rows"][0]["alert"] is True
+    page.click("#anTab")
+    assert page.locator("#anBody .st-alert").count() == 1
+    title = page.locator("#anBody .st-alert").get_attribute("title")
+    assert "1 item pendente" in title
+
+def test_status_sem_alerta_quando_reserva_ainda_tem_item_aberto(page):
+    """Garante que o alerta (decisão 0055) só liga quando a Reserva está 100% entregue — um item
+    reservado ainda em WIP não deve acionar o alerta (nem mudar reservaPhase, que continua "wip")."""
+    carregar(page, "f4p.xlsx")
+    sem = page.evaluate("semestre(TODAY)")
+    _setup_epico(page, team="AN_ST_SEMALERTA", sem=sem, itens=[
+        {"stName": "WIP", "tags": ["ROADMAP"]},
+        {"stName": "Backlog"},
+    ])
+    d = page.evaluate("anData()")
+    assert d["rows"][0]["reservaPhase"] == "wip"
+    assert d["rows"][0]["alert"] is False
+    page.click("#anTab")
+    assert page.locator("#anBody .st-alert").count() == 0
+
+def test_status_sem_alerta_quando_todos_os_itens_do_epico_estao_em_vazao(page):
+    """Caso "limpo" da decisão 0055: se TODOS os itens do épico (reservados ou não) já estão em Vazão,
+    não há pendência nenhuma — `alert` fica `False`, mesmo tendo itens sem a tag ROADMAP."""
+    carregar(page, "f4p.xlsx")
+    sem = page.evaluate("semestre(TODAY)")
+    _setup_epico(page, team="AN_ST_TUDOENT", sem=sem, itens=[
+        {"stName": "Vazao", "deploy": "2026-01-05", "tags": ["ROADMAP"]},
+        {"stName": "Vazao", "deploy": "2026-01-06"},   # entregue, sem a tag
+    ])
+    d = page.evaluate("anData()")
+    assert d["rows"][0]["reservaPhase"] == "fechado"
+    assert d["rows"][0]["alert"] is False
+    page.click("#anTab")
+    assert page.locator("#anBody .st-alert").count() == 0
 
 def test_status_ordena_pela_fase_da_reserva_nao_pela_fase_de_todos_os_itens(page):
     """anSorted ordena a coluna Status pela mesma fase agora exibida (reservaPhase) — um épico cuja

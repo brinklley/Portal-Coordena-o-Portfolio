@@ -13,7 +13,9 @@ const PH_TXT = {vazio:"Sem itens", backlog:"Backlog", discovery:"Discovery", wip
 /* Status (coluna da Visão analítica) usa a mesma fase, mas calculada só sobre a Reserva — "vazio" nesse
    caso nunca é "o épico não tem itens" (rowOf só existe para épicos com item do time), e sim "nenhum
    item tem a tag do roadmap"; rótulo próprio pra não confundir com um épico genuinamente sem itens
-   (decisão `0049`). */
+   (decisão `0049`). Desde a `0055`, "vazio" só aparece quando além de não ter reserva ainda existe algum
+   item pendente no fluxo — sem nenhum item reservado mas com tudo já em Vazão, a fase vira "fechado"
+   (ver `allVazao` em `rowOf`), então "Sem reserva" nunca aparece junto de um épico 100% entregue. */
 const PH_TXT_RESERVA = {...PH_TXT, vazio:"Sem reserva"};
 /* dead line: último dia do semestre (menos os dias de congelamento) menos o CT máximo do time */
 function semEnd(s){ const m = /(\d{4})\s*(\d)/.exec(s || ""); if (!m) return null; return m[2] === "1" ? new Date(+m[1], 5, 30) : new Date(+m[1], 11, 31); }
@@ -51,11 +53,23 @@ function anData(){
     const flow = (M.teamFlow[team] || []).map(norm); let far = -1, farName = "";
     reservados.filter(o => catOf(o) !== "vazao").forEach(o => { const k = flow.indexOf(norm(o.stName)); if (k > far){ far = k; farName = o.stName; } });
     const rCats = reservados.map(catOf);
-    const reservaPhase = phaseOf({n: reservados.length, disc: rCats.filter(c => c === "disc").length, wip: rCats.filter(c => c === "wip").length, vaz: rCats.filter(c => c === "vazao").length});
+    const reservaPhaseBase = phaseOf({n: reservados.length, disc: rCats.filter(c => c === "disc").length, wip: rCats.filter(c => c === "wip").length, vaz: rCats.filter(c => c === "vazao").length});
+    /* Decisão `0055`: "Entregue" passa a exigir que TODOS os itens vinculados ao épico (qualquer um, com
+       ou sem a tag — o mesmo `m` do agrupador `distGroup` logo abaixo) estejam em Vazão, não só os
+       reservados. Isso cobre dois pedidos do usuário:
+       1) Reserva inteira já entregue, mas o épico ainda tem item pendente fora dela (Backlog/Discovery/
+          WIP sem a tag) → não é mais um "Entregue" limpo; `alert` liga um ícone de atenção ao lado do
+          selo (que continua verde — o compromisso do roadmap foi cumprido, só avisa que o épico como um
+          todo não fechou).
+       2) Nenhum item tem a tag (reservaPhaseBase seria "vazio"/"Sem reserva"), mas TODOS os itens vinculados
+          já estão em Vazão → não há nada pendente a acompanhar, então mostra "Entregue" mesmo sem reserva. */
+    const allVazao = m.n > 0 && m.vaz === m.n;
+    const reservaPhase = allVazao ? "fechado" : reservaPhaseBase;
+    const alert = !allVazao && reservaPhaseBase === "fechado";
     const pending = m.recs.filter(o => isType(o) && !o.ready);   // ainda não entraram no fluxo do CT
     const cls = classKey && i && i.x ? fmtField(classKey, i.x[classKey]) : "--";
     const hl = qHit(e.id, e.title) || (!!i && qHit(i.id, i.title)) || e.ops.some(k => { const o = M.ops.get(k); return qHit(o.id, o.title); });
-    return {e, i, m, itens, qtd: itens.length, reservados, farName, reservaPhase, pending, ref: e.interno || (i && i.exec), cls: cls === "--" ? "" : cls, hl};
+    return {e, i, m, itens, qtd: itens.length, reservados, farName, reservaPhase, alert, pending, ref: e.interno || (i && i.exec), cls: cls === "--" ? "" : cls, hl};
   };
   const rows = [...V.visEpi].map(id => M.epis.get(id)).map(e => rowOf(e, M.inis.get(M.rels.get(e.parent).parent)));
   // épicos sem release/iniciativa válida (fora do quadro normal), mas com itens do time filtrado e
@@ -104,7 +118,7 @@ function renderAnalytics(){
       <td class="c"><button type="button" class="f4p-real" data-an-epi-items="qtd" data-an-epi="${esc(r.e.id)}" title="Ver os itens deste épico">${r.qtd}</button><br>${r.qtd === 1 ? "item" : "itens"}</td>
       <td class="ev"><span class="ep">[EP][<button class="idb" data-an-go="${esc(r.e.id)}">${esc(r.e.id)}</button>] ${esc(r.e.title || "")} <button type="button" class="f4p-real res" data-an-epi-items="res" data-an-epi="${esc(r.e.id)}" title="Ver os itens deste épico com a tag ${esc(CFG.anTag || "ROADMAP")} (capacidade do roadmap)">${r.reservados.length} reservado${r.reservados.length === 1 ? "" : "s"}</button></span><br>
         ${r.orphan ? `<mark title="Este épico não tem release nem iniciativa vinculada no Azure DevOps — corrija o Parent dele.">OBS: SEM INICIATIVA e SEM RELEASE</mark>` : `[IN][<button class="idi" data-an-go="${esc(r.i.id)}">${esc(r.i.id)}</button>] ${esc(r.i.title)}`}</td>
-      <td class="c">${r.reservaPhase === "fechado" ? `<span class="st-ent">Entregue</span>` : PH_TXT_RESERVA[r.reservaPhase]}${r.farName && r.reservaPhase !== "fechado" ? `<span class="st-sub">${esc(r.farName)}</span>` : ""}<div class="an-dist">${distGroup(m)}</div></td>
+      <td class="c">${r.reservaPhase === "fechado" ? `<span class="st-ent">Entregue</span>${r.alert ? `<span class="st-alert" title="${esc(`Atenção: a Reserva (itens com a tag ${CFG.anTag || "ROADMAP"}) já foi entregue, mas o épico ainda tem ${m.n - m.vaz} ${m.n - m.vaz === 1 ? "item" : "itens"} pendente${m.n - m.vaz === 1 ? "" : "s"} fora da reserva (Backlog, Discovery ou WIP).`)}">⚠</span>` : ""}` : PH_TXT_RESERVA[r.reservaPhase]}${r.farName && r.reservaPhase !== "fechado" ? `<span class="st-sub">${esc(r.farName)}</span>` : ""}<div class="an-dist">${distGroup(m)}</div></td>
       <td class="c fl">Ready: <b>${m.ctFrom ? fmtDM(m.ctFrom) : "--"}</b><br>Ag. Deploy: <b>${m.ctTo ? fmtDM(m.ctTo) : "--"}</b><br>
         <span class="${bad ? "ct-bad" : "ct-ok"}">CycleTime: ${m.ct ?? "--"} Dias</span>${r.pending.length && d.dl ? (() => { const left = days(TODAY, d.dl.date);
           return `<span class="dl ${left < 0 ? "late" : left <= 14 ? "near" : ""}" title="Itens do épico que ainda não entraram na coluna de entrada do CT">${r.pending.length} ${r.pending.length === 1 ? "item fora" : "itens fora"} do fluxo · entrar até ${fmtDM(d.dl.date)}</span>`; })() : ""}</td>
