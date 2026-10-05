@@ -73,9 +73,7 @@ function actBurnupMonths(st){
 function actBurnupData(st){
   st = st || f4pSemesterState();
   const capItems = anData().capItems;
-  const months = actBurnupMonths(st);
-  const inicioPrimeiroMes = months.length ? months[0] : null;
-  const fimUltimoMes = months.length ? new Date(months[months.length - 1].getFullYear(), months[months.length - 1].getMonth() + 1, 0) : null;
+  const baseMonths = actBurnupMonths(st);
   /* Decisão `0058`: "Entregue"/"Faltam" (resumo clicável, abaixo do gráfico) não dependem de a entrega
      ter caído dentro do período exato do semestre — mesma razão da decisão `0052` (Report F4P, Reserva
      entregue): um item da Reserva já em Vazão é entregue, ponto, mesmo que a saída tenha sido adiantada
@@ -85,23 +83,46 @@ function actBurnupData(st){
   const entreguesN = entregues.length;
   const faltamItems = capItems.filter(o => catOf(o) !== "vazao");
   const escopo = capItems.length;
-  /* Decisão `0059` (correção): a linha do gráfico (`cumulative`) precisa terminar no mesmo total do
-     resumo "Entregue" acima — senão ela nunca alcança a reta do Reservado mesmo com o resumo já
-     mostrando 100% entregue, parecendo um gráfico "furado"/inconsistente com o número ao lado (bug
-     relatado pelo usuário: "11 entregues" no resumo, mas a linha parava bem abaixo de 11 em junho). Uma
-     entrega fora do período do semestre (adiantada ou tardia) é "encaixada" no mês mais próximo dentro
-     do próprio eixo X — no 1º mês, se a saída foi antes do início do semestre; no último, se foi depois
-     do fim — ela não deixa de contar, só não aparece exatamente no mês real em que aconteceu (que nem
-     existe no gráfico deste semestre). */
-  const mesEfetivo = o => !o.deploy ? null : o.deploy < inicioPrimeiroMes ? inicioPrimeiroMes : o.deploy > fimUltimoMes ? fimUltimoMes : o.deploy;
+  /* Decisão `0060` (revê a metade "depois do fim" da `0059`): em vez de encaixar uma entrega tardia no
+     último mês do eixo (um mês que não é o real), o gráfico ESTENDE o eixo X com os meses seguintes de
+     verdade, até cobrir a entrega mais tardia — e uma linha vertical ("fim do semestre") marca onde o
+     período comprometido de fato terminou, para o usuário ver que os pontos à direita dela são entregas
+     fora do período. O lado "antes do início" continua como na `0059`: uma entrega adiantada é encaixada
+     no 1º mês do eixo (não há "meses anteriores" reais para mostrar nem faz sentido estender pra trás). */
+  let months = baseMonths, semEndIdx = null, extended = false;
+  if (st.end && baseMonths.length){
+    let maxDeploy = null;
+    entregues.forEach(o => { if (o.deploy && o.deploy > st.end && (!maxDeploy || o.deploy > maxDeploy)) maxDeploy = o.deploy; });
+    if (maxDeploy){
+      const last = baseMonths[baseMonths.length - 1];
+      const extra = (maxDeploy.getFullYear() - last.getFullYear()) * 12 + (maxDeploy.getMonth() - last.getMonth());
+      if (extra > 0){
+        months = baseMonths.slice();
+        for (let i = 1; i <= extra; i++) months.push(new Date(last.getFullYear(), last.getMonth() + i, 1));
+        semEndIdx = baseMonths.length - 1;
+        extended = true;
+      }
+    }
+  }
+  const inicioPrimeiroMes = months.length ? months[0] : null;
+  const mesEfetivo = o => !o.deploy ? null : o.deploy < inicioPrimeiroMes ? inicioPrimeiroMes : o.deploy;
   const cumulative = months.map(m => {
     const fim = new Date(m.getFullYear(), m.getMonth() + 1, 0);
     return entregues.filter(o => { const d = mesEfetivo(o); return d && d <= fim; }).length;
   });
-  return {months, escopo, cumulative, capItems, entregues, entreguesN, faltamItems, faltam: faltamItems.length};
+  return {months, escopo, cumulative, capItems, entregues, entreguesN, faltamItems, faltam: faltamItems.length, semEndIdx, extended};
+}
+/* Linha vertical "fim do semestre" (decisão `0060`): marca, num gráfico de linha (Burnup Reserva, CFD),
+   onde o período comprometido terminou de verdade, quando o eixo foi estendido além dele por causa de
+   uma entrega tardia — posicionada a meio caminho entre o último ponto real do semestre e o primeiro
+   ponto estendido (mesmo espírito visual da linha "hoje" já existente no CFD). */
+function actSemEndLine(xOf, idx, mT, ph){
+  if (idx == null) return "";
+  const x = ((xOf(idx) + xOf(idx + 1)) / 2).toFixed(1);
+  return `<line class="act-sem-end" x1="${x}" x2="${x}" y1="${mT}" y2="${mT + ph}"></line><text class="act-sem-end-label" x="${x}" y="${mT - 2}" text-anchor="middle">fim do semestre</text>`;
 }
 function actBurnupSvg(data){
-  const {months, escopo, cumulative} = data;
+  const {months, escopo, cumulative, semEndIdx, extended} = data;
   if (!months.length) return `<div class="an-empty">Sem meses no período para calcular.</div>`;
   const W = 460, H = 220, mL = 28, mR = 14, mT = 12, mB = 22;
   const pw = W - mL - mR, ph = H - mT - mB, n = months.length;
@@ -114,11 +135,13 @@ function actBurnupSvg(data){
   const yTicks = [0, Math.round(maxY)];
   const yAxis = yTicks.map(v => `<text class="act-axis" x="${mL - 6}" y="${(yOf(v) + 3).toFixed(1)}" text-anchor="end">${v}</text><line class="act-grid" x1="${mL}" x2="${mL + pw}" y1="${yOf(v).toFixed(1)}" y2="${yOf(v).toFixed(1)}"></line>`).join("");
   const xLabels = months.map((m, i) => `<text class="act-axis" x="${xOf(i).toFixed(1)}" y="${H - 6}" text-anchor="middle">${esc(m.toLocaleDateString("pt-BR", {month:"short"}).replace(".", ""))}</text>`).join("");
+  const semEndLine = extended ? actSemEndLine(xOf, semEndIdx, mT, ph) : "";
   return `<svg class="act-chart act-burnup" viewBox="0 0 ${W} ${H}" role="img" aria-label="Burnup da reserva do roadmap">
     ${yAxis}${xLabels}
     <path class="act-line act-line-escopo" d="${pathOf(escopoVals)}"></path>
     <path class="act-line act-line-entregue" d="${pathOf(cumulative)}"></path>
     ${dotsOf(cumulative, "act-dot-ok")}
+    ${semEndLine}
   </svg>`;
 }
 function actBurnupSummary(data){
@@ -129,6 +152,19 @@ function actBurnupSummary(data){
     <span class="f4p-sep">·</span>
     <button type="button" class="f4p-real ${data.faltam > 0 ? "f4p-warn" : "f4p-good"}" data-act-items="faltam">${data.faltam}</button> falta${data.faltam === 1 ? "" : "m"}
   </div>`;
+}
+
+/* Itens "tardios" (decisão `0060`): entregues (categoria Vazão) depois do fim do semestre selecionado,
+   mas cujo épico está comprometido com o roadmap deste time+semestre (mesmo conjunto de épicos da coluna
+   "Projetada" da Visão analítica, §10 — `anData().projItems`; não exige a tag de capacidade do roadmap,
+   ao contrário do Burnup Reserva). Usado só para decidir até onde estender o eixo X do CFD e da
+   Distribuição Vazão por mês além do semestre — o Burnup Reserva tem sua própria regra (`actBurnupData`),
+   baseada só nos itens que ele mesmo mostra (a Reserva, `capItems`), não neste helper. */
+function actLateDeliveries(st, ad){
+  st = st || f4pSemesterState();
+  if (!st.end) return [];
+  ad = ad || anData();
+  return ad.projItems.filter(o => catOf(o) === "vazao" && o.deploy && o.deploy > st.end);
 }
 
 /* Quadrante 3 · Distribuição Vazão por mês: para cada mês do semestre selecionado (do time em foco),
@@ -142,12 +178,23 @@ function actBurnupSummary(data){
    sempre mostra os 6 meses do semestre (não só os já decorridos), para o usuário ver de antemão o que
    ainda falta ao longo do período. Decisão `0044`. */
 function actBugTypes(){ return new Set(((CFG.act && CFG.act.bugTypes) || []).map(norm)); }
+/* Decisão `0060`: se há item "tardio" (helper `actLateDeliveries`, definido acima) entregue além dos 6
+   meses do semestre, os meses seguintes reais entram no eixo também — mesma extensão do Burnup Reserva
+   e do CFD, só que aqui, por ser um gráfico de barras (não uma linha contínua), não há linha vertical:
+   o mês extra ganha um ícone de alerta junto ao rótulo (`actDistData`/`actDistRow`, abaixo). */
 function actDistMonths(st){
   st = st || f4pSemesterState();
   const sem = f4pSemester(), start = f4pSemStart(sem);
   if (!start) return [];
   const months = [];
   for (let i = 0; i < 6; i++) months.push(new Date(start.getFullYear(), start.getMonth() + i, 1));
+  let maxDeploy = null;
+  actLateDeliveries(st).forEach(o => { if (!maxDeploy || o.deploy > maxDeploy) maxDeploy = o.deploy; });
+  if (maxDeploy){
+    const last = months[5];
+    const extra = (maxDeploy.getFullYear() - last.getFullYear()) * 12 + (maxDeploy.getMonth() - last.getMonth());
+    for (let i = 1; i <= extra; i++) months.push(new Date(last.getFullYear(), last.getMonth() + i, 1));
+  }
   return months;
 }
 function actDistItems(team, month){
@@ -164,10 +211,10 @@ function actDistBuckets(team, month){
   return {items, us, ts, demais};
 }
 function actDistData(team, st){
-  return actDistMonths(st).map(month => {
+  return actDistMonths(st).map((month, idx) => {
     const {items, us, ts, demais} = actDistBuckets(team, month);
     const total = items.length;
-    return {month, total, us, ts, demais,
+    return {month, total, us, ts, demais, late: idx >= 6,
       usPct: total ? us.length / total * 100 : 0,
       tsPct: total ? ts.length / total * 100 : 0,
       demaisPct: total ? demais.length / total * 100 : 0};
@@ -183,7 +230,11 @@ function actDistRow(team, d){
   const bar = d.total > 0
     ? `${seg("us", "us", d.usPct)}${seg("ts", "ts", d.tsPct)}${seg("demais", "demais", d.demaisPct)}`
     : `<span class="act-dist-seg act-dist-none" style="flex:0 0 100%">${dec2(0)}%</span>`;
-  return `<div class="act-dist-row"><span class="act-dist-month">${esc(mesLabel)}</span><div class="act-dist-bar" role="img" aria-label="${esc(mesLabel)}: ${d.total} ${d.total === 1 ? "item" : "itens"} na amostra">${bar}</div></div>`;
+  /* Decisão `0060`: mês além do semestre (entrega tardia de um item cujo épico está comprometido com o
+     roadmap) — ícone de alerta junto ao rótulo do mês, sem linha vertical (ver comentário em
+     `actDistMonths`). */
+  const alertIcon = d.late ? `<span class="act-dist-late-icon" title="Fora do semestre selecionado — aparece porque um item de um épico comprometido com este roadmap foi entregue neste mês.">⚠</span>` : "";
+  return `<div class="act-dist-row"><span class="act-dist-month">${esc(mesLabel)}${alertIcon}</span><div class="act-dist-bar" role="img" aria-label="${esc(mesLabel)}: ${d.total} ${d.total === 1 ? "item" : "itens"} na amostra">${bar}</div></div>`;
 }
 function actDistCard(team, data){
   return `<div class="act-dist">
@@ -211,10 +262,7 @@ function actDistCard(team, data){
    (`CFG.act.cfdIncludeBugs`, padrão `true` — quando desligado, exclui os tipos de `CFG.act.bugTypes`, a
    mesma lista do quadrante Distribuição Vazão por mês). Decisões `0045`, `0046` (Vazão passou a iniciar
    em 0 no início do semestre, excluindo itens já entregues antes dele). */
-function actCfdWeeks(st){
-  st = st || f4pSemesterState();
-  const {from, to} = f4pExactSemesterWindow(st);
-  if (!from || !to) return [];
+function actCfdWeeksBlock(from, to){
   const weeks = [];
   let cursor = from;
   while (cursor <= to){
@@ -223,6 +271,34 @@ function actCfdWeeks(st){
     cursor = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 7);
   }
   return weeks;
+}
+/* semanas do semestre selecionado, sem nenhuma extensão — exatamente o comportamento de antes da
+   decisão `0060` (usado por `actCfdSemEndIdx`, abaixo, para achar a fronteira entre o período real e as
+   semanas estendidas). */
+function actCfdBaseWeeks(st){
+  st = st || f4pSemesterState();
+  const {from, to} = f4pExactSemesterWindow(st);
+  return (from && to) ? actCfdWeeksBlock(from, to) : [];
+}
+/* Decisão `0060`: se há item "tardio" (`actLateDeliveries`) entregue depois do fim das semanas base, o
+   eixo X é estendido com semanas reais seguintes (começando no dia seguinte ao fim do semestre) até
+   cobrir a entrega mais tardia — em vez de o CFD simplesmente não ter onde mostrar essa entrega. Uma
+   linha vertical "fim do semestre" marca a fronteira (`actCfdSemEndIdx` + `actSemEndLine`, em
+   `actCfdSvg`). */
+function actCfdWeeks(st){
+  st = st || f4pSemesterState();
+  const base = actCfdBaseWeeks(st);
+  if (!base.length) return base;
+  const to = base[base.length - 1].to;
+  let maxDeploy = null;
+  actLateDeliveries(st).forEach(o => { if (o.deploy > to && (!maxDeploy || o.deploy > maxDeploy)) maxDeploy = o.deploy; });
+  if (!maxDeploy) return base;
+  const extraStart = new Date(to.getFullYear(), to.getMonth(), to.getDate() + 1);
+  return base.concat(actCfdWeeksBlock(extraStart, maxDeploy));
+}
+function actCfdSemEndIdx(st){
+  const base = actCfdBaseWeeks(st);
+  return base.length ? base.length - 1 : null;
 }
 /* categoria de um item numa data T: o índice mais avançado (maior) do fluxo do time cuja coluna tem
    data de entrada (`o.fd`) menor ou igual a T — null se o item ainda não tinha sido criado até T. */
@@ -315,6 +391,8 @@ function actCfdSvg(data, st){
   const xAxis = `<text class="act-axis" x="${mL}" y="${H - 6}" text-anchor="start">${esc(fmtDM(data[0].from))}</text><text class="act-axis" x="${mL + pw}" y="${H - 6}" text-anchor="end">${esc(fmtDM(data[n - 1].to))}</text>`;
   const hoje = hojeIdx == null ? "" :
     `<line class="act-cfd-hoje" x1="${xOf(hojeIdx).toFixed(1)}" x2="${xOf(hojeIdx).toFixed(1)}" y1="${mT}" y2="${mT + ph}"></line><text class="act-cfd-hoje-label" x="${xOf(hojeIdx).toFixed(1)}" y="${mT - 2}" text-anchor="middle">hoje</text>`;
+  const semEndIdx = actCfdSemEndIdx(st);
+  const semEndLine = (semEndIdx != null && semEndIdx < n - 1 && semEndIdx < cutoff) ? actSemEndLine(xOf, semEndIdx, mT, ph) : "";
   const hit = drawn.map((d, i) => {
     const x0 = n === 1 ? mL : i === 0 ? mL : (xOf(i - 1) + xOf(i)) / 2;
     const x1 = n === 1 ? mL + pw : i === n - 1 ? mL + pw : i === cutoff ? xOf(i) : (xOf(i) + xOf(i + 1)) / 2;
@@ -326,6 +404,7 @@ function actCfdSvg(data, st){
     ${bands.map(b => b.d ? `<path class="act-cfd-band ${b.cls}" d="${b.d}"></path>` : "").join("")}
     ${hit}
     ${hoje}
+    ${semEndLine}
     ${xAxis}
   </svg>`;
 }
@@ -365,13 +444,14 @@ function renderActionable(){
   const ctCard = actCard("CycleTime", actScatterSvg(ctData) + actCtLegend(ctData),
     `Dispersão de CycleTime dos itens concluídos (${esc((CFG.f4p.types || []).join(", ") || "nenhum tipo marcado")}) no período <b>${esc(f4pPeriodLabel(st))}</b> — mesma amostra e Reserva (CT máximo do time) do quadrante CycleTime do Report F4P (§12.2); Atual é o P95 da amostra. Pontos acima da Reserva ficam em destaque. Clique num ponto para ir até o item.`);
   const buCard = actCard("Burnup Reserva", actBurnupSummary(buData) + actBurnupSvg(buData),
-    `Reservado: itens com a tag <b>${esc(CFG.anTag || "ROADMAP")}</b> nos épicos do roadmap ${esc(S.f.int ? "interno" : "executivo")} do time (mesmo conjunto da Capacidade da Visão analítica, §10) — inclui itens em qualquer status, não só os já entregues. Entregue: subconjunto já na categoria de fluxo Vazão, mesmo que a entrega tenha caído fora do período exato do semestre (adiantada ou tardia). Faltam: o restante do Reservado que ainda não entrou em Vazão, de forma nenhuma. O gráfico (linha acumulada) sempre termina no mesmo total do "Entregue" ao lado — uma entrega fora do período do semestre (adiantada ou tardia) entra no mês mais próximo dentro do próprio eixo X (1º mês ou último), já que o mês real em que ela aconteceu pode nem existir neste gráfico. Sem histórico de quando cada item entrou no roadmap, a linha Reservado é sempre a contagem atual (uma reta), não uma evolução real do escopo. Clique em "reservado", "entregue" ou "faltam" para ver os itens de cada grupo.`);
+    `Reservado: itens com a tag <b>${esc(CFG.anTag || "ROADMAP")}</b> nos épicos do roadmap ${esc(S.f.int ? "interno" : "executivo")} do time (mesmo conjunto da Capacidade da Visão analítica, §10) — inclui itens em qualquer status, não só os já entregues. Entregue: subconjunto já na categoria de fluxo Vazão, mesmo que a entrega tenha caído fora do período exato do semestre (adiantada ou tardia). Faltam: o restante do Reservado que ainda não entrou em Vazão, de forma nenhuma. Uma entrega antes do início do semestre entra no 1º mês do gráfico. Uma entrega depois do fim estende o eixo X com os meses seguintes reais, até cobrir a entrega mais tardia — uma linha vertical "fim do semestre" marca onde o período comprometido terminou, para diferenciar o que foi entregue dentro dele do que veio depois. Sem histórico de quando cada item entrou no roadmap, a linha Reservado é sempre a contagem atual (uma reta), não uma evolução real do escopo. Clique em "reservado", "entregue" ou "faltam" para ver os itens de cada grupo.`);
   const distData = actDistData(team, st);
+  const distTemMesTardio = distData.some(d => d.late);
   const distCard = actCard("Distribuição Vazão por mês", actDistCard(team, distData),
-    `Para cada mês do semestre ${esc(semLong(f4pSemester()))}, dos itens entregues (Vazão) do time — exceto os tipos de bug (${esc((CFG.act.bugTypes || []).join(", ") || "nenhum tipo marcado")}) — % User Story (${esc((CFG.f4p.usTypes || []).join(", ") || "nenhum tipo marcado")}), % Technical Story (tipo fixo) e % demais tipos entregues. Um mês sem nenhum item na amostra (inclui os meses ainda não decorridos, no semestre em curso) mostra uma barra cinza com 0%. Clique numa fatia para ver os itens dela.`);
+    `Para cada mês do semestre ${esc(semLong(f4pSemester()))}, dos itens entregues (Vazão) do time — exceto os tipos de bug (${esc((CFG.act.bugTypes || []).join(", ") || "nenhum tipo marcado")}) — % User Story (${esc((CFG.f4p.usTypes || []).join(", ") || "nenhum tipo marcado")}), % Technical Story (tipo fixo) e % demais tipos entregues. Um mês sem nenhum item na amostra (inclui os meses ainda não decorridos, no semestre em curso) mostra uma barra cinza com 0%.${distTemMesTardio ? ` Mês marcado com ⚠: fora do semestre selecionado — aparece porque um item de um épico comprometido com este roadmap foi entregue depois do período; o cálculo desse mês continua olhando todas as entregas do time naquele mês civil, sem filtrar por épico, igual aos demais.` : ""} Clique numa fatia para ver os itens dela.`);
   const cfdData = actCfdData(team, st);
   const cfdCard = actCard("CFD (Cumulative Flow Diagram)", actCfdCard(cfdData, st),
-    `Para cada semana do semestre ${esc(semLong(f4pSemester()))} (blocos de 7 dias a partir do 1º dia do semestre), quantos itens do time já chegaram a cada categoria de fluxo — Nenhum (criados), Discovery, WIP e Vazão — usando as datas reais de entrada em cada coluna do quadro. Não entram itens já entregues (Vazão) antes do início do semestre selecionado, para a Vazão refletir o que aconteceu dentro do período, não o histórico acumulado de negócio já resolvido antes dele. Vazão fica na base (cresce pra cima); Nenhum no topo é sempre o total de itens (do escopo do semestre) já criados até aquela semana (nunca diminui).${st.kind === "current" ? " Num semestre em curso, o gráfico só desenha até a semana atual (marcada por uma linha vertical \"hoje\") — o restante do período fica em branco, em vez de projetar uma continuação achatada." : ""} ${CFG.act.cfdIncludeBugs === false ? "Itens do tipo bug não entram na amostra (desligado em Configurações)." : "Itens do tipo bug entram na amostra (padrão)."} Passe o mouse sobre o gráfico para ver os valores de cada semana.`);
+    `Para cada semana do semestre ${esc(semLong(f4pSemester()))} (blocos de 7 dias a partir do 1º dia do semestre), quantos itens do time já chegaram a cada categoria de fluxo — Nenhum (criados), Discovery, WIP e Vazão — usando as datas reais de entrada em cada coluna do quadro. Não entram itens já entregues (Vazão) antes do início do semestre selecionado, para a Vazão refletir o que aconteceu dentro do período, não o histórico acumulado de negócio já resolvido antes dele. Vazão fica na base (cresce pra cima); Nenhum no topo é sempre o total de itens (do escopo do semestre) já criados até aquela semana (nunca diminui).${st.kind === "current" ? " Num semestre em curso, o gráfico só desenha até a semana atual (marcada por uma linha vertical \"hoje\") — o restante do período fica em branco, em vez de projetar uma continuação achatada." : ""} Se um item de um épico comprometido com este roadmap for entregue depois do fim do semestre, o eixo X estende com as semanas seguintes reais até cobrir essa entrega, com uma linha vertical "fim do semestre" marcando a fronteira. ${CFG.act.cfdIncludeBugs === false ? "Itens do tipo bug não entram na amostra (desligado em Configurações)." : "Itens do tipo bug entram na amostra (padrão)."} Passe o mouse sobre o gráfico para ver os valores de cada semana.`);
   $("actBody").innerHTML = `<div class="act-quad-grid">${ctCard}${buCard}${distCard}${cfdCard}</div>
     <div class="an-note">Os 4 quadrantes do Actionable têm regra definida.</div>`;
 }
