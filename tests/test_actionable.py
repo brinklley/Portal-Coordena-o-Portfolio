@@ -235,10 +235,13 @@ def test_burnup_clique_em_faltam_abre_lista_dos_itens_ainda_nao_entregues(page):
     body = page.inner_text("#f4pItemsBody")
     assert "g2" in body and "g3" in body and "g1" not in body
 
-def test_burnup_entrega_fora_do_periodo_do_semestre_conta_como_faltam(page):
-    """Um item da Reserva entregue depois que o semestre selecionado (já encerrado) fechou não conta
-    como "entregue" DESTE período — ele estava previsto para este semestre, mas só saiu depois, então
-    entra em "faltam" (não em "entregue"), e some da lista de "entregue" que abre por clique."""
+def test_burnup_entrega_fora_do_periodo_do_semestre_ainda_conta_como_entregue(page):
+    """Decisão 0058 (correção; revê a regra anterior, decisão 0041): um item da Reserva entregue depois
+    que o semestre selecionado (já encerrado) fechou continua contando como "entregue" no resumo — só
+    não aparece destacado numa subida específica do gráfico (que fica limitado aos meses do semestre).
+    Mesma razão da decisão 0052 (Report F4P, Reserva entregue): o usuário reportou o resumo "faltam"
+    mostrando um item cuja Situação já lia "Vazão · DD/MM/AAAA" — "faltam" tem que significar só o que
+    de fato ainda não foi entregue, nunca uma entrega tardia."""
     carregar(page, "f4p.xlsx")
     r = page.evaluate("""()=>{
       const curStart = f4pSemStart(semestre(TODAY));
@@ -255,11 +258,14 @@ def test_burnup_entrega_fora_do_periodo_do_semestre_conta_como_faltam(page):
       S.f.team = "ACT_TARDIA"; S.f.int = prevSem;
       render();
       const bu = actBurnupData();
-      return {escopo: bu.escopo, entreguesN: bu.entreguesN, faltam: bu.faltam, faltamIds: bu.faltamItems.map(o=>o.id), entregueIds: bu.entregues.map(o=>o.id)};
+      return {escopo: bu.escopo, entreguesN: bu.entreguesN, faltam: bu.faltam, faltamIds: bu.faltamItems.map(o=>o.id), entregueIds: bu.entregues.map(o=>o.id), cumulativeUltimoMes: bu.cumulative[bu.cumulative.length - 1]};
     }""")
     assert r["escopo"] == 1
-    assert r["entreguesN"] == 0 and r["faltam"] == 1
-    assert r["faltamIds"] == ["t1"] and r["entregueIds"] == []
+    assert r["entreguesN"] == 1 and r["faltam"] == 0
+    assert r["entregueIds"] == ["t1"] and r["faltamIds"] == []
+    # o gráfico (acumulado mês a mês) continua limitado ao período do semestre — a entrega tardia não
+    # tem um mês do próprio eixo X onde entrar, então a linha não sobe por causa dela.
+    assert r["cumulativeUltimoMes"] == 0
 
 def test_os_4_quadrantes_tem_regra_definida(page):
     carregar(page, "f4p.xlsx")
