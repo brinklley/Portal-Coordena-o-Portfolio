@@ -301,6 +301,57 @@ def test_burnup_grafico_termina_no_mesmo_total_do_resumo_entregue(page):
     assert r["cumulative"][-1] == 3          # x2 (depois do fim) entra no último mês — bate com entreguesN
     assert max(r["cumulative"]) == r["entreguesN"]
 
+def test_burnup_entrega_depois_do_fim_estende_o_eixo_em_vez_de_clampar(page):
+    """Decisão 0060 (revê a metade "depois do fim" da 0059): em vez de encaixar a entrega tardia no
+    último mês do eixo (um mês que não é o real), o gráfico agora ESTENDE o eixo X com os meses
+    seguintes de verdade, até cobrir a entrega mais tardia, e marca a fronteira (semEndIdx/extended) —
+    pedido do usuário depois de ver o print do time BO: a linha devia mostrar o mês real da entrega, com
+    uma linha vertical sinalizando onde o semestre comprometido terminou. Usa um semestre já ENCERRADO
+    (mesmo padrão da decisão 0058) para garantir os 6 meses cheios do semestre como base, independente
+    de em que mês do semestre em curso os testes rodam."""
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      const curStart = f4pSemStart(semestre(TODAY));
+      const prevMid = new Date(curStart.getFullYear(), curStart.getMonth() - 3, 15);
+      const prevSem = semestre(prevMid);
+      const prevStart = f4pSemStart(prevSem);
+      const doisMesesDepois = new Date(prevStart.getFullYear(), prevStart.getMonth() + 7, 15);   // 2 meses após o fim (semestre tem 6 meses, índices 0-5)
+      S.model.teamFlow.ACT_ESTENDE = ["Backlog", "Vazao"];
+      CFG.flow.act_estende = {cat:{vazao:"vazao"}, ct:[]};
+      S.model.ops.set("y1", {id:"y1", title:"Y1", team:"ACT_ESTENDE", type:"User Story", stName:"Vazao", deploy:doisMesesDepois, ready:doisMesesDepois, tags:["ROADMAP"]});
+      S.model.inis.set("INI_Y", {id:"INI_Y", valid:true, title:"Ini", exec:prevSem, owner:null, rels:["REL_Y"]});
+      S.model.rels.set("REL_Y", {id:"REL_Y", valid:true, title:"Rel", parent:"INI_Y", epis:["EPI_Y"]});
+      S.model.epis.set("EPI_Y", {id:"EPI_Y", valid:true, title:"Epi", parent:"REL_Y", target:null, interno:null, st:0, ops:["y1"], type:"Epic"});
+      S.model.teams.push("ACT_ESTENDE");
+      S.f.team = "ACT_ESTENDE"; S.f.exec = prevSem;
+      render();
+      const bu = actBurnupData();
+      return {monthsLen: bu.months.length, semEndIdx: bu.semEndIdx, extended: bu.extended,
+        ultimoMesTime: bu.months[bu.months.length - 1].getTime(), mesRealEsperado: new Date(doisMesesDepois.getFullYear(), doisMesesDepois.getMonth(), 1).getTime(),
+        cumulativeUltimo: bu.cumulative[bu.cumulative.length - 1]};
+    }""")
+    assert r["extended"] is True
+    assert r["semEndIdx"] == 5   # último mês real do semestre (índice 5, 6 meses: 0..5)
+    assert r["monthsLen"] == 8   # 6 meses do semestre + 2 meses estendidos até a entrega
+    assert r["ultimoMesTime"] == r["mesRealEsperado"]   # o item aparece no seu mês REAL, não clampado
+    assert r["cumulativeUltimo"] == 1
+
+def test_burnup_sem_entrega_tardia_nao_estende_nem_mostra_linha(page):
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      const sem = semestre(TODAY);
+      S.model.teamFlow.ACT_SEMTARDIA = ["Backlog", "Vazao"];
+      CFG.flow.act_semtardia = {cat:{vazao:"vazao"}, ct:[]};
+      const start = f4pSemStart(sem), dentro = new Date(start.getFullYear(), start.getMonth() + 1, 15);
+      S.model.ops.set("z1", {id:"z1", title:"Z1", team:"ACT_SEMTARDIA", type:"User Story", stName:"Vazao", deploy:dentro, ready:dentro, tags:["ROADMAP"]});
+      S.model.teams.push("ACT_SEMTARDIA");
+      S.f.team = "ACT_SEMTARDIA"; S.f.exec = sem;
+      render();
+      const bu = actBurnupData();
+      return {extended: bu.extended, semEndIdx: bu.semEndIdx, svgTemLinha: actBurnupSvg(bu).includes("act-sem-end")};
+    }""")
+    assert r == {"extended": False, "semEndIdx": None, "svgTemLinha": False}
+
 def test_os_4_quadrantes_tem_regra_definida(page):
     carregar(page, "f4p.xlsx")
     _habilitar(page)
@@ -508,6 +559,79 @@ def test_dist_aparece_no_painel_com_legenda(page):
     txt = page.inner_text("#actBody")
     assert "Distribuição Vazão por mês" in txt
     assert "User Story" in txt and "Technical Story" in txt and "Demais" in txt and "Sem registro" in txt
+
+# Decisão 0060: se um item entregue (Vazão) cai num mês além dos 6 do semestre, mas pertence a um
+# épico comprometido com o roadmap (mesmo critério do CFD/Burnup — `actLateDeliveries`), o mês extra
+# aparece no quadrante, marcado com um ícone de alerta (⚠) junto ao rótulo — sem linha vertical (não se
+# aplica a um gráfico de barras). O mês extra segue a MESMA regra de qualquer outro mês do quadrante
+# (todas as entregas Vazão do time naquele mês civil, sem filtrar por épico) — só a decisão de MOSTRAR
+# o mês é que depende do épico comprometido.
+
+def test_dist_mes_extra_aparece_com_alerta_quando_ha_entrega_tardia_de_epico_comprometido(page):
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      const sem = semestre(TODAY);
+      S.model.teamFlow.ACT_DIST_LATE = ["Backlog", "Vazao"];
+      CFG.flow.act_dist_late = {cat:{vazao:"vazao"}, ct:[]};
+      const start = f4pSemStart(sem), mesExtra = new Date(start.getFullYear(), start.getMonth() + 6, 10);
+      // k1: pertence a um épico comprometido com o roadmap — é o que dispara o mês extra
+      S.model.ops.set("k1", {id:"k1", title:"K1", team:"ACT_DIST_LATE", type:"User Story", stName:"Vazao", deploy:mesExtra, ready:mesExtra, tags:[]});
+      // k2: mesmo mês extra, mas SEM vínculo com épico comprometido — ainda assim entra na barra (mesma
+      // regra de qualquer mês do quadrante, que não filtra por épico)
+      S.model.ops.set("k2", {id:"k2", title:"K2", team:"ACT_DIST_LATE", type:"Technical Story", stName:"Vazao", deploy:mesExtra, ready:mesExtra, tags:[]});
+      S.model.inis.set("INI_K", {id:"INI_K", valid:true, title:"Ini", exec:sem, owner:null, rels:["REL_K"]});
+      S.model.rels.set("REL_K", {id:"REL_K", valid:true, title:"Rel", parent:"INI_K", epis:["EPI_K"]});
+      S.model.epis.set("EPI_K", {id:"EPI_K", valid:true, title:"Epi", parent:"REL_K", target:null, interno:null, st:0, ops:["k1"], type:"Epic"});
+      S.model.teams.push("ACT_DIST_LATE");
+      S.f.team = "ACT_DIST_LATE"; S.f.exec = sem;
+      render();
+      const data = actDistData("ACT_DIST_LATE", f4pSemesterState());
+      return {n: data.length, late6: data[6] ? data[6].late : null, total6: data[6] ? data[6].total : null, lateAntes: data.slice(0, 6).every(d => !d.late)};
+    }""")
+    assert r["n"] == 7
+    assert r["late6"] is True
+    assert r["total6"] == 2   # k1 e k2, mesma regra de qualquer mês (sem filtrar por épico)
+    assert r["lateAntes"] is True
+
+def test_dist_icone_de_alerta_aparece_no_mes_extra_sem_linha_vertical(page):
+    carregar(page, "f4p.xlsx")
+    page.evaluate("""()=>{
+      const sem = semestre(TODAY);
+      S.model.teamFlow.ACT_DIST_ICON = ["Backlog", "Vazao"];
+      CFG.flow.act_dist_icon = {cat:{vazao:"vazao"}, ct:[]};
+      const start = f4pSemStart(sem), mesExtra = new Date(start.getFullYear(), start.getMonth() + 6, 10);
+      S.model.ops.set("l1", {id:"l1", title:"L1", team:"ACT_DIST_ICON", type:"User Story", stName:"Vazao", deploy:mesExtra, ready:mesExtra, tags:[]});
+      S.model.inis.set("INI_L", {id:"INI_L", valid:true, title:"Ini", exec:sem, owner:null, rels:["REL_L"]});
+      S.model.rels.set("REL_L", {id:"REL_L", valid:true, title:"Rel", parent:"INI_L", epis:["EPI_L"]});
+      S.model.epis.set("EPI_L", {id:"EPI_L", valid:true, title:"Epi", parent:"REL_L", target:null, interno:null, st:0, ops:["l1"], type:"Epic"});
+      S.model.teams.push("ACT_DIST_ICON");
+      S.f.team = "ACT_DIST_ICON"; S.f.exec = sem;
+      render();
+    }""")
+    page.click("#actTab")
+    page.wait_for_timeout(200)
+    rows = page.locator(".act-dist-row")
+    assert rows.count() == 7
+    assert rows.nth(6).locator(".act-dist-late-icon").count() == 1
+    for i in range(6):
+        assert rows.nth(i).locator(".act-dist-late-icon").count() == 0
+    assert page.locator(".act-sem-end").count() == 0   # quadrante de barras: sem linha vertical
+
+def test_dist_nao_estende_quando_entrega_tardia_nao_pertence_a_epico_comprometido(page):
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      const sem = semestre(TODAY);
+      S.model.teamFlow.ACT_DIST_NOEXT = ["Backlog", "Vazao"];
+      CFG.flow.act_dist_noext = {cat:{vazao:"vazao"}, ct:[]};
+      const start = f4pSemStart(sem), mesExtra = new Date(start.getFullYear(), start.getMonth() + 6, 10);
+      // item tardio só vinculado ao time, sem épico comprometido com o roadmap
+      S.model.ops.set("m1", {id:"m1", title:"M1", team:"ACT_DIST_NOEXT", type:"User Story", stName:"Vazao", deploy:mesExtra, ready:mesExtra, tags:[]});
+      S.model.teams.push("ACT_DIST_NOEXT");
+      S.f.team = "ACT_DIST_NOEXT"; S.f.exec = sem;
+      render();
+      return actDistMonths(f4pSemesterState()).length;
+    }""")
+    assert r == 6
 
 def test_configuracao_act_bug_types_tem_padrao(page):
     r = page.evaluate("()=>{ const c = normCfg({}); return c.act.bugTypes; }")
@@ -735,6 +859,81 @@ def test_cfd_semestre_encerrado_nao_mostra_linha_hoje_e_desenha_tudo(page):
     totalSemanas = page.evaluate("actCfdWeeks(f4pSemesterState()).length")
     hitCount = page.locator(".act-cfd-hit").count()
     assert hitCount == totalSemanas
+
+# Decisão 0060: se um item entregue (Vazão) depois do fim do semestre pertence a um épico comprometido
+# com o roadmap do time+semestre selecionado (mesmo critério da coluna "Projetada" da Visão analítica —
+# `anData().projItems`, não exige a tag ROADMAP), o CFD estende o eixo X com as semanas seguintes reais
+# até cobrir essa entrega, com uma linha vertical "fim do semestre" marcando a fronteira. Um item
+# entregue tarde mas SEM vínculo com um épico comprometido (só vinculado ao time) não dispara a
+# extensão — prova que o gatilho é o épico comprometido, não qualquer item do time.
+
+def test_cfd_estende_semanas_quando_ha_entrega_tardia_de_epico_comprometido(page):
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      const curStart = f4pSemStart(semestre(TODAY));
+      const prevMid = new Date(curStart.getFullYear(), curStart.getMonth() - 3, 15);
+      const prevSem = semestre(prevMid);
+      const prevStart = f4pSemStart(prevSem);
+      const tardia = new Date(prevStart.getFullYear(), prevStart.getMonth() + 6, 20);   // ~3 semanas depois do fim do semestre
+      S.model.teamFlow.CFD_LATE = ["Backlog", "Vazao"];
+      CFG.flow.cfd_late = {cat:{vazao:"vazao"}, ct:[]};
+      S.model.ops.set("c1", {id:"c1", title:"C1", team:"CFD_LATE", type:"User Story", stName:"Vazao", deploy:tardia, ready:tardia, fd:{backlog:prevStart, vazao:tardia}, tags:[]});
+      S.model.inis.set("INI_C", {id:"INI_C", valid:true, title:"Ini", exec:prevSem, owner:null, rels:["REL_C"]});
+      S.model.rels.set("REL_C", {id:"REL_C", valid:true, title:"Rel", parent:"INI_C", epis:["EPI_C"]});
+      S.model.epis.set("EPI_C", {id:"EPI_C", valid:true, title:"Epi", parent:"REL_C", target:null, interno:null, st:0, ops:["c1"], type:"Epic"});
+      S.model.teams.push("CFD_LATE");
+      S.f.team = "CFD_LATE"; S.f.exec = prevSem;
+      render();
+      const st = f4pSemesterState();
+      const baseLen = actCfdBaseWeeks(st).length, weeks = actCfdWeeks(st);
+      const data = actCfdData("CFD_LATE", st);
+      return {baseLen, weeksLen: weeks.length, semEndIdx: actCfdSemEndIdx(st), vazaoUltimaSemana: data[data.length - 1].vazao};
+    }""")
+    assert r["weeksLen"] > r["baseLen"]
+    assert r["semEndIdx"] == r["baseLen"] - 1
+    assert r["vazaoUltimaSemana"] == 1
+
+def test_cfd_nao_estende_quando_entrega_tardia_nao_pertence_a_epico_comprometido(page):
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      const curStart = f4pSemStart(semestre(TODAY));
+      const prevMid = new Date(curStart.getFullYear(), curStart.getMonth() - 3, 15);
+      const prevSem = semestre(prevMid);
+      const prevStart = f4pSemStart(prevSem);
+      const tardia = new Date(prevStart.getFullYear(), prevStart.getMonth() + 6, 20);
+      S.model.teamFlow.CFD_LATE2 = ["Backlog", "Vazao"];
+      CFG.flow.cfd_late2 = {cat:{vazao:"vazao"}, ct:[]};
+      // item tardio só vinculado ao time, sem épico comprometido com o roadmap
+      S.model.ops.set("c2", {id:"c2", title:"C2", team:"CFD_LATE2", type:"User Story", stName:"Vazao", deploy:tardia, ready:tardia, fd:{backlog:prevStart, vazao:tardia}, tags:[]});
+      S.model.teams.push("CFD_LATE2");
+      S.f.team = "CFD_LATE2"; S.f.exec = prevSem;
+      render();
+      const st = f4pSemesterState();
+      return {baseLen: actCfdBaseWeeks(st).length, weeksLen: actCfdWeeks(st).length};
+    }""")
+    assert r["weeksLen"] == r["baseLen"]
+
+def test_cfd_linha_fim_do_semestre_aparece_so_quando_estendido(page):
+    carregar(page, "f4p.xlsx")
+    page.evaluate("""()=>{
+      const curStart = f4pSemStart(semestre(TODAY));
+      const prevMid = new Date(curStart.getFullYear(), curStart.getMonth() - 3, 15);
+      const prevSem = semestre(prevMid);
+      const prevStart = f4pSemStart(prevSem);
+      const tardia = new Date(prevStart.getFullYear(), prevStart.getMonth() + 6, 20);
+      S.model.teamFlow.CFD_LINE = ["Backlog", "Vazao"];
+      CFG.flow.cfd_line = {cat:{vazao:"vazao"}, ct:[]};
+      S.model.ops.set("c3", {id:"c3", title:"C3", team:"CFD_LINE", type:"User Story", stName:"Vazao", deploy:tardia, ready:tardia, fd:{backlog:prevStart, vazao:tardia}, tags:[]});
+      S.model.inis.set("INI_D", {id:"INI_D", valid:true, title:"Ini", exec:prevSem, owner:null, rels:["REL_D"]});
+      S.model.rels.set("REL_D", {id:"REL_D", valid:true, title:"Rel", parent:"INI_D", epis:["EPI_D"]});
+      S.model.epis.set("EPI_D", {id:"EPI_D", valid:true, title:"Epi", parent:"REL_D", target:null, interno:null, st:0, ops:["c3"], type:"Epic"});
+      S.model.teams.push("CFD_LINE");
+      S.f.team = "CFD_LINE"; S.f.exec = prevSem;
+      render();
+    }""")
+    page.click("#actTab")
+    page.wait_for_timeout(200)
+    assert page.locator(".act-sem-end").count() == 1
 
 def test_cfd_aparece_no_painel_com_legenda_e_grafico(page):
     carregar(page, "f4p.xlsx")

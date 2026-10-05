@@ -94,6 +94,34 @@ curso (regra do print de inspiração do usuário).
   cuja única entrega é Bug tem `total === 0` (não `1`), confirmando que a exclusão de bug acontece antes
   da contagem do total, não depois.
 
+## Regra: mês extra além do semestre aparece com ícone de alerta, sem linha vertical (decisão 0060)
+
+**Garante que**: se um item entregue (Vazão) cai num mês além dos 6 fixos do semestre, mas pertence a um
+épico comprometido com o roadmap do time+semestre selecionado (mesmo critério `actLateDeliveries` usado
+pelo CFD e pelo Burnup Reserva — qualquer item do épico, não só os com a tag ROADMAP), esse mês entra no
+gráfico também (`actDistMonths` cresce além de 6), marcado com um ícone de alerta (⚠) junto ao rótulo do
+mês (`.act-dist-late-icon`) — sem linha vertical, diferente do Burnup Reserva e do CFD (este é um
+gráfico de barras, não uma linha contínua). O mês extra segue a mesma regra de filtro de qualquer outro
+mês do quadrante (todas as entregas Vazão do time naquele mês civil, sem filtrar por épico) — o épico
+comprometido só decide **se** o mês aparece, não o que entra na barra dele.
+
+- **Dado**: 2 itens entregues no mesmo mês, além do 6º mês do semestre — um (k1) vinculado a um épico
+  comprometido com o roadmap, outro (k2) sem vínculo nenhum com épico.
+- **Então (sucesso)**: `actDistMonths` ganha o 7º mês; `actDistData`\[6\].`late === true`; o total desse
+  mês é **2** (k1 e k2 — nenhum filtro por épico na contagem, só na decisão de mostrar o mês); os 6
+  meses originais continuam com `late === false`; na UI, só a 7ª linha tem o ícone `.act-dist-late-icon`.
+- **Cenário de falha coberto**: sem a extensão, uma entrega tardia de um item do roadmap simplesmente
+  desaparecia do gráfico (nenhum dos 6 meses fixos cobre o mês real da entrega) — o usuário não tinha
+  como ver essa entrega na Distribuição, mesmo sabendo que ela aconteceu (visível no Burnup Reserva/CFD,
+  já estendidos).
+- **Teste (mês extra + total sem filtro)**:
+  `test_dist_mes_extra_aparece_com_alerta_quando_ha_entrega_tardia_de_epico_comprometido`
+- **Teste (ícone na UI, sem linha vertical)**:
+  `test_dist_icone_de_alerta_aparece_no_mes_extra_sem_linha_vertical`
+- **Teste (regressão — sem épico comprometido, não estende)**:
+  `test_dist_nao_estende_quando_entrega_tardia_nao_pertence_a_epico_comprometido`
+- **Relacionado**: decisões `0058`, `0059`, `0060-burnup-cfd-dist-estendem-eixo-para-entrega-tardia.md`.
+
 ## Regra: a porcentagem de cada fatia arredonda para 2 casas decimais (vírgula)
 
 **Garante que**: o rótulo usa `dec2` (nova função, mesmo padrão de `dec1` já existente) — 2 casas
@@ -189,8 +217,9 @@ Entregue.
 - **Dado**: 1 item reservado de um semestre já encerrado, entregue no dia seguinte ao fim desse
   semestre (já no semestre seguinte).
 - **Então (sucesso)**: `entreguesN === 1`, `faltam === 0`, o item aparece em `entregues`, não em
-  `faltamItems`; o último mês de `cumulative` passa a ser `1` (decisão `0059`, abaixo — a entrega
-  entra no último mês do eixo X do gráfico, mesmo tendo saído fora do período real do semestre).
+  `faltamItems`; o último mês de `cumulative` passa a ser `1` (decisões `0059`/`0060`, abaixo — a
+  entrega entra no gráfico mesmo tendo saído fora do período real do semestre; desde a `0060`, no seu
+  mês real, já que o eixo estende 1 mês para cobri-la, em vez de encaixar num mês que não é o dela).
 - **Cenário de falha coberto**: o usuário reportou o resumo "faltam" do Burnup Reserva mostrando 2
   itens cuja Situação, na lista aberta por clique, já lia "Vazão · DD/MM/AAAA" — a entrega tinha
   acontecido no 2º semestre, mas o burnup era do 1º, então a regra anterior (herdada da decisão `0041`)
@@ -201,20 +230,23 @@ Entregue.
 
 ## Regra: o gráfico (linha acumulada) sempre termina no mesmo total do resumo "Entregue"
 
-**Garante que** (decisão `0059`, correção — consequência direta da `0058`): como "Entregue" no resumo
-passou a contar qualquer entrega (dentro ou fora do período do semestre), mas o gráfico (`cumulative`)
-só tinha meses do próprio semestre para plotar, uma entrega fora do período somava no resumo sem nunca
-aparecer na linha — o gráfico passava a nunca alcançar o total mostrado ao lado, mesmo com 100%
-entregue. A correção "encaixa" cada entrega fora do período no mês mais próximo dentro do próprio
-eixo X do gráfico: no 1º mês, se a saída foi antes do início do semestre; no último mês, se foi depois
-do fim. Isso garante `cumulative[cumulative.length - 1] === entreguesN` sempre.
+**Garante que** (decisão `0059`, correção — consequência direta da `0058`; a metade "depois do fim" foi
+revista pela decisão `0060`, na seção seguinte): como "Entregue" no resumo passou a contar qualquer
+entrega (dentro ou fora do período do semestre), mas o gráfico (`cumulative`) só tinha meses do próprio
+semestre para plotar, uma entrega fora do período somava no resumo sem nunca aparecer na linha — o
+gráfico passava a nunca alcançar o total mostrado ao lado, mesmo com 100% entregue. A correção original
+da `0059` "encaixava" cada entrega fora do período no mês mais próximo dentro do próprio eixo X do
+gráfico: no 1º mês, se a saída foi antes do início do semestre; no último mês, se foi depois do fim.
+Desde a `0060`, só o lado "antes do início" continua clampando no 1º mês — o lado "depois do fim" passou
+a **estender** o eixo com os meses reais (ver seção seguinte). Em ambos os casos,
+`cumulative[cumulative.length - 1] === entreguesN` continua garantido sempre.
 
 - **Dado**: 3 itens reservados do mesmo semestre — um entregue antes do início do semestre, um
   entregue bem depois do fim (mais de 6 meses após o início), um entregue dentro do período.
 - **Então (sucesso)**: `entreguesN === 3`; `cumulative[0] === 1` (a entrega antecipada já entra no 1º
-  mês do gráfico); `cumulative` no último mês é igual a `3` (bate com `entreguesN` — a entrega tardia
-  entrou no último mês); `Math.max(...cumulative) === entreguesN` (a linha chega no total, nunca para
-  antes).
+  mês do gráfico); `cumulative` no último mês (agora um mês real, estendido pela `0060`, não mais um
+  encaixe) é igual a `3` (bate com `entreguesN`); `Math.max(...cumulative) === entreguesN` (a linha
+  chega no total, nunca para antes).
 - **Cenário de falha coberto**: o usuário mandou um print do Burnup Reserva do time BO mostrando o
   resumo "11 reservados · 11 entregues · 0 faltam", mas a linha do gráfico terminando visivelmente
   abaixo de 11 no último mês do semestre — o número do resumo e o fim da linha do gráfico não
@@ -222,7 +254,26 @@ do fim. Isso garante `cumulative[cumulative.length - 1] === entreguesN` sempre.
   tinha caído fora do período exato do semestre (decisão `0058`: ainda conta como entregue no resumo),
   mas o gráfico (antes da `0059`) não tinha mês no eixo X para plotar essa entrega.
 - **Teste**: `test_burnup_grafico_termina_no_mesmo_total_do_resumo_entregue`
-- **Relacionado**: decisões `0058`, `0059-burnup-grafico-clampa-entrega-fora-do-periodo.md`.
+- **Relacionado**: decisões `0058`, `0059-burnup-grafico-clampa-entrega-fora-do-periodo.md`, `0060`.
+
+## Regra: entrega depois do fim do semestre estende o eixo (com linha "fim do semestre"), não clampa
+
+**Garante que** (decisão `0060`, revê a metade "depois do fim" da `0059`): em vez de encaixar uma
+entrega tardia no último mês do eixo original (um mês que não é o real), o Burnup Reserva estende o
+eixo X com os meses seguintes reais até cobrir a entrega mais tardia, e marca a fronteira com
+`semEndIdx` (índice do último mês real do semestre) + `extended:true` — usados por `actBurnupSvg` para
+desenhar a linha vertical "fim do semestre" (`.act-sem-end`). Sem nenhuma entrega tardia, `extended`
+é `false`, `semEndIdx` é `null` e a linha não aparece.
+
+- **Dado**: 1 item de um épico comprometido com um semestre já encerrado, entregue 2 meses depois do
+  fim desse semestre.
+- **Então (sucesso)**: `extended === true`; `semEndIdx === 5` (último mês real, semestre tem 6 meses,
+  índices 0 a 5); `months.length === 8` (6 do semestre + 2 estendidos); o último mês do eixo é o mês
+  REAL da entrega (não mais um encaixe no mês 5); `cumulative` no último mês é `1`.
+- **Teste**: `test_burnup_entrega_depois_do_fim_estende_o_eixo_em_vez_de_clampar`
+- **Teste (sem entrega tardia, sem extensão nem linha)**:
+  `test_burnup_sem_entrega_tardia_nao_estende_nem_mostra_linha`
+- **Relacionado**: decisão `0060-burnup-cfd-dist-estendem-eixo-para-entrega-tardia.md`.
 
 ## Regra: os 4 quadrantes têm regra definida
 
@@ -339,6 +390,26 @@ hover (`.act-cfd-hit`) ficam restritas às semanas já decorridas. Num semestre 
 - **Cenário de falha coberto**: a versão anterior desenhava as 26 semanas inteiras mesmo num semestre em
   curso, com as faixas achatadas (repetindo o valor de hoje) nas semanas futuras como projeção — o
   usuário considerou essa "continuação do morro" desnecessária e pediu para não construí-la.
+
+### Regra: estende as semanas (com linha "fim do semestre") para entrega tardia de épico comprometido (decisão `0060`)
+
+**Garante que**: se um item entregue (Vazão) depois do fim do semestre pertence a um épico comprometido
+com o roadmap do time+semestre selecionado (`actLateDeliveries` — mesmo critério "projItems" da coluna
+"Projetada" da Visão analítica, §10; não exige a tag ROADMAP), o CFD estende o eixo X com as semanas
+seguintes reais (via `actCfdWeeksBlock`, fatorado do loop original) até cobrir essa entrega, com uma
+linha vertical "fim do semestre" (`.act-sem-end`) marcando a fronteira (`actCfdSemEndIdx`). Um item
+entregue tarde mas **sem** vínculo com um épico comprometido (só vinculado ao time) não dispara a
+extensão — prova que o gatilho é o épico comprometido, não qualquer item do time.
+
+- **Teste (estende + semana extra reflete a entrega)**:
+  `test_cfd_estende_semanas_quando_ha_entrega_tardia_de_epico_comprometido` — `actCfdWeeks(st).length`
+  maior que `actCfdBaseWeeks(st).length`; `actCfdSemEndIdx` aponta a última semana base; a banda Vazão
+  da última semana (já estendida) reflete a entrega.
+- **Teste (regressão — sem épico comprometido, não estende)**:
+  `test_cfd_nao_estende_quando_entrega_tardia_nao_pertence_a_epico_comprometido`
+- **Teste (linha aparece na UI só quando estendido)**:
+  `test_cfd_linha_fim_do_semestre_aparece_so_quando_estendido`
+- **Relacionado**: decisão `0060-burnup-cfd-dist-estendem-eixo-para-entrega-tardia.md`.
 
 ### Regra: aparece no painel com a legenda das 4 faixas e o gráfico de área
 
