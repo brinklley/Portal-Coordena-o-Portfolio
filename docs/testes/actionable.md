@@ -1,6 +1,6 @@
 # Testes: Actionable (métricas acionáveis por time no período do roadmap)
 
-Cobre `tests/test_actionable.py` (45 testes). Ver `docs/regras-de-negocio.md` §13; decisões `0041`, `0042`, `0044`, `0045`, `0046`, `0047`.
+Cobre `tests/test_actionable.py` (57 testes). Ver `docs/regras-de-negocio.md` §13; decisões `0041`, `0042`, `0044`, `0045`, `0046`, `0047`, `0058`, `0059`, `0060`, `0061`, `0062`.
 Os 4 quadrantes (CycleTime, Distribuição Vazão por mês, Burnup Reserva e CFD) têm regra definida,
 alinhados por linha (decisão `0047`).
 
@@ -41,6 +41,26 @@ mesmo P95 de `f4pMetrics`.
 resto do portal — clicar fecha o Actionable e preenche `#fBusca` com o ID do item.
 
 - **Teste**: `test_clique_no_ponto_do_scatter_fecha_o_painel_e_navega`
+
+## Regra: item tardio de um épico comprometido aparece como ponto extra, sem mudar Reserva/Atual (decisão `0062`)
+
+**Garante que**: um item concluído (`o.ct != null`) de um épico comprometido com o roadmap do
+time+semestre selecionado, entregue depois do fim da janela da amostra (`f4pWindow`), aparece como
+ponto **extra** no gráfico (`d.tardios`) — o eixo X estende até essa entrega, com uma linha vertical
+"fim do semestre" (`.act-sem-end`, via `actSemEndLineAt`). "Reserva" e "Atual (P95)" continuam
+calculados só sobre `f4pSample` (a amostra original, igual ao Report F4P §12.2) — o item tardio nunca
+entra nesses dois números, só no gráfico.
+
+- **Dado**: 2 itens do mesmo épico comprometido com um semestre já encerrado — um (p1) entregue dentro
+  da janela, outro (p2) entregue bem depois do fim dela.
+- **Então (sucesso)**: a amostra (`d.items`) tem só p1; `d.atual` é o P95 de só p1 (não muda com p2);
+  `d.tardios` tem só p2; `d.extended === true`; o SVG mostra o ponto de p2 e a linha `.act-sem-end`.
+- **Cenário de falha coberto**: o usuário reportou, depois de já corrigidos o Burnup Reserva e o CFD
+  (decisão `0061`), que "somente o CycleTime não foi atualizado com o mês de julho" — os outros 3
+  quadrantes já estendiam o eixo para a mesma entrega tardia, só o CycleTime continuava preso na janela
+  original da amostra, sem nenhum ponto além dela.
+- **Teste**: `test_scatter_item_tardio_de_epico_comprometido_aparece_como_ponto_extra`
+- **Relacionado**: decisões `0060`, `0061`, `0062-cycletime-ganha-pontos-extras-para-entrega-tardia.md`.
 
 ## Regra: a Distribuição Vazão por mês sempre mostra os 6 meses inteiros do semestre (decisão 0044)
 
@@ -274,6 +294,27 @@ desenhar a linha vertical "fim do semestre" (`.act-sem-end`). Sem nenhuma entreg
 - **Teste (sem entrega tardia, sem extensão nem linha)**:
   `test_burnup_sem_entrega_tardia_nao_estende_nem_mostra_linha`
 - **Relacionado**: decisão `0060-burnup-cfd-dist-estendem-eixo-para-entrega-tardia.md`.
+
+## Regra: o eixo também estende para item tardio fora da Reserva, desde que do mesmo épico comprometido (decisão `0061`)
+
+**Garante que**: o gatilho da extensão (regra anterior) não se limita aos itens da própria Reserva
+(`entregues`/`capItems`, com a tag `CFG.anTag`) — qualquer item do épico comprometido com o roadmap
+(mesmo critério `actLateDeliveries` do CFD/Distribuição, §13.2/§13.4), com ou sem a tag, dispara a
+extensão. Os números "Entregue"/"Faltam" do resumo continuam baseados só na Reserva — só o eixo reage ao
+item fora dela.
+
+- **Dado**: um épico com 1 item reservado (tag ROADMAP) entregue dentro do semestre, e outro item do
+  mesmo épico (mesmo tipo do CT, mas SEM a tag) entregue bem depois do fim do semestre.
+- **Então (sucesso)**: `escopo === 1`, `entreguesN === 1`, `faltam === 0` (só o item reservado conta no
+  resumo); `extended === true`; o último mês do eixo é o mês real do item fora da Reserva.
+- **Cenário de falha coberto**: o usuário reportou, já depois da decisão `0060`, que o Burnup Reserva
+  continuava preso no último mês do semestre original enquanto CFD e Distribuição (no mesmo print, mesmo
+  time/semestre) já mostravam os meses seguintes — print com "5 reservados · 5 entregues · 0 faltam" e
+  a linha já achatada no topo, sem a linha "fim do semestre" que os outros dois quadrantes mostravam. O
+  item que disparava a extensão no CFD/Distribuição não tinha a tag de capacidade do roadmap, então o
+  gatilho da `0060` (restrito à Reserva) nunca reagia a ele.
+- **Teste**: `test_burnup_estende_mesmo_com_entrega_tardia_de_item_fora_da_reserva`
+- **Relacionado**: decisão `0061-burnup-eixo-reage-a-qualquer-item-do-epico-comprometido.md`.
 
 ## Regra: os 4 quadrantes têm regra definida
 
