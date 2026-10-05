@@ -74,30 +74,30 @@ function actBurnupData(st){
   st = st || f4pSemesterState();
   const capItems = anData().capItems;
   const months = actBurnupMonths(st);
-  // fim do último mês calculado (fim do semestre, se encerrado; hoje, se em curso) — usado só para
-  // distribuir a linha do gráfico mês a mês (cada mês do eixo X só pode mostrar entregas que já
-  // aconteceram até o fim dele). Não é mais usado para decidir "entregue" vs. "faltam" no resumo
-  // clicável (decisão `0058`, abaixo).
+  const inicioPrimeiroMes = months.length ? months[0] : null;
   const fimUltimoMes = months.length ? new Date(months[months.length - 1].getFullYear(), months[months.length - 1].getMonth() + 1, 0) : null;
-  const entreguesNoPeriodo = o => catOf(o) === "vazao" && o.deploy && (!fimUltimoMes || o.deploy <= fimUltimoMes);
-  const entreguesParaGrafico = capItems.filter(entreguesNoPeriodo);
-  const cumulative = months.map(m => {
-    const fim = new Date(m.getFullYear(), m.getMonth() + 1, 0);
-    return entreguesParaGrafico.filter(o => o.deploy <= fim).length;
-  });
-  const escopo = capItems.length;
-  /* Decisão `0058`: "Entregue"/"Faltam" (resumo clicável, abaixo do gráfico) não dependem mais de a
-     entrega ter caído dentro do período exato do semestre — mesma razão da decisão `0052` (Report F4P,
-     Reserva entregue): um item da Reserva já em Vazão é entregue, ponto, mesmo que a saída tenha sido
-     adiantada ou tardia em relação ao semestre comprometido; "Faltam" volta a significar só o que de
-     fato ainda não chegou em Vazão, não mais "chegou fora do prazo". Antes, uma entrega tardia contava
-     em "Faltam" mesmo já mostrando "Vazão · DD/MM/AAAA" na lista — o usuário reportou isso como dado
-     desalinhado (clicava em "faltam" e via itens já entregues). O gráfico (linha `cumulative` acima)
-     continua limitado ao período — não tem como plotar uma entrega fora dos meses do próprio eixo X —
-     só o resumo numérico muda. */
+  /* Decisão `0058`: "Entregue"/"Faltam" (resumo clicável, abaixo do gráfico) não dependem de a entrega
+     ter caído dentro do período exato do semestre — mesma razão da decisão `0052` (Report F4P, Reserva
+     entregue): um item da Reserva já em Vazão é entregue, ponto, mesmo que a saída tenha sido adiantada
+     ou tardia em relação ao semestre comprometido; "Faltam" significa só o que de fato ainda não chegou
+     em Vazão. */
   const entregues = capItems.filter(o => catOf(o) === "vazao");
   const entreguesN = entregues.length;
   const faltamItems = capItems.filter(o => catOf(o) !== "vazao");
+  const escopo = capItems.length;
+  /* Decisão `0059` (correção): a linha do gráfico (`cumulative`) precisa terminar no mesmo total do
+     resumo "Entregue" acima — senão ela nunca alcança a reta do Reservado mesmo com o resumo já
+     mostrando 100% entregue, parecendo um gráfico "furado"/inconsistente com o número ao lado (bug
+     relatado pelo usuário: "11 entregues" no resumo, mas a linha parava bem abaixo de 11 em junho). Uma
+     entrega fora do período do semestre (adiantada ou tardia) é "encaixada" no mês mais próximo dentro
+     do próprio eixo X — no 1º mês, se a saída foi antes do início do semestre; no último, se foi depois
+     do fim — ela não deixa de contar, só não aparece exatamente no mês real em que aconteceu (que nem
+     existe no gráfico deste semestre). */
+  const mesEfetivo = o => !o.deploy ? null : o.deploy < inicioPrimeiroMes ? inicioPrimeiroMes : o.deploy > fimUltimoMes ? fimUltimoMes : o.deploy;
+  const cumulative = months.map(m => {
+    const fim = new Date(m.getFullYear(), m.getMonth() + 1, 0);
+    return entregues.filter(o => { const d = mesEfetivo(o); return d && d <= fim; }).length;
+  });
   return {months, escopo, cumulative, capItems, entregues, entreguesN, faltamItems, faltam: faltamItems.length};
 }
 function actBurnupSvg(data){
@@ -365,7 +365,7 @@ function renderActionable(){
   const ctCard = actCard("CycleTime", actScatterSvg(ctData) + actCtLegend(ctData),
     `Dispersão de CycleTime dos itens concluídos (${esc((CFG.f4p.types || []).join(", ") || "nenhum tipo marcado")}) no período <b>${esc(f4pPeriodLabel(st))}</b> — mesma amostra e Reserva (CT máximo do time) do quadrante CycleTime do Report F4P (§12.2); Atual é o P95 da amostra. Pontos acima da Reserva ficam em destaque. Clique num ponto para ir até o item.`);
   const buCard = actCard("Burnup Reserva", actBurnupSummary(buData) + actBurnupSvg(buData),
-    `Reservado: itens com a tag <b>${esc(CFG.anTag || "ROADMAP")}</b> nos épicos do roadmap ${esc(S.f.int ? "interno" : "executivo")} do time (mesmo conjunto da Capacidade da Visão analítica, §10) — inclui itens em qualquer status, não só os já entregues. Entregue: subconjunto já na categoria de fluxo Vazão, mesmo que a entrega tenha caído fora do período exato do semestre (adiantada ou tardia). Faltam: o restante do Reservado que ainda não entrou em Vazão, de forma nenhuma. O gráfico (linha acumulada) continua limitado aos meses do semestre selecionado — uma entrega fora desse período soma no resumo "Entregue", mas não aparece destacada numa subida específica do gráfico. Sem histórico de quando cada item entrou no roadmap, a linha Reservado é sempre a contagem atual (uma reta), não uma evolução real do escopo. Clique em "reservado", "entregue" ou "faltam" para ver os itens de cada grupo.`);
+    `Reservado: itens com a tag <b>${esc(CFG.anTag || "ROADMAP")}</b> nos épicos do roadmap ${esc(S.f.int ? "interno" : "executivo")} do time (mesmo conjunto da Capacidade da Visão analítica, §10) — inclui itens em qualquer status, não só os já entregues. Entregue: subconjunto já na categoria de fluxo Vazão, mesmo que a entrega tenha caído fora do período exato do semestre (adiantada ou tardia). Faltam: o restante do Reservado que ainda não entrou em Vazão, de forma nenhuma. O gráfico (linha acumulada) sempre termina no mesmo total do "Entregue" ao lado — uma entrega fora do período do semestre (adiantada ou tardia) entra no mês mais próximo dentro do próprio eixo X (1º mês ou último), já que o mês real em que ela aconteceu pode nem existir neste gráfico. Sem histórico de quando cada item entrou no roadmap, a linha Reservado é sempre a contagem atual (uma reta), não uma evolução real do escopo. Clique em "reservado", "entregue" ou "faltam" para ver os itens de cada grupo.`);
   const distData = actDistData(team, st);
   const distCard = actCard("Distribuição Vazão por mês", actDistCard(team, distData),
     `Para cada mês do semestre ${esc(semLong(f4pSemester()))}, dos itens entregues (Vazão) do time — exceto os tipos de bug (${esc((CFG.act.bugTypes || []).join(", ") || "nenhum tipo marcado")}) — % User Story (${esc((CFG.f4p.usTypes || []).join(", ") || "nenhum tipo marcado")}), % Technical Story (tipo fixo) e % demais tipos entregues. Um mês sem nenhum item na amostra (inclui os meses ainda não decorridos, no semestre em curso) mostra uma barra cinza com 0%. Clique numa fatia para ver os itens dela.`);

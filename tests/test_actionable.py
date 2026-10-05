@@ -237,11 +237,12 @@ def test_burnup_clique_em_faltam_abre_lista_dos_itens_ainda_nao_entregues(page):
 
 def test_burnup_entrega_fora_do_periodo_do_semestre_ainda_conta_como_entregue(page):
     """Decisão 0058 (correção; revê a regra anterior, decisão 0041): um item da Reserva entregue depois
-    que o semestre selecionado (já encerrado) fechou continua contando como "entregue" no resumo — só
-    não aparece destacado numa subida específica do gráfico (que fica limitado aos meses do semestre).
-    Mesma razão da decisão 0052 (Report F4P, Reserva entregue): o usuário reportou o resumo "faltam"
-    mostrando um item cuja Situação já lia "Vazão · DD/MM/AAAA" — "faltam" tem que significar só o que
-    de fato ainda não foi entregue, nunca uma entrega tardia."""
+    que o semestre selecionado (já encerrado) fechou continua contando como "entregue" no resumo. Mesma
+    razão da decisão 0052 (Report F4P, Reserva entregue): o usuário reportou o resumo "faltam" mostrando
+    um item cuja Situação já lia "Vazão · DD/MM/AAAA" — "faltam" tem que significar só o que de fato
+    ainda não foi entregue, nunca uma entrega tardia. Desde a decisão 0059, essa entrega tardia também
+    é refletida no gráfico (encaixada no último mês do eixo X), para a linha terminar no mesmo total do
+    resumo (ver `test_burnup_grafico_termina_no_mesmo_total_do_resumo_entregue`)."""
     carregar(page, "f4p.xlsx")
     r = page.evaluate("""()=>{
       const curStart = f4pSemStart(semestre(TODAY));
@@ -263,9 +264,42 @@ def test_burnup_entrega_fora_do_periodo_do_semestre_ainda_conta_como_entregue(pa
     assert r["escopo"] == 1
     assert r["entreguesN"] == 1 and r["faltam"] == 0
     assert r["entregueIds"] == ["t1"] and r["faltamIds"] == []
-    # o gráfico (acumulado mês a mês) continua limitado ao período do semestre — a entrega tardia não
-    # tem um mês do próprio eixo X onde entrar, então a linha não sobe por causa dela.
-    assert r["cumulativeUltimoMes"] == 0
+    # decisão 0059: a entrega tardia é encaixada no último mês do gráfico, então a linha já reflete o
+    # total entregue desde o fim do período, batendo com o resumo (ver teste dedicado abaixo).
+    assert r["cumulativeUltimoMes"] == 1
+
+def test_burnup_grafico_termina_no_mesmo_total_do_resumo_entregue(page):
+    """Decisão 0059 (correção): o usuário relatou (print do time BO) o resumo mostrando "11 entregues"
+    enquanto a linha do gráfico terminava visivelmente abaixo de 11 — a entrega de um item fora do
+    período exato do semestre (decisão 0058: ainda conta como "entregue" no resumo) não tinha onde
+    entrar no gráfico, então a linha nunca alcançava o total real. A linha agora sempre termina no mesmo
+    valor de `entreguesN`: uma entrega antes do início do semestre entra no 1º mês do eixo X; uma depois
+    do fim entra no último."""
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      const sem = semestre(TODAY);
+      const curStart = f4pSemStart(sem);
+      const antes = new Date(curStart.getFullYear(), curStart.getMonth() - 1, 15);   // antes do início
+      const depois = new Date(curStart.getFullYear(), curStart.getMonth() + 7, 15);   // depois do fim (semestre tem 6 meses)
+      const dentro = new Date(curStart.getFullYear(), curStart.getMonth() + 1, 15);
+      S.model.teamFlow.ACT_BORDAS = ["Backlog", "Vazao"];
+      CFG.flow.act_bordas = {cat:{vazao:"vazao"}, ct:[]};
+      S.model.ops.set("x1", {id:"x1", title:"X1", team:"ACT_BORDAS", type:"User Story", stName:"Vazao", deploy:antes, ready:antes, tags:["ROADMAP"]});
+      S.model.ops.set("x2", {id:"x2", title:"X2", team:"ACT_BORDAS", type:"User Story", stName:"Vazao", deploy:depois, ready:depois, tags:["ROADMAP"]});
+      S.model.ops.set("x3", {id:"x3", title:"X3", team:"ACT_BORDAS", type:"User Story", stName:"Vazao", deploy:dentro, ready:dentro, tags:["ROADMAP"]});
+      S.model.inis.set("INI_X", {id:"INI_X", valid:true, title:"Ini", exec:sem, owner:null, rels:["REL_X"]});
+      S.model.rels.set("REL_X", {id:"REL_X", valid:true, title:"Rel", parent:"INI_X", epis:["EPI_X"]});
+      S.model.epis.set("EPI_X", {id:"EPI_X", valid:true, title:"Epi", parent:"REL_X", target:null, interno:null, st:0, ops:["x1","x2","x3"], type:"Epic"});
+      S.model.teams.push("ACT_BORDAS");
+      S.f.team = "ACT_BORDAS"; S.f.exec = sem;
+      render();
+      const bu = actBurnupData();
+      return {entreguesN: bu.entreguesN, cumulative: bu.cumulative};
+    }""")
+    assert r["entreguesN"] == 3
+    assert r["cumulative"][0] == 1          # x1 (antes do início) já entra no 1º mês
+    assert r["cumulative"][-1] == 3          # x2 (depois do fim) entra no último mês — bate com entreguesN
+    assert max(r["cumulative"]) == r["entreguesN"]
 
 def test_os_4_quadrantes_tem_regra_definida(page):
     carregar(page, "f4p.xlsx")
