@@ -184,13 +184,13 @@ formam uma partição exata do Reservado (`entregues.length + faltamItems.length
 sempre), mas "Entregue" agora é só "categoria de fluxo Vazão" (`catOf(o) === "vazao"`), **sem** exigir
 que a saída tenha caído dentro do período do semestre selecionado — um item entregue antes ou depois
 desse período (ex.: um semestre encerrado cuja entrega só saiu no semestre seguinte) ainda conta em
-Entregue. Só o **gráfico** (linha acumulada mês a mês, `cumulative`) continua restrito aos meses do
-semestre — não tem como plotar a entrega fora do próprio eixo X.
+Entregue.
 
 - **Dado**: 1 item reservado de um semestre já encerrado, entregue no dia seguinte ao fim desse
   semestre (já no semestre seguinte).
 - **Então (sucesso)**: `entreguesN === 1`, `faltam === 0`, o item aparece em `entregues`, não em
-  `faltamItems`; o último mês de `cumulative` continua `0` (o gráfico não teve onde plotar a entrega).
+  `faltamItems`; o último mês de `cumulative` passa a ser `1` (decisão `0059`, abaixo — a entrega
+  entra no último mês do eixo X do gráfico, mesmo tendo saído fora do período real do semestre).
 - **Cenário de falha coberto**: o usuário reportou o resumo "faltam" do Burnup Reserva mostrando 2
   itens cuja Situação, na lista aberta por clique, já lia "Vazão · DD/MM/AAAA" — a entrega tinha
   acontecido no 2º semestre, mas o burnup era do 1º, então a regra anterior (herdada da decisão `0041`)
@@ -198,6 +198,31 @@ semestre — não tem como plotar a entrega fora do próprio eixo X.
   Mesma razão de negócio já corrigida no Report F4P (decisão `0052`, Reserva entregue).
 - **Teste**: `test_burnup_entrega_fora_do_periodo_do_semestre_ainda_conta_como_entregue`
 - **Relacionado**: decisões `0042`, `0058-burnup-entrega-fora-do-periodo-conta-como-entregue.md`.
+
+## Regra: o gráfico (linha acumulada) sempre termina no mesmo total do resumo "Entregue"
+
+**Garante que** (decisão `0059`, correção — consequência direta da `0058`): como "Entregue" no resumo
+passou a contar qualquer entrega (dentro ou fora do período do semestre), mas o gráfico (`cumulative`)
+só tinha meses do próprio semestre para plotar, uma entrega fora do período somava no resumo sem nunca
+aparecer na linha — o gráfico passava a nunca alcançar o total mostrado ao lado, mesmo com 100%
+entregue. A correção "encaixa" cada entrega fora do período no mês mais próximo dentro do próprio
+eixo X do gráfico: no 1º mês, se a saída foi antes do início do semestre; no último mês, se foi depois
+do fim. Isso garante `cumulative[cumulative.length - 1] === entreguesN` sempre.
+
+- **Dado**: 3 itens reservados do mesmo semestre — um entregue antes do início do semestre, um
+  entregue bem depois do fim (mais de 6 meses após o início), um entregue dentro do período.
+- **Então (sucesso)**: `entreguesN === 3`; `cumulative[0] === 1` (a entrega antecipada já entra no 1º
+  mês do gráfico); `cumulative` no último mês é igual a `3` (bate com `entreguesN` — a entrega tardia
+  entrou no último mês); `Math.max(...cumulative) === entreguesN` (a linha chega no total, nunca para
+  antes).
+- **Cenário de falha coberto**: o usuário mandou um print do Burnup Reserva do time BO mostrando o
+  resumo "11 reservados · 11 entregues · 0 faltam", mas a linha do gráfico terminando visivelmente
+  abaixo de 11 no último mês do semestre — o número do resumo e o fim da linha do gráfico não
+  "batiam", mesmo o resumo já indicando 100% entregue. Causa: a entrega de ao menos 1 dos 11 itens
+  tinha caído fora do período exato do semestre (decisão `0058`: ainda conta como entregue no resumo),
+  mas o gráfico (antes da `0059`) não tinha mês no eixo X para plotar essa entrega.
+- **Teste**: `test_burnup_grafico_termina_no_mesmo_total_do_resumo_entregue`
+- **Relacionado**: decisões `0058`, `0059-burnup-grafico-clampa-entrega-fora-do-periodo.md`.
 
 ## Regra: os 4 quadrantes têm regra definida
 
