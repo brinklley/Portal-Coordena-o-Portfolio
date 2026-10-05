@@ -102,6 +102,43 @@ def test_clique_no_ponto_do_scatter_fecha_o_painel_e_navega(page):
     assert page.evaluate("ACT.open") is False
     assert page.evaluate("document.getElementById('fBusca').value") == alvo
 
+def test_scatter_item_tardio_de_epico_comprometido_aparece_como_ponto_extra(page):
+    """Decisão 0062 (mesmo espírito das 0060/0061): depois da correção do Burnup Reserva e do CFD, o
+    usuário mandou outro print mostrando que só o CycleTime continuava "preso" em junho, sem refletir
+    uma entrega de julho do mesmo roadmap. A amostra de CycleTime (`f4pSample`, igual ao Report F4P
+    §12.2) é definida por uma janela fixa — mudar essa janela mudaria a Reserva/Atual comparados no
+    Report F4P também, então a correção não toca nela: um item concluído de um épico comprometido com o
+    roadmap, entregue depois do fim da janela, aparece como ponto EXTRA no gráfico (eixo estendido, linha
+    "fim do semestre"), mas Reserva e Atual (P95) continuam calculados só sobre a amostra original."""
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      const curStart = f4pSemStart(semestre(TODAY));
+      const prevMid = new Date(curStart.getFullYear(), curStart.getMonth() - 3, 15);
+      const prevSem = semestre(prevMid);
+      const prevStart = f4pSemStart(prevSem);
+      const dentro = new Date(prevStart.getFullYear(), prevStart.getMonth() + 1, 15);
+      const tardia = new Date(prevStart.getFullYear(), prevStart.getMonth() + 6, 10);   // depois do fim da janela
+      S.model.ops.set("p1", {id:"p1", title:"P1", team:"ACT_CT_TARDIO", type:"User Story", deploy:dentro, ct:30, tags:["ROADMAP"]});
+      S.model.ops.set("p2", {id:"p2", title:"P2", team:"ACT_CT_TARDIO", type:"User Story", deploy:tardia, ct:45, tags:[]});
+      S.model.inis.set("INI_P", {id:"INI_P", valid:true, title:"Ini", exec:prevSem, owner:null, rels:["REL_P"]});
+      S.model.rels.set("REL_P", {id:"REL_P", valid:true, title:"Rel", parent:"INI_P", epis:["EPI_P"]});
+      S.model.epis.set("EPI_P", {id:"EPI_P", valid:true, title:"Epi", parent:"REL_P", target:null, interno:null, st:0, ops:["p1", "p2"], type:"Epic"});
+      S.model.teams.push("ACT_CT_TARDIO");
+      S.f.team = "ACT_CT_TARDIO"; S.f.exec = prevSem;
+      render();
+      const d = actCtScatterData("ACT_CT_TARDIO");
+      return {nAmostra: d.items.length, amostraIds: d.items.map(o=>o.id), atual: d.atual,
+        tardiosIds: d.tardios.map(o=>o.id), extended: d.extended,
+        svgTemP2: actScatterSvg(d).includes("P2 · CT 45d"),
+        svgTemLinha: actScatterSvg(d).includes("act-sem-end")};
+    }""")
+    assert r["nAmostra"] == 1 and r["amostraIds"] == ["p1"]   # p2 nunca entra na amostra (fora da janela)
+    assert r["atual"] == 30   # P95 de 1 item só — não conta p2
+    assert r["tardiosIds"] == ["p2"]
+    assert r["extended"] is True
+    assert r["svgTemP2"] is True   # p2 aparece como ponto extra no gráfico
+    assert r["svgTemLinha"] is True
+
 def test_burnup_reservado_e_o_mesmo_da_capacidade_da_visao_analitica(page):
     """"Reservado" no burnup é o mesmo conjunto de itens da Capacidade da Visão analítica (§10) — itens
     com a tag de capacidade do roadmap, em qualquer status, não só os já entregues."""
@@ -351,6 +388,48 @@ def test_burnup_sem_entrega_tardia_nao_estende_nem_mostra_linha(page):
       return {extended: bu.extended, semEndIdx: bu.semEndIdx, svgTemLinha: actBurnupSvg(bu).includes("act-sem-end")};
     }""")
     assert r == {"extended": False, "semEndIdx": None, "svgTemLinha": False}
+
+def test_burnup_estende_mesmo_com_entrega_tardia_de_item_fora_da_reserva(page):
+    """Decisão 0061 (correção da 0060): o usuário reportou, depois da 0060, que o Burnup Reserva ficava
+    "preso" no último mês do semestre (jun) enquanto o CFD e a Distribuição já mostravam julho/agosto —
+    print com "5 reservados · 5 entregues · 0 faltam" e a linha do Burnup já achatada no topo, sem a
+    linha "fim do semestre" que os outros dois quadrantes mostravam. Causa: a extensão do Burnup só
+    reagia a item da própria Reserva (`entregues`/`capItems`, com a tag ROADMAP); o item que disparava a
+    extensão no CFD/Distribuição era de um tipo do CT mas SEM a tag — fazia parte do mesmo épico
+    comprometido, mas não da Reserva. Correção: o gatilho da extensão passa a usar `actLateDeliveries`
+    (qualquer item do épico comprometido, mesmo critério do CFD/Distribuição) — os números "Entregue"/
+    "Faltam" do resumo continuam baseados só na Reserva, só o eixo passa a reagir ao épico inteiro."""
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      const curStart = f4pSemStart(semestre(TODAY));
+      const prevMid = new Date(curStart.getFullYear(), curStart.getMonth() - 3, 15);
+      const prevSem = semestre(prevMid);
+      const prevStart = f4pSemStart(prevSem);
+      const dentro = new Date(prevStart.getFullYear(), prevStart.getMonth() + 1, 15);
+      const tardia = new Date(prevStart.getFullYear(), prevStart.getMonth() + 7, 10);   // bem depois do fim
+      S.model.teamFlow.ACT_FORADARESERVA = ["Backlog", "Vazao"];
+      CFG.flow.act_foradareserva = {cat:{vazao:"vazao"}, ct:[]};
+      // n1: reservado (tag ROADMAP), entregue dentro do semestre — é o que o resumo "Entregue" mede
+      S.model.ops.set("n1", {id:"n1", title:"N1", team:"ACT_FORADARESERVA", type:"User Story", stName:"Vazao", deploy:dentro, ready:dentro, tags:["ROADMAP"]});
+      // n2: mesmo épico, mesmo tipo do CT, SEM a tag ROADMAP (fora da Reserva) — entregue bem depois do
+      // fim do semestre; antes da 0061, não disparava a extensão do Burnup (só CFD/Distribuição reagiam)
+      S.model.ops.set("n2", {id:"n2", title:"N2", team:"ACT_FORADARESERVA", type:"User Story", stName:"Vazao", deploy:tardia, ready:tardia, tags:[]});
+      S.model.inis.set("INI_N", {id:"INI_N", valid:true, title:"Ini", exec:prevSem, owner:null, rels:["REL_N"]});
+      S.model.rels.set("REL_N", {id:"REL_N", valid:true, title:"Rel", parent:"INI_N", epis:["EPI_N"]});
+      S.model.epis.set("EPI_N", {id:"EPI_N", valid:true, title:"Epi", parent:"REL_N", target:null, interno:null, st:0, ops:["n1", "n2"], type:"Epic"});
+      S.model.teams.push("ACT_FORADARESERVA");
+      S.f.team = "ACT_FORADARESERVA"; S.f.exec = prevSem;
+      render();
+      const bu = actBurnupData();
+      return {escopo: bu.escopo, entreguesN: bu.entreguesN, faltam: bu.faltam, entregueIds: bu.entregues.map(o=>o.id),
+        extended: bu.extended, semEndIdx: bu.semEndIdx,
+        ultimoMesTime: bu.months[bu.months.length - 1].getTime(), mesRealEsperado: new Date(tardia.getFullYear(), tardia.getMonth(), 1).getTime()};
+    }""")
+    assert r["escopo"] == 1 and r["entreguesN"] == 1 and r["faltam"] == 0   # só n1 é Reserva — números inalterados
+    assert r["entregueIds"] == ["n1"]   # n2 nunca entra no "Entregue" (não é Reserva), só estende o eixo
+    assert r["extended"] is True
+    assert r["semEndIdx"] == 5
+    assert r["ultimoMesTime"] == r["mesRealEsperado"]   # eixo chega no mês real da entrega de n2
 
 def test_os_4_quadrantes_tem_regra_definida(page):
     carregar(page, "f4p.xlsx")
@@ -615,7 +694,10 @@ def test_dist_icone_de_alerta_aparece_no_mes_extra_sem_linha_vertical(page):
     assert rows.nth(6).locator(".act-dist-late-icon").count() == 1
     for i in range(6):
         assert rows.nth(i).locator(".act-dist-late-icon").count() == 0
-    assert page.locator(".act-sem-end").count() == 0   # quadrante de barras: sem linha vertical
+    # decisão 0061: o Burnup Reserva também reage ao mesmo item tardio (mesmo épico comprometido) e
+    # desenha sua própria linha "fim do semestre" — mas a Distribuição (quadrante de barras) nunca tem
+    # uma, então escopamos a checagem ao próprio card da Distribuição.
+    assert page.locator(".act-dist .act-sem-end").count() == 0
 
 def test_dist_nao_estende_quando_entrega_tardia_nao_pertence_a_epico_comprometido(page):
     carregar(page, "f4p.xlsx")
@@ -933,7 +1015,9 @@ def test_cfd_linha_fim_do_semestre_aparece_so_quando_estendido(page):
     }""")
     page.click("#actTab")
     page.wait_for_timeout(200)
-    assert page.locator(".act-sem-end").count() == 1
+    # decisão 0061: o Burnup Reserva também reage ao mesmo item tardio (mesmo épico comprometido),
+    # então a linha aparece nos dois quadrantes — aqui confirmamos especificamente a do CFD.
+    assert page.locator(".act-cfd-wrap .act-sem-end").count() == 1
 
 def test_cfd_aparece_no_painel_com_legenda_e_grafico(page):
     carregar(page, "f4p.xlsx")
