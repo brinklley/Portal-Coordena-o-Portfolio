@@ -17,12 +17,12 @@ Uso:
   python3 scripts/relatorio/gerar_relatorio.py --config configuracao_mapa_portfolio.json --fonte azure --time MOBILE
   python3 scripts/relatorio/gerar_relatorio.py --config configuracao_mapa_portfolio.json --fonte simulado --fixture times.xlsx
 """
-import argparse, html, json, re, sys
+import argparse, asyncio, html, json, re, sys
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from playwright.sync_api import sync_playwright
+from playwright.async_api import async_playwright
 
 AQUI = Path(__file__).resolve().parent
 RAIZ = AQUI.parents[1]
@@ -32,10 +32,10 @@ FUSO = ZoneInfo("America/Sao_Paulo")
 # Frase da nota de rodapé da Visão Analítica que só faz sentido na tela interativa (números clicáveis).
 FRASE_CLICAVEL = re.compile(r"\s*Os números do cabeçalho.*?quando entregue\)\.", re.S)
 
-JS_CARREGAR = """async () => {
+JS_CARREGAR = """async (limiteMs) => {
   azRun();
   const t0 = Date.now();
-  while (Date.now() - t0 < 900000) {
+  while (Date.now() - t0 < limiteMs) {
     if (document.getElementById('srcLabel').textContent.includes('Azure DevOps')) return {ok:true};
     const ok = document.getElementById('azMapOk');           // colunas novas/antigas no histórico: segue o padrão (ignorar)
     if (ok && !ok.closest('[hidden]')) ok.click();
@@ -80,26 +80,41 @@ def ler_config(caminho):
     return cfg
 
 
-def preparar_fonte(pg, cfg, args):
-    """Ajusta `cfg.azure` e a rota de rede conforme a fonte. Devolve o texto de origem p/ o relatório."""
+class _Captura:
+    """Adapta o Azure simulado (feito para a API síncrona) à API assíncrona: captura o `fulfill` e o repassa."""
+    def __init__(self, route): self.request, self.resp = route.request, None
+    def fulfill(self, **kw): self.resp = kw
+
+
+async def preparar_fonte(pg, cfg, args):
+    """Ajusta `cfg.azure` e a rota de rede conforme a fonte. Devolve (tokens de enchimento, texto de origem, ponte|None)."""
+    padrao = re.compile(r"https://(analytics\.)?dev\.azure\.com/.*")
     if args.fonte == "simulado":
         sys.path.insert(0, str(RAIZ / "tests"))
         from azure_simulado import AzureSimulado, fontes_de
         sim = AzureSimulado(args.fixture)
-        pg.route(re.compile(r"https://(analytics\.)?dev\.azure\.com/.*"), sim.rota)
+        async def rota_sim(route):
+            c = _Captura(route); sim.rota(c); await route.fulfill(**c.resp)
+        await pg.route(padrao, rota_sim)
         fontes = fontes_de(sim)
         cfg["azure"].update(orgs=[{"org": o} for o in sorted({f["org"] for f in fontes})], sources=fontes, maps={}, mapMeta={})
         cfg["flow"] = {}   # o fluxo da configuração descreve os quadros REAIS; os quadros fictícios usam o fluxo padrão
-        tokens = {o["org"]: "token-simulado" for o in cfg["azure"]["orgs"]}
-        return tokens, "Azure simulado (dados fictícios)"
+        return {o["org"]: "token-simulado" for o in cfg["azure"]["orgs"]}, "Azure simulado (dados fictícios)", None
     from ponte_azure import Ponte, pats_do_ambiente, ENCHIMENTO
     orgs = sorted({s["org"] for s in cfg["azure"]["sources"]})
     pats = pats_do_ambiente(orgs)
     ponte = Ponte(pats)
-    ponte.verificar(orgs)
-    print("Autenticação: " + ", ".join(f"{o} ({'variável de ambiente' if pats[o] else 'credencial do ambiente'})" for o in orgs))
-    pg.route(re.compile(r"https://(analytics\.)?dev\.azure\.com/.*"), ponte.rota)
-    return {o: ENCHIMENTO for o in orgs}, "Azure DevOps"
+    await asyncio.to_thread(ponte.verificar, orgs)
+    print("Autenticação: " + ", ".join(f"{o} ({'variável de ambiente' if pats[o] else 'credencial do ambiente'})" for o in orgs), flush=True)
+    await pg.route(padrao, ponte.rota)
+    return {o: ENCHIMENTO for o in orgs}, "Azure DevOps", ponte
+
+
+async def acompanhar(ponte, pg):
+    """Uma linha de progresso a cada 30s (a janela do portal não atualiza de forma confiável sem tela)."""
+    while True:
+        await asyncio.sleep(30)
+        print("  carregando… " + (ponte.resumo() if ponte else ""), flush=True)
 
 
 def montar_secao(sid, dados):
@@ -108,40 +123,45 @@ def montar_secao(sid, dados):
             f'<div class="an-body">{dados["corpo"]}</div>\n</section>')
 
 
-def gerar(args):
+async def gerar(args):
     if not DIST.exists():
         raise SystemExit("Falta o dist/mapa_portfolio.html: rode `npm run build` antes.")
     cfg = ler_config(args.config)
     agora = datetime.now(FUSO)
-    with sync_playwright() as p:
-        navegador = p.chromium.launch()
-        ctx = navegador.new_context(viewport={"width": 1500, "height": 950}, timezone_id="America/Sao_Paulo", locale="pt-BR")
-        pg = ctx.new_page()
+    async with async_playwright() as p:
+        navegador = await p.chromium.launch()
+        ctx = await navegador.new_context(viewport={"width": 1500, "height": 950}, timezone_id="America/Sao_Paulo", locale="pt-BR")
+        pg = await ctx.new_page()
         erros = []
         pg.on("pageerror", lambda e: erros.append(str(e)))
-        pg.goto(DIST.as_uri())
-        pg.wait_for_timeout(400)
-        tokens, origem = preparar_fonte(pg, cfg, args)
+        await pg.goto(DIST.as_uri())
+        await pg.wait_for_timeout(400)
+        tokens, origem, ponte = await preparar_fonte(pg, cfg, args)
         # Configuração do Portal (sem token). `saveCfg` grava só no localStorage deste navegador descartável.
-        pg.evaluate("([j, tokens]) => { CFG = normCfg(j); saveCfg(); Object.entries(tokens).forEach(([o, t]) => AZ.tokens[o] = t); }", [cfg, tokens])
-        r = pg.evaluate(JS_CARREGAR)
+        await pg.evaluate("([j, tokens]) => { CFG = normCfg(j); saveCfg(); Object.entries(tokens).forEach(([o, t]) => AZ.tokens[o] = t); }", [cfg, tokens])
+        andamento = asyncio.create_task(acompanhar(ponte, pg))
+        try:
+            r = await pg.evaluate(JS_CARREGAR, args.limite_min * 60 * 1000)
+        finally:
+            andamento.cancel()
+        if ponte: print("Carga concluída: " + ponte.resumo(), flush=True)
         if not r["ok"]:
             raise SystemExit("A carga do Azure DevOps não terminou:\n" + r["erro"])
-        pg.wait_for_timeout(300)
+        await pg.wait_for_timeout(300)
         # uma fonte que falha não derruba a carga (o portal segue com o resto): para um relatório diário isso
         # seria dado faltando sem aviso, então aqui qualquer fonte ausente aborta a geração.
-        faltam = pg.evaluate("""() => { const ok = new Set(AZ.raw.map(L => L.src.id)); return azCfgOf(CFG).sources.filter(s => !ok.has(s.id)).map(s => `${s.org}/${s.alias || s.team}`); }""")
+        faltam = await pg.evaluate("""() => { const ok = new Set(AZ.raw.map(L => L.src.id)); return azCfgOf(CFG).sources.filter(s => !ok.has(s.id)).map(s => `${s.org}/${s.alias || s.team}`); }""")
         if faltam:
             raise SystemExit("Fontes do Azure DevOps que não carregaram (relatório não gerado): " + ", ".join(faltam))
 
-        vigente = pg.evaluate("semestre(TODAY)")
+        vigente = await pg.evaluate("semestre(TODAY)")
         roadmap = args.roadmap or vigente
-        opcoes = pg.evaluate("[...document.getElementById(%r).options].map(o => o.value).filter(Boolean)" % ("fInt" if args.tipo_roadmap == "interno" else "fExec"))
+        opcoes = await pg.evaluate("[...document.getElementById(%r).options].map(o => o.value).filter(Boolean)" % ("fInt" if args.tipo_roadmap == "interno" else "fExec"))
         if roadmap not in opcoes:
             raise SystemExit(f"O roadmap {roadmap!r} não existe nos dados carregados. Disponíveis: {', '.join(opcoes) or '(nenhum)'}")
         rm = {"interno": roadmap if args.tipo_roadmap == "interno" else "", "executivo": roadmap if args.tipo_roadmap == "executivo" else ""}
 
-        comprometidos = [t for t in pg.evaluate(JS_TIMES, rm) if t["capacidade"] > 0]
+        comprometidos = [t for t in await pg.evaluate(JS_TIMES, rm) if t["capacidade"] > 0]
         print(f"Roadmap {roadmap} ({args.tipo_roadmap}) · times comprometidos: " +
               (", ".join(f'{t["time"]} (cap {t["capacidade"]}/proj {t["projetada"]})' for t in comprometidos) or "nenhum"))
         alvo = args.time or (comprometidos[0]["time"] if comprometidos else None)
@@ -150,12 +170,12 @@ def gerar(args):
         if alvo not in {t["time"] for t in comprometidos}:
             raise SystemExit(f"O time {alvo!r} não está comprometido no roadmap {roadmap}. Comprometidos: {', '.join(t['time'] for t in comprometidos)}")
 
-        dados = pg.evaluate(JS_VISAO, {"time": alvo, **rm})
+        dados = await pg.evaluate(JS_VISAO, {"time": alvo, **rm})
         if "erro" in dados:
             raise SystemExit(dados["erro"])
         dados["time"] = alvo
         dados["corpo"] = FRASE_CLICAVEL.sub("", dados["corpo"])
-        ctx.close(); navegador.close()
+        await ctx.close(); await navegador.close()
     if erros:
         raise SystemExit("Erros de JavaScript no portal durante a geração: " + "; ".join(erros))
 
@@ -185,8 +205,9 @@ def main(argv=None):
     ap.add_argument("--time", help="nome do time como no Portal (padrão: o primeiro time comprometido)")
     ap.add_argument("--roadmap", help='semestre, ex.: "2026 2º Semestre" (padrão: o vigente hoje)')
     ap.add_argument("--tipo-roadmap", choices=["interno", "executivo"], default="interno")
+    ap.add_argument("--limite-min", type=int, default=60, help="tempo máximo da carga do Azure, em minutos")
     ap.add_argument("--saida", default=str(RAIZ / "dist" / "relatorio"), help="pasta de saída (dist/ está no .gitignore: nunca versionar dados reais)")
-    gerar(ap.parse_args(argv))
+    asyncio.run(gerar(ap.parse_args(argv)))
 
 
 if __name__ == "__main__":

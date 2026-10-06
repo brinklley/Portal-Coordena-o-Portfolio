@@ -1,12 +1,17 @@
 """Gerador do relatório diário (scripts/relatorio/) — etapa 1: Visão Analítica de UM time. Decisão 0063.
 O gerador roda como subprocesso, exatamente como a rotina agendada o chamará, contra o Azure simulado
 (fixture fictícia `relatorio.xlsx`) e a configuração mínima abaixo — nunca contra dados reais."""
-import base64, json, re, subprocess, sys
+import asyncio, base64, json, re, subprocess, sys
+from concurrent.futures import ThreadPoolExecutor
 import pytest
 from conftest import ROOT, carregar
 
 sys.path.insert(0, str(ROOT / "scripts" / "relatorio"))
 import ponte_azure
+
+def _exec(corrotina):
+    """roda a corrotina num thread próprio: a sessão síncrona do Playwright (fixture `browser`) já ocupa o loop deste thread"""
+    with ThreadPoolExecutor(1) as ex: return ex.submit(asyncio.run, corrotina).result()
 
 GERADOR = ROOT / "scripts" / "relatorio" / "gerar_relatorio.py"
 CFG_MINIMA = {"anTag": "ROADMAP", "azure": {"orgs": [], "sources": []}}
@@ -63,7 +68,7 @@ class _Rota:
     def __init__(self, metodo, url, hdr=None, corpo=None):
         self.request = type("Req", (), {"method": metodo, "url": url, "headers": hdr or {}, "post_data": corpo, "post_data_buffer": corpo.encode() if corpo else None})()
         self.resp = None
-    def fulfill(self, **kw): self.resp = kw
+    async def fulfill(self, **kw): self.resp = kw
 
 class _Resp:
     def __init__(self, status, corpo=b"{}"): self.status_code, self.content, self.headers = status, corpo, {"Content-Type": "application/json"}
@@ -72,18 +77,18 @@ def test_ponte_troca_o_token_de_enchimento_pelo_pat_real_e_responde_cors(monkeyp
     visto = {}
     ponte = ponte_azure.Ponte({"vsunicred": "PAT-DE-TESTE"})
     monkeypatch.setattr(ponte.sessao, "request", lambda m, u, **kw: visto.update(m=m, u=u, **kw) or _Resp(200, b'{"ok":1}'))
-    pre = _Rota("OPTIONS", "https://dev.azure.com/vsunicred/_apis/projects"); ponte.rota(pre)
+    pre = _Rota("OPTIONS", "https://dev.azure.com/vsunicred/_apis/projects"); _exec(ponte.rota(pre))
     assert pre.resp["status"] == 200 and pre.resp["headers"]["Access-Control-Allow-Origin"] == "*" and not visto
     r = _Rota("POST", "https://dev.azure.com/vsunicred/p/_apis/wit/wiql", {"authorization": "Basic " + base64.b64encode(b":" + ponte_azure.ENCHIMENTO.encode()).decode(), "content-type": "application/json"}, '{"q":1}')
-    ponte.rota(r)
+    _exec(ponte.rota(r))
     assert visto["headers"]["Authorization"] == "Basic " + base64.b64encode(b":PAT-DE-TESTE").decode()
     assert visto["allow_redirects"] is False and r.resp["status"] == 200 and r.resp["body"] == b'{"ok":1}'
 
 def test_ponte_converte_redirecionamento_de_login_em_401_e_barra_org_fora_da_configuracao(monkeypatch):
     ponte = ponte_azure.Ponte({"vsunicred": "x"})
     monkeypatch.setattr(ponte.sessao, "request", lambda *a, **k: _Resp(302, b"<html>login</html>"))
-    r = _Rota("GET", "https://dev.azure.com/vsunicred/_apis/projects"); ponte.rota(r); assert r.resp["status"] == 401
-    outra = _Rota("GET", "https://dev.azure.com/outraorg/_apis/projects"); ponte.rota(outra); assert outra.resp["status"] == 403
+    r = _Rota("GET", "https://dev.azure.com/vsunicred/_apis/projects"); _exec(ponte.rota(r)); assert r.resp["status"] == 401
+    outra = _Rota("GET", "https://dev.azure.com/outraorg/_apis/projects"); _exec(ponte.rota(outra)); assert outra.resp["status"] == 403
 
 def test_pats_do_ambiente_le_so_o_que_existe_e_sem_pat_a_ponte_nao_envia_authorization(monkeypatch):
     monkeypatch.setenv("AZURE_DEVOPS_PAT_VSUNICRED", " segredo "); monkeypatch.delenv("AZURE_DEVOPS_PAT_UNICREDBR", raising=False)
@@ -92,7 +97,7 @@ def test_pats_do_ambiente_le_so_o_que_existe_e_sem_pat_a_ponte_nao_envia_authori
     visto = {}
     ponte = ponte_azure.Ponte(pats)
     monkeypatch.setattr(ponte.sessao, "request", lambda m, u, **kw: visto.update(kw) or _Resp(200))
-    ponte.rota(_Rota("GET", "https://dev.azure.com/unicredbr/_apis/projects"))
+    _exec(ponte.rota(_Rota("GET", "https://dev.azure.com/unicredbr/_apis/projects")))
     assert "Authorization" not in visto["headers"]      # o proxy do ambiente injeta a credencial dessa organização
 
 def test_verificar_aborta_nomeando_a_organizacao_sem_acesso(monkeypatch):
@@ -100,3 +105,14 @@ def test_verificar_aborta_nomeando_a_organizacao_sem_acesso(monkeypatch):
     monkeypatch.setattr(ponte.sessao, "get", lambda u, **kw: _Resp(200 if "/unicredbr/" in u else 302))
     with pytest.raises(SystemExit) as e: ponte.verificar(["unicredbr", "vsunicred"])
     assert "vsunicred" in str(e.value) and "unicredbr," not in str(e.value) and "x" != str(e.value)
+
+def test_ponte_atende_chamadas_em_paralelo(monkeypatch):
+    """O portal dispara até 4 chamadas ao mesmo tempo; a ponte não pode serializá-las (o histórico do Analytics é lento)."""
+    import time
+    ponte = ponte_azure.Ponte({"unicredbr": None})
+    monkeypatch.setattr(ponte.sessao, "request", lambda *a, **k: time.sleep(0.5) or _Resp(200))
+    async def quatro():
+        t = time.time()
+        await asyncio.gather(*[ponte.rota(_Rota("GET", f"https://dev.azure.com/unicredbr/x{i}")) for i in range(4)])
+        return time.time() - t
+    assert _exec(quatro()) < 1.2       # em série seriam ~2s
