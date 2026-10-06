@@ -1,6 +1,6 @@
 # Testes: Relatório diário (gerador offline)
 
-Cobre `tests/test_relatorio.py` (11 testes). Decisão `0063`; código em `scripts/relatorio/`. O gerador roda como subprocesso (como a rotina agendada), contra o Azure simulado e a fixture fictícia `relatorio.xlsx`.
+Cobre `tests/test_relatorio.py` (14 testes). Decisão `0063`; código em `scripts/relatorio/`. O gerador roda como subprocesso (como a rotina agendada), contra o Azure simulado e a fixture fictícia `relatorio.xlsx`.
 
 ## Regra: o relatório é idêntico ao que o portal mostra
 
@@ -44,3 +44,16 @@ Cobre `tests/test_relatorio.py` (11 testes). Decisão `0063`; código em `script
 
 - **Cenário de falha coberto**: um único lote do histórico com 502 fazendo o portal refazer a fonte inteira (minutos), estourando o tempo da rotina; ou repetir indefinidamente um erro de acesso.
 - **Teste**: `test_ponte_repete_so_a_chamada_com_erro_passageiro_e_nao_repete_erro_de_acesso`
+
+## Regra: lote pesado do histórico que continua em 502 é dividido e remontado sem perder nem duplicar linha
+
+**Garante que**: depois de 3 tentativas em 502, o lote de itens da consulta do histórico é dividido ao meio (recursivamente) e a resposta volta única, sem paginação, com todas as revisões, ordenada por `WorkItemId`, mesmo com os IDs fora de ordem; páginas seguintes (`$skiptoken`) não são divididas (duplicariam linhas) e um item que sozinho não responde vira erro, nunca dado faltando em silêncio. Os IDs são lidos da URL decodificada (o `2` de `%2C` não é um ID).
+
+- **Teste(s)**: `test_ponte_divide_o_lote_do_historico_quando_o_azure_da_502_e_remonta_a_resposta`, `test_ponte_nao_divide_pagina_seguinte_nem_esconde_item_que_nao_responde`
+
+## Regra: toda dependência de terceiros do gerador está em `requirements-dev.txt`
+
+**Garante que**: qualquer pacote importado por `scripts/relatorio/*.py` (fora a biblioteca padrão e os módulos do projeto) aparece em `requirements-dev.txt`.
+
+- **Cenário de falha coberto**: a rotina agendada rodar numa sessão nova e quebrar com `ModuleNotFoundError` (aconteceu com `requests` no teste em produção), porque no ambiente de quem desenvolve o pacote já existia por acaso.
+- **Teste**: `test_requirements_dev_lista_todas_as_dependencias_de_terceiros_do_gerador`
