@@ -40,3 +40,15 @@ Azure DevOps  →  "abas" {headers, rows, flow}  →  buildModel()  →  recompu
 - `npm run check` → sintaxe do código juntado.
 - `npm test` → build + `pytest` (Playwright/Chromium) com dados fictícios e Azure simulado.
 - Antes de qualquer entrega: build, check e testes verdes.
+
+## Relatório diário offline (`scripts/relatorio/`)
+
+Fora do portal (que continua sendo um único HTML sem servidor): um gerador em Python + Playwright que abre `dist/mapa_portfolio.html` num Chromium sem interface, carrega os dados pelo `azRun` e captura o que as funções do próprio portal calculam (decisão `0063`). Gera um HTML único offline com menu lateral.
+
+| Arquivo | Conteúdo |
+|---|---|
+| `gerar_relatorio.py` | CLI: carga, escolha do roadmap vigente e dos times comprometidos, captura da Visão Analítica, montagem do arquivo |
+| `ponte_azure.py` | Atende as chamadas do portal ao Azure com o PAT de `AZURE_DEVOPS_PAT_<ORG>`; o navegador nunca vê o token |
+| `modelo.html` | Casca (menu lateral de 3 grupos) com o CSS do portal embutido |
+
+`--fonte simulado` usa o Azure simulado dos testes (`fixtures/relatorio.xlsx`); `--fonte azure` usa o Azure real. Saída em `dist/relatorio/` (nunca versionar).

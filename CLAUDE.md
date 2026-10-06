@@ -8,6 +8,7 @@ Visualizador encadeado Iniciativa → Release → Épico → itens dos times, co
 - `npm run build` → gera `dist/mapa_portfolio.html` (o arquivo entregue aos usuários)
 - `npm run check` → sintaxe do código juntado
 - `python3 tests/gerar_fixtures.py` → planilhas fictícias em `fixtures/`, usadas para alimentar o Azure simulado dos testes (não há mais upload de planilha no app)
+- `python3 scripts/relatorio/gerar_relatorio.py --config <config.json> --fonte simulado --fixture relatorio.xlsx` → relatório diário offline em `dist/relatorio/` (decisão `0063`; `--fonte azure` usa os PATs `AZURE_DEVOPS_PAT_<ORG>`)
 - `npm test` → build + testes (`pytest`, Playwright/Chromium). Primeira vez: `pip install -r requirements-dev.txt` e `python3 -m playwright install chromium`
 
 ## Regras de trabalho

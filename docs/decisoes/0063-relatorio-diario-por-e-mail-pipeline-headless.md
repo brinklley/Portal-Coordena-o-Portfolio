@@ -1,0 +1,13 @@
+# 0063 · Relatório diário (Visão Analítica, Actionable, Report F4P) gerado por navegador headless
+
+**Contexto.** O envio recorrente da Visão Analítica / Actionable / Report F4P por e-mail hoje depende de alguém abrir o portal, carregar o Azure e copiar cada tela. A regra de negócio já vive no JavaScript do portal (`anData`, `renderAnalytics` e afins); reimplementá-la em outra linguagem faria o relatório divergir da tela.
+**Decisão.**
+- O relatório é **um único HTML offline**, anexável, com menu lateral de 3 grupos: Visão Analítica (um item por time comprometido no roadmap vigente), Actionable (idem) e Report F4P (fixo, os 4 times, sem seleção). Estilo do próprio portal (`src/styles.css` embutido), sem biblioteca externa; gráficos em SVG reaproveitando o código do Actionable.
+- Os dados saem das **mesmas funções do portal**: `scripts/relatorio/gerar_relatorio.py` abre `dist/mapa_portfolio.html` num Chromium sem interface (Playwright), carrega pelo mesmo caminho da tela (`azRun`), aplica os filtros e captura o que `anData`/`renderAnalytics` produzem. Nunca há regra de negócio em Python.
+- **Time comprometido** = time com Capacidade > 0 (itens com a tag `CFG.anTag`) no roadmap vigente (`semestre(TODAY)`, interno por padrão).
+- **PAT por organização**, de uma de duas formas: credencial de API do ambiente da rotina (o proxy injeta o cabeçalho `Authorization: Basic` por host + prefixo de caminho — `dev.azure.com` e `analytics.dev.azure.com` com `/<org>/`, uma credencial por organização; o PAT nem chega ao processo) ou variável `AZURE_DEVOPS_PAT_<ORG>` fora da nuvem. O navegador **nunca vê o token**: uma ponte em Python (`ponte_azure.py`) atende as chamadas ao Azure com o PAT real; no portal só existe um valor de enchimento em `AZ.tokens`. Mantém a decisão `0007` (token nunca salvo) e a verificação de TLS ligada.
+- Qualquer fonte do Azure que falhe na carga **aborta** a geração (relatório diário com time faltando, sem aviso, seria pior que nenhum relatório).
+- **Entrega**: nenhum e-mail automático por ora; a rotina entrega o arquivo como anexo na conversa e o envio é manual. Frequência diária; quem decide é a pessoa responsável (repassar o dia ou esperar acumular mudança).
+- **Etapa 1 (esta)**: valida o pipeline ponta a ponta com a Visão Analítica de **um** time. Actionable, Report F4P e todos os times vêm depois, sobre a mesma casca.
+- No arquivo estático nada é clicável (modais de itens e ordenação dependem do portal); a frase da nota de rodapé que prometia clique é removida.
+**Consequências.** O relatório muda junto com o portal sem trabalho extra. A saída contém dados reais e vai para `dist/relatorio/` (no `.gitignore`): nunca versionar. A validação sem token usa o Azure simulado e a fixture fictícia `relatorio.xlsx`.
