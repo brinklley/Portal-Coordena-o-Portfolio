@@ -13,7 +13,7 @@ Em qualquer dos casos:
   nunca é salvo em localStorage/IndexedDB nem aparece em log — coerente com a decisão 0007;
 - a verificação de TLS continua ligada (usa o pacote de CAs do ambiente, que inclui a do proxy).
 """
-import base64, os, re
+import asyncio, base64, os, re, time
 from urllib.parse import urlsplit
 
 import requests
@@ -37,6 +37,8 @@ class Ponte:
         self.pats = pats
         self.sessao = requests.Session()
         self.chamadas = 0
+        self.bytes = 0
+        self.t0 = time.time()
 
     def _org(self, url):
         seg = [s for s in urlsplit(url).path.split("/") if s]
@@ -61,21 +63,27 @@ class Ponte:
             raise SystemExit("Sem acesso ao Azure DevOps nas organizações: " + ", ".join(ruins) +
                              f". Confira a credencial de API do ambiente (host dev.azure.com e analytics.dev.azure.com, prefixo /<org>/) ou a variável {var_do_token('<org>')}.")
 
-    def rota(self, route):
+    async def rota(self, route):
+        """Atende uma chamada do portal. Assíncrona: o portal dispara várias em paralelo (até 4) e o histórico do
+        quadro (Analytics) é lento; atender uma por vez dividia a velocidade da carga por quatro."""
         req = route.request
         if req.method == "OPTIONS":
-            return route.fulfill(status=200, headers=CORS, body="")
+            return await route.fulfill(status=200, headers=CORS, body="")
         org = self._org(req.url)
         if org not in self.pats:
-            return route.fulfill(status=403, headers=CORS, body=f"organização {org} fora da configuração")
+            return await route.fulfill(status=403, headers=CORS, body=f"organização {org} fora da configuração")
         hdr = self._cabecalho(org)
         if req.post_data:
             hdr["Content-Type"] = req.headers.get("content-type", "application/json")
         self.chamadas += 1
         try:
-            r = self.sessao.request(req.method, req.url, headers=hdr, data=req.post_data_buffer, allow_redirects=False, timeout=180)
+            r = await asyncio.to_thread(self.sessao.request, req.method, req.url, headers=hdr, data=req.post_data_buffer, allow_redirects=False, timeout=180)
         except requests.RequestException as e:
-            return route.fulfill(status=502, headers=CORS, body=f"falha de rede: {type(e).__name__}")
+            return await route.fulfill(status=502, headers=CORS, body=f"falha de rede: {type(e).__name__}")
+        self.bytes += len(r.content)
         # o Azure responde 302 para a tela de login quando o PAT é inválido/sem escopo: vira 401 para o portal
         status = 401 if r.status_code in (301, 302, 303, 307, 308) else r.status_code
-        return route.fulfill(status=status, headers={**CORS, "Content-Type": r.headers.get("Content-Type", "application/json")}, body=r.content)
+        return await route.fulfill(status=status, headers={**CORS, "Content-Type": r.headers.get("Content-Type", "application/json")}, body=r.content)
+
+    def resumo(self):
+        return f"{self.chamadas} chamadas ao Azure, {self.bytes / 1048576:.1f} MB, {int(time.time() - self.t0)}s"
