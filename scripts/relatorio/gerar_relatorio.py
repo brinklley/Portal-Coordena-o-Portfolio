@@ -46,6 +46,21 @@ JS_CARREGAR = """async (limiteMs) => {
   return {ok:false, erro:'tempo esgotado esperando a carga do Azure DevOps'};
 }"""
 
+# Só na execução headless (o portal em si não muda): mais chamadas simultâneas nas listas de lotes (o portal fixa 4; o
+# histórico do Analytics é o trecho mais lento) e nova tentativa por fonte, mostrando o motivo da falha no log.
+JS_AJUSTES = """(n) => {
+  const pool = azPool; azPool = (tarefas, _n, aoTerminar) => pool(tarefas, n, aoTerminar);
+  const carregar = azLoadSource;
+  azLoadSource = async (src, st) => {
+    let ultimo;
+    for (let t = 1; t <= 3; t++) {
+      try { return await carregar(src, st); }
+      catch (e) { ultimo = e; console.log(`[carga] ${src.org}/${src.alias || src.team}: tentativa ${t} de 3 falhou: ${e.message}`); await new Promise(r => setTimeout(r, 4000 * t)); }
+    }
+    throw ultimo;
+  };
+}"""
+
 JS_TIMES = """(rm) => {
   const out = [];
   for (const tm of cfgTeams(CFG).filter(hasData)) {
@@ -134,11 +149,13 @@ async def gerar(args):
         pg = await ctx.new_page()
         erros = []
         pg.on("pageerror", lambda e: erros.append(str(e)))
+        pg.on("console", lambda m: print(m.text, flush=True) if m.text.startswith("[carga]") else None)
         await pg.goto(DIST.as_uri())
         await pg.wait_for_timeout(400)
         tokens, origem, ponte = await preparar_fonte(pg, cfg, args)
         # Configuração do Portal (sem token). `saveCfg` grava só no localStorage deste navegador descartável.
         await pg.evaluate("([j, tokens]) => { CFG = normCfg(j); saveCfg(); Object.entries(tokens).forEach(([o, t]) => AZ.tokens[o] = t); }", [cfg, tokens])
+        await pg.evaluate(JS_AJUSTES, args.simultaneas)
         andamento = asyncio.create_task(acompanhar(ponte, pg))
         try:
             r = await pg.evaluate(JS_CARREGAR, args.limite_min * 60 * 1000)
@@ -205,6 +222,7 @@ def main(argv=None):
     ap.add_argument("--time", help="nome do time como no Portal (padrão: o primeiro time comprometido)")
     ap.add_argument("--roadmap", help='semestre, ex.: "2026 2º Semestre" (padrão: o vigente hoje)')
     ap.add_argument("--tipo-roadmap", choices=["interno", "executivo"], default="interno")
+    ap.add_argument("--simultaneas", type=int, default=12, help="(azure) chamadas simultâneas por lista de lotes; o portal usa 4")
     ap.add_argument("--limite-min", type=int, default=60, help="tempo máximo da carga do Azure, em minutos")
     ap.add_argument("--saida", default=str(RAIZ / "dist" / "relatorio"), help="pasta de saída (dist/ está no .gitignore: nunca versionar dados reais)")
     asyncio.run(gerar(ap.parse_args(argv)))
