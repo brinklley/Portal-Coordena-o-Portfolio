@@ -1,6 +1,6 @@
 # Testes: Relatório diário (gerador offline)
 
-Cobre `tests/test_relatorio.py` (10 testes). Decisão `0063`; código em `scripts/relatorio/`. O gerador roda como subprocesso (como a rotina agendada), contra o Azure simulado e a fixture fictícia `relatorio.xlsx`.
+Cobre `tests/test_relatorio.py` (11 testes). Decisão `0063`; código em `scripts/relatorio/`. O gerador roda como subprocesso (como a rotina agendada), contra o Azure simulado e a fixture fictícia `relatorio.xlsx`.
 
 ## Regra: o relatório é idêntico ao que o portal mostra
 
@@ -37,3 +37,10 @@ Cobre `tests/test_relatorio.py` (10 testes). Decisão `0063`; código em `script
 
 - **Cenário de falha coberto**: token vazando em log/mensagem ou entrando na página (decisão `0007`); PAT inválido virando "HTML de login" interpretado como dado.
 - **Testes**: `test_ponte_troca_o_token_de_enchimento_pelo_pat_real_e_responde_cors`, `test_ponte_converte_redirecionamento_de_login_em_401_e_barra_org_sem_pat`, `test_pats_do_ambiente_exige_todas_as_orgs_e_nunca_mostra_valores`
+
+## Regra: erro passageiro do Azure é repetido só na chamada que falhou
+
+**Garante que**: 502/503/504 (ou falha de rede) são repetidos dentro da ponte e o portal nunca os vê; 401/403/404 passam direto e na hora; ao esgotar as tentativas, o erro é devolvido (a nova tentativa por fonte do portal continua como rede de segurança).
+
+- **Cenário de falha coberto**: um único lote do histórico com 502 fazendo o portal refazer a fonte inteira (minutos), estourando o tempo da rotina; ou repetir indefinidamente um erro de acesso.
+- **Teste**: `test_ponte_repete_so_a_chamada_com_erro_passageiro_e_nao_repete_erro_de_acesso`
