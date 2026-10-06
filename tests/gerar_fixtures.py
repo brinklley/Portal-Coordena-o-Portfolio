@@ -115,6 +115,38 @@ def f4p():
         T.append([2000 + i, 100, f"Item {i}", "User Story", entry, entry, deploy, deploy + dt.timedelta(days=1)])
     wb.save(OUT / "f4p.xlsx")
 
+def relatorio():
+    """Quatro times (CORE, IB, BO, MOBILE) com itens reservados (tag ROADMAP) no roadmap vigente — alimenta
+    o gerador do relatório por e-mail (scripts/relatorio) e seu teste. Datas relativas a agora, para o
+    CycleTime e o dead line caírem sempre numa situação realista, qualquer que seja o dia da execução."""
+    random.seed(11)
+    hoje = dt.datetime.now(); ini = hoje - dt.timedelta(days=150)
+    sem = f"{hoje.year} {1 if hoje.month <= 6 else 2}º Semestre"
+    alvo = dt.datetime(hoje.year, 3 if hoje.month <= 6 else 9, 15)    # Target Date dentro do semestre vigente
+    wb = openpyxl.Workbook(); wb.remove(wb.active)
+    I = wb.create_sheet("Iniciativa"); I.append(["ID","Title","AnoSemestreRoadmap","Assigned To","Materialização da Oportunidade ou Solicitação","Concluído"])
+    I.append([1, "[Cartões] Iniciativa fictícia A", sem, "Fulano de Tal <fulano@exemplo.com>", ini, None])
+    I.append([2, "[Cartões] Iniciativa fictícia B", sem, "Ciclana de Tal <ciclana@exemplo.com>", ini, None])
+    R = wb.create_sheet("Release"); R.append(["ID","Title","Parent","Assigned To","Inventário de Opções de Valor","Entregue"])
+    E = wb.create_sheet("Épico"); E.append(["ID","Title","Parent","Target Date","Backlog","Fechado"])
+    epicos = []
+    for r in range(4):
+        R.append([10 + r, f"Release fictícia {r}", 1 + r % 2, "Ciclano", ini, None])
+        for e in range(3):
+            eid = 100 + r * 10 + e; epicos.append(eid)
+            E.append([eid, f"Épico fictício {r}-{e}", 10 + r, alvo + dt.timedelta(days=30 * e), ini, None])
+    base = ["Backlog","Refinamento","READY / PRONTO PARA DEV","Em Desenvolvimento","Code Review","Testes","Pronto para Deploy","Em Produção","Fechado"]
+    oid = 3000
+    for nome in ("TIME CORE", "TIME IB", "TIME BO", "TIME MOBILE"):
+        T = wb.create_sheet(nome); T.append(["ID","ID_EPICO_UNICRED","Title","Work Item Type","Tags"] + base)
+        for _ in range(random.randint(18, 26)):
+            k = len(base) - 1 if random.random() < .35 else random.randint(0, len(base) - 2)
+            oid += 1
+            tags = [t for t, p in (("ROADMAP", .6), ("Blocked", .08)) if random.random() < p]
+            T.append([oid, random.choice(epicos), f"Item fictício {oid}", random.choice(["User Story","User Story","Technical Story","Internal Bug"]),
+                      "; ".join(tags)] + fluxo(len(base), k, ini + dt.timedelta(days=random.randint(0, 70)), passo=(2, 9)))
+    wb.save(OUT / "relatorio.xlsx")
+
 if __name__ == "__main__":
-    for f in (times, responsaveis, fluxo_largo, desdobramento, f4p): f()
+    for f in (times, responsaveis, fluxo_largo, desdobramento, f4p, relatorio): f()
     print("fixtures geradas em", OUT)
