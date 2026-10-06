@@ -20,6 +20,7 @@ import requests
 
 CORS = {"Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization,content-type",
         "Access-Control-Allow-Methods": "GET,POST,OPTIONS"}
+TENTATIVAS = 6   # por chamada, em 502/503/504 ou falha de rede
 ENCHIMENTO = "token-so-na-ponte"   # o que o portal acha que é o token; a ponte troca pelo PAT real (ou o proxy injeta)
 
 
@@ -37,6 +38,8 @@ class Ponte:
         self.pats = pats
         self.sessao = requests.Session()
         self.chamadas = 0
+        self.retentativas = 0
+        self.espera = 2.0      # segundos × nº da tentativa, entre as novas tentativas de uma chamada
         self.bytes = 0
         self.t0 = time.time()
 
@@ -76,14 +79,25 @@ class Ponte:
         if req.post_data:
             hdr["Content-Type"] = req.headers.get("content-type", "application/json")
         self.chamadas += 1
-        try:
-            r = await asyncio.to_thread(self.sessao.request, req.method, req.url, headers=hdr, data=req.post_data_buffer, allow_redirects=False, timeout=180)
-        except requests.RequestException as e:
-            return await route.fulfill(status=502, headers=CORS, body=f"falha de rede: {type(e).__name__}")
+        # Erros passageiros do Azure (502/503/504 ou falha de rede) são repetidos AQUI, só nesta chamada: se chegassem ao
+        # portal, ele refaria a fonte inteira (minutos de histórico) por causa de um único lote.
+        r = erro = None
+        for tentativa in range(1, TENTATIVAS + 1):
+            try:
+                r = await asyncio.to_thread(self.sessao.request, req.method, req.url, headers=hdr, data=req.post_data_buffer, allow_redirects=False, timeout=180)
+                erro = None
+                if r.status_code not in (502, 503, 504): break
+            except requests.RequestException as e:
+                r, erro = None, e
+            if tentativa < TENTATIVAS:
+                self.retentativas += 1
+                await asyncio.sleep(self.espera * tentativa)
+        if r is None:
+            return await route.fulfill(status=502, headers=CORS, body=f"falha de rede: {type(erro).__name__}")
         self.bytes += len(r.content)
         # o Azure responde 302 para a tela de login quando o PAT é inválido/sem escopo: vira 401 para o portal
         status = 401 if r.status_code in (301, 302, 303, 307, 308) else r.status_code
         return await route.fulfill(status=status, headers={**CORS, "Content-Type": r.headers.get("Content-Type", "application/json")}, body=r.content)
 
     def resumo(self):
-        return f"{self.chamadas} chamadas ao Azure, {self.bytes / 1048576:.1f} MB, {int(time.time() - self.t0)}s"
+        return f"{self.chamadas} chamadas ao Azure ({self.retentativas} repetidas por erro passageiro), {self.bytes / 1048576:.1f} MB, {int(time.time() - self.t0)}s"

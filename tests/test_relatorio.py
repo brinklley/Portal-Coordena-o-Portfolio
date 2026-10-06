@@ -143,3 +143,18 @@ def test_ponte_atende_chamadas_em_paralelo(monkeypatch):
         await asyncio.gather(*[ponte.rota(_Rota("GET", f"https://dev.azure.com/unicredbr/x{i}")) for i in range(4)])
         return time.time() - t
     assert _exec(quatro()) < 1.2       # em série seriam ~2s
+
+def test_ponte_repete_so_a_chamada_com_erro_passageiro_e_nao_repete_erro_de_acesso(monkeypatch):
+    """502/503/504 do Azure são repetidos dentro da ponte (o portal nunca vê); 401 e 404 passam direto na hora."""
+    respostas = iter([_Resp(502), _Resp(503), _Resp(200, b'{"ok":1}')])
+    ponte = ponte_azure.Ponte({"vsunicred": None}); ponte.espera = 0
+    monkeypatch.setattr(ponte.sessao, "request", lambda *a, **k: next(respostas))
+    r = _Rota("GET", "https://analytics.dev.azure.com/vsunicred/p/_odata/x"); _exec(ponte.rota(r))
+    assert r.resp["status"] == 200 and r.resp["body"] == b'{"ok":1}' and ponte.retentativas == 2
+    chamadas = []
+    monkeypatch.setattr(ponte.sessao, "request", lambda *a, **k: chamadas.append(1) or _Resp(404))
+    r = _Rota("GET", "https://dev.azure.com/vsunicred/p/_apis/y"); _exec(ponte.rota(r))
+    assert r.resp["status"] == 404 and len(chamadas) == 1                  # erro "de verdade" não é repetido
+    monkeypatch.setattr(ponte.sessao, "request", lambda *a, **k: _Resp(502))
+    r = _Rota("GET", "https://dev.azure.com/vsunicred/p/_apis/z"); _exec(ponte.rota(r))
+    assert r.resp["status"] == 502 and ponte.retentativas == 2 + (ponte_azure.TENTATIVAS - 1)    # desiste após o limite, devolvendo o erro
