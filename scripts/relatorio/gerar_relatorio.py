@@ -8,8 +8,8 @@ Depois só embute esse resultado numa casca com menu lateral, com o estilo do pr
 bibliotecas externas.
 
 Fontes de dados (`--fonte`):
-  azure     Azure DevOps de verdade. Exige uma variável de ambiente por organização com o PAT
-            (`AZURE_DEVOPS_PAT_<ORG>`, ex.: AZURE_DEVOPS_PAT_VSUNICRED). O PAT fica só neste processo.
+  azure     Azure DevOps de verdade. O PAT vem da credencial de API do ambiente (injetada pelo proxy)
+            ou de `AZURE_DEVOPS_PAT_<ORG>`; nunca entra no navegador.
   simulado  Azure simulado dos testes (tests/azure_simulado.py), alimentado por uma fixture fictícia de
             fixtures/. Serve para validar o pipeline sem dados reais nem token.
 
@@ -94,7 +94,10 @@ def preparar_fonte(pg, cfg, args):
         return tokens, "Azure simulado (dados fictícios)"
     from ponte_azure import Ponte, pats_do_ambiente, ENCHIMENTO
     orgs = sorted({s["org"] for s in cfg["azure"]["sources"]})
-    ponte = Ponte(pats_do_ambiente(orgs))
+    pats = pats_do_ambiente(orgs)
+    ponte = Ponte(pats)
+    ponte.verificar(orgs)
+    print("Autenticação: " + ", ".join(f"{o} ({'variável de ambiente' if pats[o] else 'credencial do ambiente'})" for o in orgs))
     pg.route(re.compile(r"https://(analytics\.)?dev\.azure\.com/.*"), ponte.rota)
     return {o: ENCHIMENTO for o in orgs}, "Azure DevOps"
 

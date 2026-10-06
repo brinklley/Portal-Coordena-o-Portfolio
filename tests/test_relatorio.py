@@ -79,15 +79,24 @@ def test_ponte_troca_o_token_de_enchimento_pelo_pat_real_e_responde_cors(monkeyp
     assert visto["headers"]["Authorization"] == "Basic " + base64.b64encode(b":PAT-DE-TESTE").decode()
     assert visto["allow_redirects"] is False and r.resp["status"] == 200 and r.resp["body"] == b'{"ok":1}'
 
-def test_ponte_converte_redirecionamento_de_login_em_401_e_barra_org_sem_pat(monkeypatch):
+def test_ponte_converte_redirecionamento_de_login_em_401_e_barra_org_fora_da_configuracao(monkeypatch):
     ponte = ponte_azure.Ponte({"vsunicred": "x"})
     monkeypatch.setattr(ponte.sessao, "request", lambda *a, **k: _Resp(302, b"<html>login</html>"))
     r = _Rota("GET", "https://dev.azure.com/vsunicred/_apis/projects"); ponte.rota(r); assert r.resp["status"] == 401
     outra = _Rota("GET", "https://dev.azure.com/outraorg/_apis/projects"); ponte.rota(outra); assert outra.resp["status"] == 403
 
-def test_pats_do_ambiente_exige_todas_as_orgs_e_nunca_mostra_valores(monkeypatch):
-    monkeypatch.setenv("AZURE_DEVOPS_PAT_VSUNICRED", "segredo-que-nao-pode-vazar"); monkeypatch.delenv("AZURE_DEVOPS_PAT_UNICREDBR", raising=False)
-    with pytest.raises(SystemExit) as e: ponte_azure.pats_do_ambiente(["unicredbr", "vsunicred"])
-    assert "AZURE_DEVOPS_PAT_UNICREDBR" in str(e.value) and "AZURE_DEVOPS_PAT_VSUNICRED" not in str(e.value) and "segredo" not in str(e.value)
-    monkeypatch.setenv("AZURE_DEVOPS_PAT_UNICREDBR", " outro ")
-    assert ponte_azure.pats_do_ambiente(["unicredbr", "vsunicred"]) == {"unicredbr": "outro", "vsunicred": "segredo-que-nao-pode-vazar"}
+def test_pats_do_ambiente_le_so_o_que_existe_e_sem_pat_a_ponte_nao_envia_authorization(monkeypatch):
+    monkeypatch.setenv("AZURE_DEVOPS_PAT_VSUNICRED", " segredo "); monkeypatch.delenv("AZURE_DEVOPS_PAT_UNICREDBR", raising=False)
+    pats = ponte_azure.pats_do_ambiente(["unicredbr", "vsunicred"])
+    assert pats == {"unicredbr": None, "vsunicred": "segredo"}
+    visto = {}
+    ponte = ponte_azure.Ponte(pats)
+    monkeypatch.setattr(ponte.sessao, "request", lambda m, u, **kw: visto.update(kw) or _Resp(200))
+    ponte.rota(_Rota("GET", "https://dev.azure.com/unicredbr/_apis/projects"))
+    assert "Authorization" not in visto["headers"]      # o proxy do ambiente injeta a credencial dessa organização
+
+def test_verificar_aborta_nomeando_a_organizacao_sem_acesso(monkeypatch):
+    ponte = ponte_azure.Ponte({"unicredbr": None, "vsunicred": "x"})
+    monkeypatch.setattr(ponte.sessao, "get", lambda u, **kw: _Resp(200 if "/unicredbr/" in u else 302))
+    with pytest.raises(SystemExit) as e: ponte.verificar(["unicredbr", "vsunicred"])
+    assert "vsunicred" in str(e.value) and "unicredbr," not in str(e.value) and "x" != str(e.value)
