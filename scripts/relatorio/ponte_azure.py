@@ -13,14 +13,16 @@ Em qualquer dos casos:
   nunca é salvo em localStorage/IndexedDB nem aparece em log — coerente com a decisão 0007;
 - a verificação de TLS continua ligada (usa o pacote de CAs do ambiente, que inclui a do proxy).
 """
-import asyncio, base64, os, re, time
-from urllib.parse import urlsplit
+import asyncio, base64, json, os, re, time
+from urllib.parse import unquote, urlsplit
 
 import requests
 
 CORS = {"Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization,content-type",
         "Access-Control-Allow-Methods": "GET,POST,OPTIONS"}
 TENTATIVAS = 6   # por chamada, em 502/503/504 ou falha de rede
+TENTATIVAS_ANTES_DE_DIVIDIR = 3   # histórico (Analytics): se repetir a mesma consulta pesada não resolve, divide o lote
+IDS_NO_FILTRO = re.compile(r"(WorkItemId(?:%20|\+| )in(?:%20|\+| )\()([^)]*)(\))")
 ENCHIMENTO = "token-so-na-ponte"   # o que o portal acha que é o token; a ponte troca pelo PAT real (ou o proxy injeta)
 
 
@@ -39,6 +41,7 @@ class Ponte:
         self.sessao = requests.Session()
         self.chamadas = 0
         self.retentativas = 0
+        self.divisoes = 0
         self.espera = 2.0      # segundos × nº da tentativa, entre as novas tentativas de uma chamada
         self.bytes = 0
         self.t0 = time.time()
@@ -79,19 +82,16 @@ class Ponte:
         if req.post_data:
             hdr["Content-Type"] = req.headers.get("content-type", "application/json")
         self.chamadas += 1
-        # Erros passageiros do Azure (502/503/504 ou falha de rede) são repetidos AQUI, só nesta chamada: se chegassem ao
-        # portal, ele refaria a fonte inteira (minutos de histórico) por causa de um único lote.
-        r = erro = None
-        for tentativa in range(1, TENTATIVAS + 1):
-            try:
-                r = await asyncio.to_thread(self.sessao.request, req.method, req.url, headers=hdr, data=req.post_data_buffer, allow_redirects=False, timeout=180)
-                erro = None
-                if r.status_code not in (502, 503, 504): break
-            except requests.RequestException as e:
-                r, erro = None, e
-            if tentativa < TENTATIVAS:
-                self.retentativas += 1
-                await asyncio.sleep(self.espera * tentativa)
+        dividivel = IDS_NO_FILTRO.search(req.url) is not None and "WorkItemRevisions" in req.url and req.method == "GET" and "skiptoken" not in req.url.lower()   # páginas seguintes não: dividir duplicaria linhas já lidas
+        r, erro = await self._requisitar(req.method, req.url, hdr, req.post_data_buffer, TENTATIVAS_ANTES_DE_DIVIDIR if dividivel else TENTATIVAS)
+        if dividivel and (r is None or r.status_code in (502, 503, 504)):
+            # Erros passageiros do Azure (502/503/504) em consulta pesada do histórico: repetir a MESMA consulta não adianta
+            # (o gateway estoura o tempo), então o lote de itens é dividido ao meio, recursivamente, e o resultado é remontado.
+            ids = re.findall(r"\d+", unquote(IDS_NO_FILTRO.search(req.url).group(2)))   # unquote: o "2" de "%2C" não é um ID
+            dados = await self._buscar_dividindo(req.url, hdr, ids)
+            if dados is not None:
+                self.bytes += len(dados)
+                return await route.fulfill(status=200, headers={**CORS, "Content-Type": "application/json"}, body=dados)
         if r is None:
             return await route.fulfill(status=502, headers=CORS, body=f"falha de rede: {type(erro).__name__}")
         self.bytes += len(r.content)
@@ -99,5 +99,46 @@ class Ponte:
         status = 401 if r.status_code in (301, 302, 303, 307, 308) else r.status_code
         return await route.fulfill(status=status, headers={**CORS, "Content-Type": r.headers.get("Content-Type", "application/json")}, body=r.content)
 
+    async def _requisitar(self, metodo, url, hdr, corpo, tentativas):
+        """(resposta|None, erro). Repete 502/503/504 e falha de rede, com espera crescente; o último erro é devolvido."""
+        r = erro = None
+        for tentativa in range(1, tentativas + 1):
+            try:
+                r = await asyncio.to_thread(self.sessao.request, metodo, url, headers=hdr, data=corpo, allow_redirects=False, timeout=180)
+                erro = None
+                if r.status_code not in (502, 503, 504): break
+            except requests.RequestException as e:
+                r, erro = None, e
+            if tentativa < tentativas:
+                self.retentativas += 1
+                await asyncio.sleep(self.espera * tentativa)
+        return r, erro
+
+    async def _buscar_dividindo(self, url, hdr, ids):
+        """JSON (bytes) com TODAS as linhas dos `ids`, buscadas em lotes menores; None se nem um item sozinho responder.
+        Segue o @odata.nextLink dentro da ponte, então o portal recebe uma resposta única, sem paginação."""
+        m = IDS_NO_FILTRO.search(url)
+        sub = url[:m.start(2)] + "%2C".join(ids) + url[m.end(2):]
+        r, _ = await self._requisitar("GET", sub, hdr, None, 2 if len(ids) > 1 else TENTATIVAS)
+        if r is not None and r.status_code == 200:
+            try:
+                resp = r.json(); linhas = list(resp.get("value", []))
+                while resp.get("@odata.nextLink"):
+                    r, _ = await self._requisitar("GET", resp["@odata.nextLink"], hdr, None, TENTATIVAS)
+                    if r is None or r.status_code != 200: raise ValueError("página seguinte falhou")
+                    resp = r.json(); linhas += resp.get("value", [])
+                return json.dumps({"value": linhas}).encode()
+            except ValueError:
+                pass
+        if len(ids) < 2:
+            return None
+        self.divisoes += 1
+        meio = len(ids) // 2
+        a, b = await self._buscar_dividindo(url, hdr, ids[:meio]), await self._buscar_dividindo(url, hdr, ids[meio:])
+        if a is None or b is None:
+            return None
+        # igual ao Azure: `$orderby=WorkItemId` (ordenação estável, então a ordem das revisões de cada item é mantida)
+        return json.dumps({"value": sorted(json.loads(a)["value"] + json.loads(b)["value"], key=lambda x: x["WorkItemId"])}).encode()
+
     def resumo(self):
-        return f"{self.chamadas} chamadas ao Azure ({self.retentativas} repetidas por erro passageiro), {self.bytes / 1048576:.1f} MB, {int(time.time() - self.t0)}s"
+        return f"{self.chamadas} chamadas ao Azure ({self.retentativas} repetidas e {self.divisoes} lotes divididos por erro passageiro), {self.bytes / 1048576:.1f} MB, {int(time.time() - self.t0)}s"
