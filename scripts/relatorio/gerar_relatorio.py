@@ -71,7 +71,7 @@ JS_TIMES = """(rm) => {
 
 # Captura o painel REAL do portal (mesmas funções, mesmo HTML) e tira dele tudo o que só faz sentido com clique:
 # botões viram texto, dicas "clique…" somem, frases de rodapé que mandam clicar são cortadas.
-JS_PAINEL = """(a) => {
+JS_PAINEL = r"""(a) => {
   const P = {
     va:  {abrir: () => openAnalytics(),   fechar: () => closeAnalytics(),   aberto: () => AN.open,  titulo: 'anTitle',  corpo: 'anBody'},
     act: {abrir: () => openActionable(),  fechar: () => closeActionable(),  aberto: () => ACT.open, titulo: 'actTitle', corpo: 'actBody'},
