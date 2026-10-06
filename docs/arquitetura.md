@@ -43,7 +43,7 @@ Azure DevOps  →  "abas" {headers, rows, flow}  →  buildModel()  →  recompu
 
 ## Relatório diário offline (`scripts/relatorio/`)
 
-Fora do portal (que continua sendo um único HTML sem servidor): um gerador em Python + Playwright que abre `dist/mapa_portfolio.html` num Chromium sem interface, carrega os dados pelo `azRun` e captura o que as funções do próprio portal calculam (decisão `0063`). Gera um HTML único offline com menu lateral.
+Fora do portal (que continua sendo um único HTML sem servidor): um gerador em Python + Playwright que abre `dist/mapa_portfolio.html` num Chromium sem interface, carrega os dados pelo `azRun` e captura o que as funções do próprio portal calculam e desenham — Visão Analítica e Actionable por time comprometido e o Report F4P (decisão `0063`). Gera um HTML único offline com menu lateral.
 
 | Arquivo | Conteúdo |
 |---|---|
