@@ -40,9 +40,35 @@ def test_relatorio_reproduz_exatamente_a_visao_analitica_do_portal(browser, gera
       const d = anData(); return {cap:d.cap, proj:d.proj, ids: anSorted(d.rows).map(r => r.e.id), cts: anSorted(d.rows).map(r => r.m.ct)}; }""")
     assert esperado["cap"] > 0 and len(esperado["ids"]) > 3
     rel = page.context.new_page(); rel.goto("file://" + gerado["arq"])
-    assert rel.inner_text(".an-title h3").replace("\n", " ") == f"Entregas previstas: Capacidade {esperado['cap']} US / Projetada {esperado['proj']} US"
-    assert rel.eval_on_selector_all(".an-table tbody tr .ep .idb", "els => els.map(e => e.textContent)") == esperado["ids"]
-    assert rel.eval_on_selector_all(".an-table .ct-ok, .an-table .ct-bad", "els => els.map(e => e.textContent)") == [f"CycleTime: {c if c is not None else '--'} Dias" for c in esperado["cts"]]
+    assert rel.inner_text("#va-mobile .an-title h3").replace("\n", " ") == f"Entregas previstas: Capacidade {esperado['cap']} US / Projetada {esperado['proj']} US"
+    assert rel.eval_on_selector_all("#va-mobile .an-table tbody tr .ep .idb", "els => els.map(e => e.textContent)") == esperado["ids"]
+    assert rel.eval_on_selector_all("#va-mobile .an-table .ct-ok, #va-mobile .an-table .ct-bad", "els => els.map(e => e.textContent)") == [f"CycleTime: {c if c is not None else '--'} Dias" for c in esperado["cts"]]
+    page.context.close()
+
+def test_actionable_e_report_f4p_reproduzem_exatamente_o_portal(browser, gerado):
+    page = browser.new_context(viewport={"width": 1500, "height": 950}, timezone_id="America/Sao_Paulo", locale="pt-BR").new_page()
+    page.goto((ROOT / "dist" / "mapa_portfolio.html").as_uri()); page.wait_for_timeout(400)
+    carregar(page, "relatorio.xlsx")
+    portal = page.evaluate("""() => {
+      S.f.team = 'MOBILE'; S.f.int = semestre(TODAY); S.f.exec = ''; S.f.q = '';
+      const texto = sel => [...document.querySelectorAll(sel)].map(e => e.textContent.trim().replace(/\\s+/g, ' '));
+      openActionable(); const barras = [...document.querySelectorAll('#actBody .act-dist-row')].map(l => { const bar = l.querySelector('.act-dist-bar'); return [...bar.children].map(c => Math.round(c.getBoundingClientRect().width / bar.getBoundingClientRect().width * 100)); });
+      const estilos = [...document.querySelectorAll('#actBody .act-dist-seg')].map(c => c.getAttribute('style'));
+      const act = {barras, estilos, graficos: document.querySelectorAll('#actBody svg').length, rotulos: texto('#actBody svg text'), resumo: texto('#actBody .act-bu-sum')}; closeActionable();
+      openF4P(); const f4p = {celulas: texto('#f4pBody .f4p-tbl td'), colunas: texto('#f4pBody .f4p-tbl th')}; closeF4P();
+      return {act, f4p}; }""")
+    rel = page.context.new_page(); rel.goto("file://" + gerado["arq"])
+    txt = lambda sel: rel.eval_on_selector_all(sel, "els => els.map(e => e.textContent.trim().replace(/\\s+/g, ' '))")
+    assert portal["act"]["graficos"] == 3 and rel.locator("#act-mobile svg").count() == 3     # dispersão, burnup, CFD (a Distribuição é de barras em HTML)
+    rel.evaluate("location.hash = '#act-mobile'"); rel.wait_for_timeout(200)       # só a seção aberta tem largura medível
+    barras = rel.evaluate("""() => [...document.querySelectorAll('#act-mobile .act-dist-row')].map(l => { const bar = l.querySelector('.act-dist-bar'); return [...bar.children].map(c => Math.round(c.getBoundingClientRect().width / bar.getBoundingClientRect().width * 100)); })""")
+    estilos = rel.eval_on_selector_all("#act-mobile .act-dist-seg", "els => els.map(c => c.getAttribute('style'))")
+    assert barras == portal["act"]["barras"]                                  # larguras proporcionais iguais às do portal
+    assert estilos == portal["act"]["estilos"] and all(e and "flex" in e for e in estilos) and estilos   # o style inline (largura) sobrevive à conversão botão → texto
+    assert txt("#act-mobile svg text") == portal["act"]["rotulos"]
+    assert txt("#act-mobile .act-bu-sum") == portal["act"]["resumo"]
+    assert txt("#f4p .f4p-tbl td") == portal["f4p"]["celulas"] and len(portal["f4p"]["celulas"]) > 8
+    assert sorted(set(txt("#f4p .f4p-tbl th"))) == sorted(set(portal["f4p"]["colunas"])) and {"MOBILE", "CORE", "IB", "BO"} <= set(txt("#f4p .f4p-tbl th"))
     page.context.close()
 
 def test_relatorio_e_um_arquivo_unico_offline_e_sem_interacao_enganosa(gerado):
@@ -52,7 +78,8 @@ def test_relatorio_e_um_arquivo_unico_offline_e_sem_interacao_enganosa(gerado):
         assert f"<h2>{grupo}</h2>" in h
     tabela = h[h.index('<table class="an-table"'):h.index("</table>")]
     assert "<button" not in tabela and "data-sort" not in tabela      # nada clicável no arquivo estático
-    assert "clicáveis" not in h                                       # a nota do rodapé não promete clique
+    assert not re.search(r"[Cc]lique|clicáv", re.sub(r"<style.*?</style>", "", h, flags=re.S)), "sobrou frase que manda clicar"
+    assert 'id="va-mobile"' in h and 'id="act-mobile"' in h and 'id="f4p"' in h and 'data-sort' not in h
     assert "Azure simulado" in gerado["saida"]
 
 def test_time_sem_capacidade_no_roadmap_aborta_com_mensagem_clara(tmp_path):

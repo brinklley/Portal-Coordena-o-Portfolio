@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Gera o relatório do portfólio em um único HTML offline (primeira etapa: Visão Analítica de UM time).
+"""Gera o relatório do portfólio em um único HTML offline: Visão Analítica e Actionable por time comprometido + Report F4P.
 
 As regras de negócio NÃO são reimplementadas aqui: o script abre `dist/mapa_portfolio.html` num Chromium
 sem interface, carrega os dados pelo mesmo caminho da tela (`azRun`), aplica os mesmos filtros (Time +
@@ -29,9 +29,6 @@ RAIZ = AQUI.parents[1]
 DIST = RAIZ / "dist" / "mapa_portfolio.html"
 FUSO = ZoneInfo("America/Sao_Paulo")
 
-# Frase da nota de rodapé da Visão Analítica que só faz sentido na tela interativa (números clicáveis).
-FRASE_CLICAVEL = re.compile(r"\s*Os números do cabeçalho.*?quando entregue\)\.", re.S)
-
 JS_CARREGAR = """async (limiteMs) => {
   azRun();
   const t0 = Date.now();
@@ -53,9 +50,9 @@ JS_AJUSTES = """(n) => {
   const carregar = azLoadSource;
   azLoadSource = async (src, st) => {
     let ultimo;
-    for (let t = 1; t <= 3; t++) {
+    for (let t = 1; t <= 5; t++) {
       try { return await carregar(src, st); }
-      catch (e) { ultimo = e; console.log(`[carga] ${src.org}/${src.alias || src.team}: tentativa ${t} de 3 falhou: ${e.message}`); await new Promise(r => setTimeout(r, 4000 * t)); }
+      catch (e) { ultimo = e; console.log(`[carga] ${src.org}/${src.alias || src.team}: tentativa ${t} de 5 falhou: ${e.message}`); await new Promise(r => setTimeout(r, 4000 * t)); }
     }
     throw ultimo;
   };
@@ -72,19 +69,35 @@ JS_TIMES = """(rm) => {
   return out;
 }"""
 
-JS_VISAO = """(a) => {
+# Captura o painel REAL do portal (mesmas funções, mesmo HTML) e tira dele tudo o que só faz sentido com clique:
+# botões viram texto, dicas "clique…" somem, frases de rodapé que mandam clicar são cortadas.
+JS_PAINEL = """(a) => {
+  const P = {
+    va:  {abrir: () => openAnalytics(),   fechar: () => closeAnalytics(),   aberto: () => AN.open,  titulo: 'anTitle',  corpo: 'anBody'},
+    act: {abrir: () => openActionable(),  fechar: () => closeActionable(),  aberto: () => ACT.open, titulo: 'actTitle', corpo: 'actBody'},
+    f4p: {abrir: () => openF4P(),         fechar: () => closeF4P(),         aberto: () => F4P.open, titulo: 'f4pTitle', corpo: 'f4pBody'}}[a.painel];
   S.f.team = a.time; S.f.int = a.interno; S.f.exec = a.executivo; S.f.q = ''; S.f.owners = new Set();
-  openAnalytics();
-  if (!AN.open) return {erro: 'a Visão analítica não habilitou (time/roadmap sem dados?)'};
-  const d = anData();
-  const titulo = $('anTitle').cloneNode(true), corpo = $('anBody').cloneNode(true);
+  P.abrir();
+  if (!P.aberto()) return {erro: `o painel ${a.painel} não habilitou para ${a.time} (time/roadmap sem dados ou semestre futuro?)`};
+  const extra = a.painel === 'va' ? (d => ({capacidade: d.cap, projetada: d.proj, epicos: d.rows.length}))(anData()) : {};
+  const titulo = $(P.titulo).cloneNode(true), corpo = $(P.corpo).cloneNode(true);
+  const CLIQUE = /cliqu|clicáv|clic\b/i;
   [titulo, corpo].forEach(raiz => {
-    raiz.querySelectorAll('button').forEach(b => {          // no arquivo estático nada é clicável
-      const s = document.createElement('span'); s.className = b.className; s.title = b.title; s.textContent = b.textContent; b.replaceWith(s); });
+    raiz.querySelectorAll('button').forEach(b => {
+      const s = document.createElement('span'); s.className = b.className; s.innerHTML = b.innerHTML;   // style inline (larguras das barras) e spans internos precisam sobreviver
+      if (b.getAttribute('style')) s.setAttribute('style', b.getAttribute('style')); b.replaceWith(s); });
+    raiz.querySelectorAll('[title]').forEach(x => { if (CLIQUE.test(x.title) || /^Ver (os )?itens/i.test(x.title)) x.removeAttribute('title'); });
     raiz.querySelectorAll('[data-sort]').forEach(x => x.removeAttribute('data-sort'));
+    const w = document.createTreeWalker(raiz, NodeFilter.SHOW_TEXT);
+    for (let n = w.nextNode(); n; n = w.nextNode()) {
+      n.nodeValue = n.nodeValue
+        .replace(/\s*·\s*[Cc]lique[^·.]*/g, '')
+        .replace(/\s*[Cc]lique[^.]*\./g, '')
+        .replace(/\s*Os números do cabeçalho.*?quando entregue\)\./gs, '');
+    }
   });
-  closeAnalytics();
-  return {titulo: titulo.innerHTML, corpo: corpo.innerHTML, capacidade: d.cap, projetada: d.proj, epicos: d.rows.length, semestre: semLong(a.interno || a.executivo)};
+  P.fechar();
+  return {titulo: titulo.innerHTML, corpo: corpo.innerHTML, semestre: semLong(a.interno || a.executivo), ...extra};
 }"""
 
 
@@ -132,8 +145,12 @@ async def acompanhar(ponte, pg):
         print("  carregando… " + (ponte.resumo() if ponte else ""), flush=True)
 
 
-def montar_secao(sid, dados):
-    return (f'<section class="rel-sec" id="{sid}" aria-label="Visão Analítica · {html.escape(dados["time"])}">\n'
+ROTULO = {"va": "Visão Analítica", "act": "Actionable", "f4p": "Report F4P"}
+
+
+def montar_secao(sid, painel, time, dados):
+    rotulo = ROTULO[painel] + (f" · {time}" if time else "")
+    return (f'<section class="rel-sec" id="{sid}" aria-label="{html.escape(rotulo)}">\n'
             f'<div class="an-head"><div class="an-title">{dados["titulo"]}</div></div>\n'
             f'<div class="an-body">{dados["corpo"]}</div>\n</section>')
 
@@ -181,36 +198,51 @@ async def gerar(args):
         comprometidos = [t for t in await pg.evaluate(JS_TIMES, rm) if t["capacidade"] > 0]
         print(f"Roadmap {roadmap} ({args.tipo_roadmap}) · times comprometidos: " +
               (", ".join(f'{t["time"]} (cap {t["capacidade"]}/proj {t["projetada"]})' for t in comprometidos) or "nenhum"))
-        alvo = args.time or (comprometidos[0]["time"] if comprometidos else None)
-        if not alvo:
+        existentes = {t["time"]: t for t in comprometidos}
+        alvos = args.time or [t["time"] for t in comprometidos]
+        if not alvos:
             raise SystemExit("Nenhum time comprometido (com itens reservados) neste roadmap.")
-        if alvo not in {t["time"] for t in comprometidos}:
-            raise SystemExit(f"O time {alvo!r} não está comprometido no roadmap {roadmap}. Comprometidos: {', '.join(t['time'] for t in comprometidos)}")
+        for t in alvos:
+            if t not in existentes:
+                raise SystemExit(f"O time {t!r} não está comprometido no roadmap {roadmap}. Comprometidos: {', '.join(existentes)}")
 
-        dados = await pg.evaluate(JS_VISAO, {"time": alvo, **rm})
-        if "erro" in dados:
-            raise SystemExit(dados["erro"])
-        dados["time"] = alvo
-        dados["corpo"] = FRASE_CLICAVEL.sub("", dados["corpo"])
+        secoes = []   # (id, painel, time, dados)
+        for painel in ("va", "act"):
+            for t in alvos:
+                d = await pg.evaluate(JS_PAINEL, {"painel": painel, "time": t, **rm})
+                if "erro" in d:
+                    raise SystemExit(d["erro"])
+                secoes.append((f"{painel}-" + re.sub(r"[^a-z0-9]+", "-", t.lower()).strip("-"), painel, t, d))
+        d = await pg.evaluate(JS_PAINEL, {"painel": "f4p", "time": alvos[0], **rm})   # o F4P mostra sempre todos os times carregados
+        if "erro" in d:
+            raise SystemExit(d["erro"])
+        secoes.append(("f4p", "f4p", "", d))
         await ctx.close(); await navegador.close()
     if erros:
         raise SystemExit("Erros de JavaScript no portal durante a geração: " + "; ".join(erros))
 
-    sid = "va-" + re.sub(r"[^a-z0-9]+", "-", alvo.lower()).strip("-")
-    menu = ('  <h2>Visão Analítica</h2>\n' f'  <a href="#{sid}">{html.escape(alvo)}<small>{dados["capacidade"]} US capacidade · {dados["epicos"]} épicos</small></a>\n'
-            '  <h2>Actionable</h2>\n  <span class="off">em construção<small>próxima etapa</small></span>\n'
-            '  <h2>Report F4P</h2>\n  <span class="off">em construção<small>próxima etapa</small></span>')
+    menu = []
+    for painel in ("va", "act", "f4p"):
+        menu.append(f"  <h2>{ROTULO[painel]}</h2>")
+        for sid, pn, t, d in secoes:
+            if pn != painel: continue
+            sub = f'<small>{d["capacidade"]} US capacidade · {d["epicos"]} épicos</small>' if painel == "va" else ""
+            menu.append(f'  <a href="#{sid}">{html.escape(t or "Todos os times")}{sub}</a>')
     css = (RAIZ / "src" / "styles.css").read_text(encoding="utf-8")
     modelo = (AQUI / "modelo.html").read_text(encoding="utf-8")
+    semestre = secoes[0][3]["semestre"]
     saida = (modelo.replace("__DATA_CURTA__", agora.strftime("%d/%m/%Y")).replace("__GERADO_EM__", agora.strftime("%d/%m/%Y às %H:%M"))
-             .replace("__ROADMAP__", html.escape(dados["semestre"])).replace("__MENU__", menu)
-             .replace("__SECOES__", montar_secao(sid, dados)).replace("/*__CSS__*/", css))
-    if re.search(r"<script[^>]*src=|<link[^>]*href=\"http|@import|https?://[^\"')\s]*\.(js|css)", saida):
+             .replace("__ROADMAP__", html.escape(semestre)).replace("__MENU__", "\n".join(menu))
+             .replace("__SECOES__", "\n".join(montar_secao(*x) for x in secoes)).replace("/*__CSS__*/", css))
+    if re.search(r"<script[^>]*\ssrc=|<link[^>]*\shref=|@import|(src|href)=\"https?:", saida):
         raise SystemExit("O relatório referenciou recurso externo, o que quebraria o requisito de arquivo único offline.")
     pasta = Path(args.saida); pasta.mkdir(parents=True, exist_ok=True)
-    arq = pasta / f"relatorio_portfolio_{agora.strftime('%Y-%m-%d')}_{re.sub(r'[^A-Za-z0-9]+', '-', alvo).strip('-')}.html"
+    nome = re.sub(r"[^A-Za-z0-9]+", "-", alvos[0]).strip("-") if len(alvos) == 1 else f"{len(alvos)}-times"
+    arq = pasta / f"relatorio_portfolio_{agora.strftime('%Y-%m-%d')}_{nome}.html"
     arq.write_text(saida, encoding="utf-8")
-    print(f"Origem dos dados: {origem}\nGerado: {arq} ({arq.stat().st_size / 1024:.0f} KB) · {dados['epicos']} épicos · Capacidade {dados['capacidade']} / Projetada {dados['projetada']}")
+    va = [x[3] for x in secoes if x[1] == "va"]
+    print(f"Origem dos dados: {origem}\nGerado: {arq} ({arq.stat().st_size / 1024:.0f} KB) · seções: " + ", ".join(f"{ROTULO[x[1]]}{' ' + x[2] if x[2] else ''}" for x in secoes)
+          + " · " + " / ".join(f"{x[2]} Capacidade {x[3]['capacidade']} Projetada {x[3]['projetada']}" for x in secoes if x[1] == "va"))
     return arq
 
 
@@ -219,7 +251,7 @@ def main(argv=None):
     ap.add_argument("--config", required=True, help="exportação da configuração do Portal (JSON, sem token)")
     ap.add_argument("--fonte", choices=["azure", "simulado"], default="azure")
     ap.add_argument("--fixture", default="times.xlsx", help="(simulado) fixture de fixtures/ que alimenta o Azure simulado")
-    ap.add_argument("--time", help="nome do time como no Portal (padrão: o primeiro time comprometido)")
+    ap.add_argument("--time", action="append", help="time como no Portal; pode repetir (padrão: todos os times comprometidos)")
     ap.add_argument("--roadmap", help='semestre, ex.: "2026 2º Semestre" (padrão: o vigente hoje)')
     ap.add_argument("--tipo-roadmap", choices=["interno", "executivo"], default="interno")
     ap.add_argument("--simultaneas", type=int, default=12, help="(azure) chamadas simultâneas por lista de lotes; o portal usa 4")

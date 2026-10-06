@@ -1,6 +1,6 @@
 # Testes: Relatório diário (gerador offline)
 
-Cobre `tests/test_relatorio.py` (7 testes). Decisão `0063`; código em `scripts/relatorio/`. O gerador roda como subprocesso (como a rotina agendada), contra o Azure simulado e a fixture fictícia `relatorio.xlsx`.
+Cobre `tests/test_relatorio.py` (10 testes). Decisão `0063`; código em `scripts/relatorio/`. O gerador roda como subprocesso (como a rotina agendada), contra o Azure simulado e a fixture fictícia `relatorio.xlsx`.
 
 ## Regra: o relatório é idêntico ao que o portal mostra
 
@@ -11,9 +11,16 @@ Cobre `tests/test_relatorio.py` (7 testes). Decisão `0063`; código em `scripts
 - **Cenário de falha coberto**: alguém reimplementar uma regra no gerador (ou filtrar diferente) e o e-mail mostrar números que não batem com a tela.
 - **Teste**: `test_relatorio_reproduz_exatamente_a_visao_analitica_do_portal`
 
+## Regra: Actionable e Report F4P também são idênticos ao portal
+
+**Garante que**: os rótulos dos gráficos SVG, o resumo do Burnup e as células/colunas do Report F4P do arquivo gerado são os mesmos que o portal mostra para o mesmo time e roadmap; o Actionable traz os 3 gráficos em SVG e o F4P mostra os 4 times.
+
+- **Cenário de falha coberto**: a captura perder ou alterar um quadrante; o F4P deixar de mostrar todos os times.
+- **Teste**: `test_actionable_e_report_f4p_reproduzem_exatamente_o_portal`
+
 ## Regra: arquivo único, offline e sem interação enganosa
 
-**Garante que**: o HTML não referencia nenhum recurso externo, tem os 3 grupos de menu, não tem botões/ordenação (nada clicável) e a nota de rodapé não promete números clicáveis.
+**Garante que**: o HTML não referencia nenhum recurso externo, tem os 3 grupos de menu, não tem botões/ordenação (nada clicável) e nenhuma frase manda clicar (Visão Analítica, Actionable e F4P) e existem as 3 seções.
 
 - **Cenário de falha coberto**: anexo que abre em branco sem internet; números com cara de link que não fazem nada.
 - **Teste**: `test_relatorio_e_um_arquivo_unico_offline_e_sem_interacao_enganosa`
