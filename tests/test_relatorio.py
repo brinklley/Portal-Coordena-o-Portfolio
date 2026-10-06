@@ -190,3 +190,20 @@ def test_ponte_nao_divide_pagina_seguinte_nem_esconde_item_que_nao_responde(monk
     ponte.retentativas = 0; chamadas.clear()
     r = _Rota("GET", _url_historico([1, 2])); _exec(ponte.rota(r))                                          # nem um item sozinho responde: erro, não dado faltando
     assert r.resp["status"] == 502
+
+def test_requirements_dev_lista_todas_as_dependencias_de_terceiros_do_gerador():
+    """Achado no teste em produção da rotina: `requests` (usado pela ponte) não estava no requirements-dev.txt — no
+    ambiente de quem desenvolve ele já existia por acaso, mas numa sessão nova a rotina quebrava com ModuleNotFoundError."""
+    import ast
+    pedido = (ROOT / "requirements-dev.txt").read_text(encoding="utf-8").lower()
+    pacote = {"yaml": "pyyaml"}                                   # nome do import ≠ nome do pacote, se algum dia aparecer
+    faltam = set()
+    for arq in (ROOT / "scripts" / "relatorio").glob("*.py"):
+        for no in ast.walk(ast.parse(arq.read_text(encoding="utf-8"))):
+            nomes = [a.name for a in no.names] if isinstance(no, ast.Import) else [no.module] if isinstance(no, ast.ImportFrom) and no.module and no.level == 0 else []
+            for n in nomes:
+                raiz = n.split(".")[0]
+                local = (ROOT / "scripts" / "relatorio" / f"{raiz}.py").exists() or raiz in ("azure_simulado",)    # módulos do próprio projeto
+                if raiz not in sys.stdlib_module_names and not local and pacote.get(raiz, raiz).lower() not in pedido:
+                    faltam.add(raiz)
+    assert not faltam, f"importados pelo gerador mas ausentes de requirements-dev.txt: {sorted(faltam)}"
