@@ -54,7 +54,7 @@ def test_actionable_e_report_f4p_reproduzem_exatamente_o_portal(browser, gerado)
       const texto = sel => [...document.querySelectorAll(sel)].map(e => e.textContent.trim().replace(/\\s+/g, ' '));
       openActionable(); const barras = [...document.querySelectorAll('#actBody .act-dist-row')].map(l => { const bar = l.querySelector('.act-dist-bar'); return [...bar.children].map(c => Math.round(c.getBoundingClientRect().width / bar.getBoundingClientRect().width * 100)); });
       const estilos = [...document.querySelectorAll('#actBody .act-dist-seg')].map(c => c.getAttribute('style'));
-      const act = {barras, estilos, graficos: document.querySelectorAll('#actBody svg').length, rotulos: texto('#actBody svg text'), resumo: texto('#actBody .act-bu-sum')}; closeActionable();
+      const act = {barras, estilos, graficos: document.querySelectorAll('#actBody svg').length, rotulos: texto('#actBody svg text'), resumo: texto('#actBody .act-summary')}; closeActionable();
       openF4P(); const f4p = {celulas: texto('#f4pBody .f4p-tbl td'), colunas: texto('#f4pBody .f4p-tbl th')}; closeF4P();
       return {act, f4p}; }""")
     rel = page.context.new_page(); rel.goto("file://" + gerado["arq"])
@@ -66,7 +66,8 @@ def test_actionable_e_report_f4p_reproduzem_exatamente_o_portal(browser, gerado)
     assert barras == portal["act"]["barras"]                                  # larguras proporcionais iguais às do portal
     assert estilos == portal["act"]["estilos"] and all(e and "flex" in e for e in estilos) and estilos   # o style inline (largura) sobrevive à conversão botão → texto
     assert txt("#act-mobile svg text") == portal["act"]["rotulos"]
-    assert txt("#act-mobile .act-bu-sum") == portal["act"]["resumo"]
+    assert portal["act"]["resumo"] and "reservado" in portal["act"]["resumo"][0]          # não vazio: antes comparava duas listas vazias
+    assert txt("#act-mobile .act-summary") == portal["act"]["resumo"]
     assert txt("#f4p .f4p-tbl td") == portal["f4p"]["celulas"] and len(portal["f4p"]["celulas"]) > 8
     assert sorted(set(txt("#f4p .f4p-tbl th"))) == sorted(set(portal["f4p"]["colunas"])) and {"MOBILE", "CORE", "IB", "BO"} <= set(txt("#f4p .f4p-tbl th"))
     page.context.close()
