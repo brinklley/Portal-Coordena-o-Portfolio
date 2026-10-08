@@ -29,4 +29,5 @@ Visualizador encadeado Iniciativa → Release → Épico → itens dos times, co
 - Arquitetura e mapa dos arquivos: `docs/arquitetura.md`
 - Decisões e motivos: `docs/decisoes/`
 - Documentação dos testes (o que cada teste garante, entrada/saída esperada, cenário de falha coberto): `docs/testes/`
+- Guia do usuário por funcionalidade (linguagem simples, "por que não está batendo com o que eu esperava"): `docs/guia-usuario/`
 - Report F4P (8 quadrantes, todos implementados): `docs/backlog/report-f4p.md`, decisões em `docs/decisoes/0011` a `0031`. Pendências gerais: `docs/backlog/pendencias.md`
