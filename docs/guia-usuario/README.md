@@ -38,10 +38,16 @@ o link até `docs/testes/`.
 
 | Arquivo | Funcionalidade |
 |---|---|
+| [`quadro.md`](quadro.md) | Quadro (whiteboard) — tela principal, navegação e painel de detalhes |
+| [`filtros-e-busca.md`](filtros-e-busca.md) | Filtros e busca — campo único, "+N ocultos" e investigação por ID |
+| [`configuracoes.md`](configuracoes.md) | Configurações — as 2 abas, validações, exportar/importar |
+| [`azure-devops.md`](azure-devops.md) | Conectar e carregar dados do Azure DevOps — conexões, fontes, mapeamento, higiene de dados |
 | [`visao-analitica.md`](visao-analitica.md) | Visão Analítica — tabela de roadmap por time e semestre |
 | [`report-f4p.md`](report-f4p.md) | Report F4P — os 8 quadrantes de indicadores, todos os times |
 | [`actionable.md`](actionable.md) | Actionable — os 4 quadrantes de métricas acionáveis por time |
+| [`relatorio-diario.md`](relatorio-diario.md) | Relatório diário — o arquivo offline gerado automaticamente com os 3 painéis acima |
 
-Cobre, por enquanto, as 3 telas onde esse tipo de dúvida mais acontece. Quadro (whiteboard), Filtros,
-Configurações e a carga do Azure DevOps ainda não têm guia próprio aqui — use
-`docs/regras-de-negocio.md` e `docs/telas.md` para essas áreas por ora.
+Cobre a tela principal, os filtros, as configurações, a carga do Azure DevOps e os 3 painéis
+analíticos — as áreas onde esse tipo de dúvida mais acontece. Fora do escopo por ora: investigação por
+ID como tela própria (está dentro de `filtros-e-busca.md`), e qualquer outra funcionalidade pontual não
+listada acima — use `docs/regras-de-negocio.md` e `docs/telas.md` para essas.
