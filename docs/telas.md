@@ -18,6 +18,8 @@ interface e a aba "Configurações gerais" (ver `docs/configuracoes.md`). Ver de
 - **Zoom/arrastar**, **minimapa**, **navegador de times** ("Ir para"), iniciativas recolhidas quando uma é selecionada — a menos que "Manter todas as iniciativas visíveis" esteja ligada (opção, desligada por padrão): aí a lista de Iniciativas continua mostrando todas as do filtro, com a selecionada em foco (borda destacada) e as demais sem foco (esmaecidas), para o usuário conseguir voltar e continuar analisando as próximas sem perder o lugar. Selecionar outra iniciativa move o foco sem recolher a lista de novo. Ver `docs/decisoes/0021-manter-iniciativas-visiveis.md`.
 - **Etapas vazias** (opção, ligada por padrão) e **itens sem desdobramento** (opção, ligada por padrão).
 
+Guia do usuário: `docs/guia-usuario/quadro.md`.
+
 ## Filtros e busca
 
 - Filtros: Roadmap executivo, Responsável (busca por qualquer parte do nome, múltipla escolha), Roadmap interno, Time (dinâmico: inclui times cadastrados sem carga), **ID ou descrição** (campo único — decisão `0034`).
@@ -26,13 +28,19 @@ interface e a aba "Configurações gerais" (ver `docs/configuracoes.md`). Ver de
 - **Diagnóstico de quadro vazio**: explica qual filtro zerou o resultado e quantas iniciativas aparecem sem cada um; para um ID que existe mas não aparece, diz se é cadeia inválida, regra de exibição ou outro filtro escondendo, com um botão para remover e ir até ele.
 - **"+N ocultos"** (decisão `0050`): com algum filtro ativo, um botão pequeno no cabeçalho das faixas de Iniciativas, Releases e Épicos avisa quando aquele nível tem irmãos que o filtro está escondendo — só aparece se houver de fato algo oculto ali. Clicar revela os irmãos ocultos esmaecidos (mesmo estilo das iniciativas fora de foco), com a linha de conexão até o pai; clicar de novo esconde. Fica ligado entre navegações. Clicar num card revelado abre o painel de detalhes, mas não navega até ele (continua fora do filtro).
 
+Guia do usuário (inclui Investigação por ID): `docs/guia-usuario/filtros-e-busca.md`.
+
 ## Investigação por ID
 
 Percorre as etapas e para na primeira que falhar: retornou nos dados (ou foi excluído como Removed, ou não veio da fonte) → reconhecido → cadeia válida / regra de exibição → filtros → recolhido.
 
+Guia do usuário: `docs/guia-usuario/filtros-e-busca.md`.
+
 ## Painel de detalhes
 
 Alertas com diagnóstico, medidor e "O que fazer"; resumo nos pais; campos; "Como o CT foi calculado" (épico); itens por categoria (épico); campos adicionais; rastreabilidade ("Por que está aqui"); link para o Azure DevOps.
+
+Guia do usuário: `docs/guia-usuario/quadro.md`.
 
 ## Visão analítica
 
@@ -50,10 +58,12 @@ Painel lateral (aba "Actionable", ao lado da Visão analítica e do Report F4P) 
 
 Relatório da carga do Azure (itens Removidos excluídos, vínculos divergentes), órfãos, épicos inválidos, releases sem iniciativa.
 
+Guia do usuário: `docs/guia-usuario/azure-devops.md`.
+
 ## Configurações
 
-Duas abas — Azure DevOps (sempre acessível) e Configurações gerais (travada até a 1ª carga). Ver `docs/configuracoes.md`.
+Duas abas — Azure DevOps (sempre acessível) e Configurações gerais (travada até a 1ª carga). Ver `docs/configuracoes.md`. Guia do usuário: `docs/guia-usuario/configuracoes.md`.
 
 ## Carga do Azure DevOps
 
-Botão "Azure DevOps" (barra de ferramentas, ou o botão equivalente dentro da tela de primeiro acesso): pede tokens das organizações usadas, mostra o plano de execução (terminal), pede mapeamento de colunas antigas na primeira carga. Única forma de carregar dados no portal — ver `docs/integracao-azure.md` e a decisão `0032`.
+Botão "Azure DevOps" (barra de ferramentas, ou o botão equivalente dentro da tela de primeiro acesso): pede tokens das organizações usadas, mostra o plano de execução (terminal), pede mapeamento de colunas antigas na primeira carga. Única forma de carregar dados no portal — ver `docs/integracao-azure.md` e a decisão `0032`. Guia do usuário: `docs/guia-usuario/azure-devops.md`.
