@@ -48,6 +48,7 @@ o link até `docs/testes/`.
 | [`relatorio-diario.md`](relatorio-diario.md) | Relatório diário — o arquivo offline gerado automaticamente com os 3 painéis acima |
 
 Cobre a tela principal, os filtros, as configurações, a carga do Azure DevOps e os 3 painéis
-analíticos — as áreas onde esse tipo de dúvida mais acontece. Fora do escopo por ora: investigação por
-ID como tela própria (está dentro de `filtros-e-busca.md`), e qualquer outra funcionalidade pontual não
-listada acima — use `docs/regras-de-negocio.md` e `docs/telas.md` para essas.
+analíticos, além do relatório diário — as áreas onde esse tipo de dúvida mais acontece. Fora do
+escopo por ora: investigação por ID como tela própria (está dentro de `filtros-e-busca.md`), e
+qualquer outra funcionalidade pontual não listada acima — use `docs/regras-de-negocio.md` e
+`docs/telas.md` para essas.
