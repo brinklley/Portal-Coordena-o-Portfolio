@@ -15,6 +15,10 @@ guia são, em geral, complementos que você abre a partir daqui.
 - Clicar num card abre o nível abaixo dele (ex.: clicar numa iniciativa mostra as releases dela).
   "Abrir cadeia completa" abre os quatro níveis de uma vez, com os times agregados numa ilha própria
   por time.
+- Com a Visão Analítica, o Report F4P ou o Actionable abertos, clicar em qualquer lugar do quadro —
+  num card ou numa área vazia — fecha o painel, sem precisar ir até o botão "«" no canto dele. Um
+  card clicado continua respondendo normalmente (abre o nível abaixo, seleciona). Arrastar o quadro
+  (pan) não fecha o painel — só um clique de verdade, sem arrastar.
 - Cada nível, e cada time (no modo cadeia completa), é uma **ilha** com borda própria. Times são
   distribuídos em fileiras equilibradas (os maiores primeiro); uma coluna do fluxo com mais de 6 itens
   quebra automaticamente em subcolunas, para não ficar uma lista vertical enorme.
@@ -139,7 +143,8 @@ Veja `docs/guia-usuario/configuracoes.md` para como ajustar esses limites.
 - Decisões: [`0003`](../decisoes/0003-regra-b-itens-sem-desdobramento.md) (itens sem desdobramento),
   [`0021`](../decisoes/0021-manter-iniciativas-visiveis.md) (manter iniciativas visíveis),
   [`0040`](../decisoes/0040-offsets-de-ilhas-descartados-por-contexto.md) (ilhas soltas — posição
-  descartada por contexto).
+  descartada por contexto), [`0065`](../decisoes/0065-clicar-no-whiteboard-fecha-painel-lateral.md)
+  (clicar no whiteboard fecha o painel lateral aberto).
 - Detalhe exaustivo de cobertura de teste:
   [`docs/testes/hierarquia-e-modelo.md`](../testes/hierarquia-e-modelo.md),
   [`docs/testes/quadro-e-selecao.md`](../testes/quadro-e-selecao.md),
