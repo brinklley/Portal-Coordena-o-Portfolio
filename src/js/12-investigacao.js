@@ -96,23 +96,26 @@ function resolvePath(found){
 /* aplica a busca como o filtro único (persistente, aparece em "filtros ativos") e, quando ela é
    um ID, também tenta rolar/abrir o item — decisão 0034. Texto livre (sem ID) só filtra: o
    diagnóstico de "nenhum resultado" (diagnoseEmpty) já cobre esse caso sem precisar navegar.
-   Se o quadro inteiro ficar vazio, quem explica é o diagnóstico automático do render() (evita dois
-   avisos disputando o mesmo #fmsg — um deles, agendado por requestAnimationFrame, sempre venceria). */
+   Para um ID numérico, resolve found/path ANTES de aplicar o filtro (decisão `0064`): um ID que não
+   existe, ou que existe mas está fora da cadeia válida (ex.: épico sem release/iniciativa, decisão
+   0036 — alcançável a partir de um link da Visão Analítica), nunca vai aparecer no quadro de jeito
+   nenhum; aplicar o filtro "ID ou descrição" mesmo assim só zeraria o quadro à toa, escondendo o que
+   o usuário já estava vendo, e duplicaria o aviso (o diagnóstico automático do render(), mais este
+   próprio showFmsg, brigando pelo mesmo #fmsg). Nesses dois casos, o quadro e os filtros atuais ficam
+   intocados — só o aviso aparece. */
 function gotoId(q){
   if (!S.model) return;
   q = (q || "").trim();
-  setQueryFilter(q);
-  if (!q) return;
-  const id = nid(q);
-  if (!id || !/^\d+$/.test(id)) return;
-  const V = S.V;
-  if (!V.visIni.size) return;
-  const found = findAny(id);
   const anchor = $("fBusca");
+  const id = nid(q);
+  if (!q || !id || !/^\d+$/.test(id)){ setQueryFilter(q); return; }
+  const found = findAny(id);
   const inv = `<div class="acts"><button class="btn primary" data-investigate="${esc(id)}">Investigar por que não aparece</button></div>`;
   if (!found) return showFmsg(anchor, `<b>ID ${esc(q)} não encontrado</b> nos dados carregados.${inv}`, "info");
   const {target, path} = resolvePath(found);
   if (!path) return showFmsg(anchor, `<b>O ID ${esc(q)} existe, mas está fora da cadeia válida</b> (falta o vínculo com épico, release ou iniciativa), por isso não aparece no quadro.${inv}`, "info");
+  setQueryFilter(q);
+  const V = S.V;
   const opKey = target.startsWith("op:") ? target : null;
   if (!pathVisible(V, path, opKey)){
     const act = activeFilters(), blk = blockingFilters(path, opKey);

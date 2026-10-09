@@ -94,6 +94,29 @@ anterior tinha criado.
 - **Teste**: `test_trocar_a_busca_por_outro_id_tambem_desfaz_a_selecao_anterior`
 - **Relacionado**: decisão `0035`.
 
+## Regra: ir para um ID fora da cadeia válida não aplica o filtro nem zera o quadro
+
+**Garante que**: clicar num link de ID (ex.: o épico dentro da Visão Analítica) cujo alvo não existe
+nos dados, ou existe mas está fora da cadeia válida (ex.: um épico órfão, sem release/iniciativa —
+decisão `0036`), nunca aplica o ID como filtro "ID ou descrição" — esse filtro nunca teria resultado no
+quadro, então aplicá-lo só trocaria o que o usuário já estava vendo por "Nada corresponde aos filtros".
+Só um aviso informativo aparece (com um atalho para "Investigar por que não aparece"), sem mexer em
+`S.f` nem no restante da tela.
+
+- **Dado**: `f4p.xlsx` carregado, time CORE com Roadmap interno selecionado, um épico órfão (`valid:
+  false`, sem release/iniciativa) cadastrado com um ID numérico, a Visão Analítica aberta mostrando
+  esse épico com o aviso "OBS: SEM INICIATIVA e SEM RELEASE".
+- **Quando**: clica no ID do épico dentro da Visão Analítica.
+- **Então (sucesso)**: `S.f` continua byte a byte igual a antes do clique (`S.f.q` continua vazio); o
+  aviso (`#fmsg`) cita "fora da cadeia válida" e traz o botão "Investigar por que não aparece".
+- **Cenário de falha coberto** (bug relatado pelo cliente): o clique aplicava o ID como filtro "ID ou
+  descrição", que nunca bate com nada no quadro para um épico órfão — o quadro, que podia estar
+  mostrando conteúdo real, virava "Nada corresponde aos filtros", com dois avisos quase idênticos
+  sobrepostos (o diagnóstico automático de `render()` e a mensagem da própria navegação), e o usuário
+  precisava "Limpar filtros" para voltar ao que estava vendo.
+- **Teste**: `test_ir_para_epico_orfao_nao_aplica_filtro_nem_zera_o_quadro`
+- **Relacionado**: decisão [`0064`](../decisoes/0064-gotoid-nao-aplica-filtro-para-id-invalido.md).
+
 ## Regra: recarregar os dados preserva o filtro de Time, sem travar os painéis
 
 **Garante que**: depois de uma nova carga (Azure DevOps "atualizar os dados", ou uma nova importação)

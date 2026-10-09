@@ -1554,7 +1554,10 @@ def test_us_clique_no_reservado_abre_lista_e_permite_navegar(page):
       S.f.team='CORE'; S.f.int=semestre(TODAY);
       [...S.model.ops.values()].filter(o=>o.team==='CORE').forEach(o => { o.deploy = null; });
       const alvo = [...S.model.ops.values()].find(o=>o.team==='CORE');
-      S.model.epis.set("eusres1", {id:"eusres1", parent:null, target:null, interno:semestre(TODAY), st:0, stDate:null, ops:[], type:"Epic"});
+      const sem = semestre(TODAY);
+      S.model.inis.set("INI_USRES1", {id:"INI_USRES1", valid:true, title:"Ini", exec:sem, owner:null, rels:["REL_USRES1"]});
+      S.model.rels.set("REL_USRES1", {id:"REL_USRES1", valid:true, title:"Rel", parent:"INI_USRES1", epis:["eusres1"]});
+      S.model.epis.set("eusres1", {id:"eusres1", valid:true, parent:"REL_USRES1", target:null, interno:sem, st:0, stDate:null, ops:[], type:"Epic"});
       alvo.type = 'User Story'; alvo.tags = ['ROADMAP']; alvo.epicoId = 'eusres1';
       alvo.deploy = new Date(f4pSemesterState().start.getTime() + 5 * 864e5);
       render();
