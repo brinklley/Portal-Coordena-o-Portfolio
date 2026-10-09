@@ -69,6 +69,14 @@ Roadmap interno, Responsável e ID/descrição sempre são limpos numa recarga. 
 `S.f.team` nunca ficam dessincronizados: ou os dois mantêm o time selecionado, ou os dois voltam para
 "Todos os times" juntos.
 
+**Ir para um ID numérico (`gotoId`) que não existe, ou que existe mas está fora da cadeia válida**
+(decisão `0064` — ex.: um épico órfão, §11, alcançado por um link da Visão Analítica/Report F4P/
+Actionable/painel de detalhes) **nunca aplica o filtro "ID ou descrição"**: esse ID jamais apareceria
+no quadro de qualquer forma, então aplicar o filtro só zeraria a visão atual à toa. Só um aviso
+informativo aparece, com o quadro e os filtros ativos intocados. O filtro só é aplicado quando o ID
+resolve numa cadeia válida (mesmo que outro filtro ainda esconda o resultado — nesse caso, o aviso
+aponta qual).
+
 ### 3.2 "+N ocultos": revelar irmãos escondidos pelo filtro (decisão `0050`)
 
 Com pelo menos um filtro ativo, um card visível pode ter irmãos (mesmo nível, mesmo pai) que o filtro

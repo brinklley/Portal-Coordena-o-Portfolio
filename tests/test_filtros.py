@@ -24,6 +24,36 @@ def test_ir_para_id_aponta_o_filtro_que_esconde(page):
     # o filtro único (decisão 0034) fica ativo depois de ir até o ID, diferente dos outros que foram limpos
     assert page.evaluate("activeFilters().length") == 1 and page.evaluate("S.f.q") == alvo
 
+def test_ir_para_epico_orfao_nao_aplica_filtro_nem_zera_o_quadro(page):
+    """Bug relatado pelo cliente: clicar no link do ID de um épico órfão (sem release/iniciativa
+    vinculada, decisão 0036) dentro da Visão Analítica aplicava o ID como filtro "ID ou descrição" —
+    um filtro que esse ID nunca vai satisfazer no quadro, já que o épico órfão não aparece lá — e
+    deixava a tela presa em "Nada corresponde aos filtros", com o conteúdo real que o usuário estava
+    vendo sumindo e dois avisos quase idênticos sobrepostos (o diagnóstico automático do render() e o
+    da própria navegação). gotoId() agora resolve found/path ANTES de tocar no filtro: um ID fora da
+    cadeia válida só mostra um aviso informativo, sem mexer em S.f nem no que já estava na tela."""
+    carregar(page, "f4p.xlsx")
+    sem = page.evaluate("semestre(TODAY)")
+    page.evaluate("""(args)=>{
+      const {team, sem} = args;
+      S.model.ops.set("op_orfao_bug", {id:"op_orfao_bug", title:"Item do épico órfão", team, type:"User Story",
+        stName: S.model.teamFlow[team][0], deploy:null, ready:new Date(2026,0,1), tags:[]});
+      S.model.epis.set("971770", {id:"971770", valid:false, title:"["+team+"] Épico órfão de teste", parent:null,
+        target:new Date(2026,0,15), interno:sem, st:0, ops:["op_orfao_bug"], type:"Epic"});
+      S.f.team = team; S.f.int = sem; S.f.exec = ""; S.f.q = ""; S.f.owners = new Set();
+      render();
+    }""", {"team": "CORE", "sem": sem})
+    filtros_antes = page.evaluate("JSON.stringify(S.f)")
+    page.click("#anTab")
+    page.click("[data-an-go='971770']")
+    page.wait_for_timeout(500)
+    # o filtro "ID ou descrição" nunca foi aplicado — os filtros continuam exatamente como antes
+    assert page.evaluate("JSON.stringify(S.f)") == filtros_antes
+    assert page.evaluate("S.f.q") == ""
+    msg = page.inner_text("#fmsg")
+    assert "fora da cadeia válida" in msg
+    assert "Investigar por que não aparece" in msg
+
 def test_diagnostico_quando_o_filtro_zera_o_quadro(page):
     carregar(page, "responsaveis.xlsx")
     page.fill("#fBusca", "texto que nao existe"); page.wait_for_timeout(700)
