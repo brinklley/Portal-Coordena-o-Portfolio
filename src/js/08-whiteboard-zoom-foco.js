@@ -38,13 +38,18 @@ vp.addEventListener("wheel", e => {
   const r = vp.getBoundingClientRect();
   setZoom(Z * (e.deltaY < 0 ? 1.1 : 1/1.1), e.clientX - r.left, e.clientY - r.top);
 }, {passive:false});
-let pan = null;
+let pan = null, panMoved = false;
 vp.addEventListener("pointerdown", e => {
+  panMoved = false;
   if (e.button !== 0 || e.target.closest(".card,button,a,input,select,.zoom,.movable")) return;
   pan = {x:e.clientX, y:e.clientY, sl:vp.scrollLeft, st:vp.scrollTop, id:e.pointerId};
   vp.setPointerCapture(e.pointerId); vp.classList.add("panning");
 });
-vp.addEventListener("pointermove", e => { if (!pan) return; vp.scrollLeft = pan.sl - (e.clientX - pan.x); vp.scrollTop = pan.st - (e.clientY - pan.y); });
+vp.addEventListener("pointermove", e => {
+  if (!pan) return;
+  if (Math.hypot(e.clientX - pan.x, e.clientY - pan.y) > 4) panMoved = true;
+  vp.scrollLeft = pan.sl - (e.clientX - pan.x); vp.scrollTop = pan.st - (e.clientY - pan.y);
+});
 const endPan = () => { if (pan){ vp.releasePointerCapture(pan.id); pan = null; vp.classList.remove("panning"); } };
 vp.addEventListener("pointerup", endPan); vp.addEventListener("pointercancel", endPan);
 if (window.ResizeObserver) new ResizeObserver(redraw).observe(board);

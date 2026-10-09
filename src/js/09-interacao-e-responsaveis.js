@@ -1,4 +1,14 @@
 /* ---------------- interação ---------------- */
+/* clicar em qualquer lugar do whiteboard (inclusive num card) fecha o painel lateral aberto (Visão
+   Analítica, Report F4P ou Actionable) — decisão `0065`: o usuário clicava ali esperando esse efeito,
+   sem saber que precisava ir até o botão "«". Ignora cliques que vieram de um arrastar (pan do quadro
+   ou de uma ilha solta) — ver `panMoved` em 08-whiteboard-zoom-foco.js. */
+vp.addEventListener("click", () => {
+  if (panMoved) return;
+  if (AN.open) closeAnalytics();
+  else if (F4P.open) closeF4P();
+  else if (ACT.open) closeActionable();
+});
 board.addEventListener("click", e => {
   const c = e.target.closest(".card"); if (!c) return;
   const key = c.dataset.key; const [lvl, ...rest] = key.split(":"); const id = rest.join(":");
