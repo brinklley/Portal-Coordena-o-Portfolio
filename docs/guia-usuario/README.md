@@ -41,7 +41,8 @@ o link até `docs/testes/`.
 | [`visao-analitica.md`](visao-analitica.md) | Visão Analítica — tabela de roadmap por time e semestre |
 | [`report-f4p.md`](report-f4p.md) | Report F4P — os 8 quadrantes de indicadores, todos os times |
 | [`actionable.md`](actionable.md) | Actionable — os 4 quadrantes de métricas acionáveis por time |
+| [`relatorio-diario.md`](relatorio-diario.md) | Relatório diário — o arquivo offline gerado automaticamente com os 3 painéis acima |
 
-Cobre, por enquanto, as 3 telas onde esse tipo de dúvida mais acontece. Quadro (whiteboard), Filtros,
-Configurações e a carga do Azure DevOps ainda não têm guia próprio aqui — use
+Cobre, por enquanto, as telas e o relatório diário — onde esse tipo de dúvida mais acontece. Quadro
+(whiteboard), Filtros, Configurações e a carga do Azure DevOps ainda não têm guia próprio aqui — use
 `docs/regras-de-negocio.md` e `docs/telas.md` para essas áreas por ora.
