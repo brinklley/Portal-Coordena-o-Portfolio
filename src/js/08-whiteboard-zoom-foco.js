@@ -1,9 +1,16 @@
 /* ---------------- whiteboard: zoom e arrastar ---------------- */
 const vp = $("viewport"), sizer = $("sizer");
 let Z = 1;
+/* usa offsetWidth/offsetHeight (não clientWidth/clientHeight) de propósito: client* encolhe quando a
+   barra de rolagem aparece, e board.style.minWidth/minHeight é justamente o que decide, via sizer,
+   se o viewport (overflow:auto) PRECISA de barra — ler client* aqui fecha um ciclo (barra aparece →
+   client* encolhe → board encolhe → barra some → client* cresce → board cresce → barra aparece de
+   novo…) que o ResizeObserver em board (abaixo) reexecuta a cada mudança, sem nunca estabilizar. Isso
+   é o que o usuário via como a tela "tremendo em loop" — decisão `0066`. offset* inclui a barra no
+   cálculo (não muda com ela presente ou não), rompendo o ciclo. */
 function updateSizer(){
-  board.style.minWidth = (vp.clientWidth / Z) + "px";
-  board.style.minHeight = (vp.clientHeight / Z) + "px";
+  board.style.minWidth = (vp.offsetWidth / Z) + "px";
+  board.style.minHeight = (vp.offsetHeight / Z) + "px";
   board.style.transform = `scale(${Z})`;
   const ex = boardExtent();
   sizer.style.width = (Math.max(board.offsetWidth, ex.r + 160) * Z) + "px";
