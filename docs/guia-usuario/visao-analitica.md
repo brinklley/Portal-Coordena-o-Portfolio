@@ -26,9 +26,13 @@ existe nenhum dado possível para mostrar ainda).
 - **Reservado** (número ao lado da descrição do épico): quantos desses itens têm a **tag de
   capacidade do roadmap** marcada no Azure DevOps (por padrão, a tag `ROADMAP`) — é esse subconjunto
   que conta como "garantido" para o roadmap do semestre selecionado.
-- **Capacidade** e **Projetada** (números no topo, acima da tabela): a **soma**, de todos os épicos
+- **Reservados** e **Projetada** (números no topo, acima da tabela): a **soma**, de todos os épicos
   mostrados na tabela, do Reservado e do QTD de cada linha, respectivamente — nunca um total
   calculado à parte; se a tabela mudar (por causa de outro filtro), esses números mudam junto.
+- **Barra de conclusão** (logo abaixo dos dois números): para Reservados e para Projetada, mostra o
+  percentual dos itens daquela soma que já estão **entregues** (categoria Vazão) — ex.: se Reservados
+  é 10 e 2 desses itens já foram entregues, a barra mostra 20% preenchido e o texto "20% (2/10)". Sem
+  nenhum item na soma, a barra mostra "--" em vez de "0%".
 - **Status**: a fase do épico — Backlog, Discovery, WIP, Entregue ou "Sem reserva" — calculada **só
   sobre os itens reservados** do épico, não sobre todo o vínculo do time com ele. Isso evita que um
   item fora da reserva, mas mais adiantado no fluxo, faça o Status parecer mais avançado do que a
@@ -41,7 +45,7 @@ existe nenhum dado possível para mostrar ainda).
   acima, que olha só a reserva.
 - **Ref.** e **Dead line**: o semestre do roadmap (ex.: `2S/26`) e a data-limite calculada (fim do
   semestre, menos a folga de dias configurada, menos o CycleTime máximo do time).
-- **Transparência**: clique em qualquer número — QTD, Reservado (de uma linha), ou Capacidade/Projetada
+- **Transparência**: clique em qualquer número — QTD, Reservado (de uma linha), ou Reservados/Projetada
   (do topo) — para ver a lista exata dos itens que compõem aquela soma, cada um levando direto até o
   item no quadro.
 
@@ -62,12 +66,18 @@ conta como entregue para efeito de Status, mesmo o nome da coluna sugerindo que 
 Confira o mapeamento de colunas do time em Configurações › Fluxo dos times para ver qual categoria
 cada coluna do fluxo tem — é o mapeamento que decide, não o nome da coluna.
 
-### "A Capacidade/Projetada no topo não bate com a conta que eu fiz manualmente olhando o quadro"
+### "Os Reservados/Projetada no topo não batem com a conta que eu fiz manualmente olhando o quadro"
 
-Capacidade e Projetada são sempre a **soma dos números que já aparecem nas linhas da tabela** — e a
+Reservados e Projetada são sempre a **soma dos números que já aparecem nas linhas da tabela** — e a
 tabela só mostra os épicos que passam pelos filtros ativos (time, roadmap, responsável). Se algum
 filtro extra estiver ligado, a soma reflete só o que está visível na tela naquele momento, não o
 total absoluto do time no portal inteiro.
+
+### "A barra de conclusão mostra '--' em vez de uma porcentagem"
+
+Acontece quando a soma daquele lado (Reservados ou Projetada) é **0** — não há itens para calcular um
+percentual, então a barra mostra "--" em vez de "0%" (que daria a entender, erradamente, que existe
+trabalho pendente).
 
 ### "Por que aparece 'Sem reserva' em um épico que tem item em andamento?"
 
@@ -80,7 +90,7 @@ mostra "Sem reserva" até que algum item do épico receba a tag.
 
 É um épico sem release/iniciativa válida (por isso ele não aparece no quadro normal), mas que tem
 itens do time filtrado e cujo Target Date cai no semestre do **Roadmap interno** selecionado — ele
-ainda entra na Visão Analítica (e nas somas de QTD/Capacidade/Projetada), com esse aviso no lugar da
+ainda entra na Visão Analítica (e nas somas de QTD/Reservados/Projetada), com esse aviso no lugar da
 linha `[IN][id] título`. Só acontece com o Roadmap interno; no executivo esse épico não apareceria
 (não há iniciativa da qual herdar um roadmap executivo).
 
@@ -130,6 +140,19 @@ linha `[IN][id] título`. Só acontece com o Roadmap interno; no executivo esse 
 - Então o Status mostra "Entregue ⚠" — o compromisso do roadmap foi cumprido, mas ainda falta algo no
   épico como um todo
 
+## Cenários (barra de conclusão)
+
+**Cenário: parte dos itens reservados já entregue**
+- Dado que a soma de Reservados é 10 itens
+- E 2 desses itens já estão na categoria Vazão (entregues)
+- Quando a Visão Analítica renderiza o cabeçalho
+- Então a barra de Reservados mostra 20% preenchido e o texto "20% (2/10)"
+
+**Cenário de comportamento inesperado: nenhum item na soma**
+- Dado que a soma de Projetada é 0 (nenhum item do tipo considerado no time/roadmap filtrado)
+- Quando a Visão Analítica renderiza o cabeçalho
+- Então a barra de Projetada mostra "--" em vez de "0%", e fica vazia (sem preenchimento)
+
 ## Regras de negócio relacionadas
 
 - `docs/regras-de-negocio.md` §10 (Visão analítica) e §7 (Categorias de coluna e fase — o mapeamento
@@ -140,5 +163,6 @@ linha `[IN][id] título`. Só acontece com o Roadmap interno; no executivo esse 
   [`0036`](../decisoes/0036-visao-analitica-epico-orfao-roadmap-interno.md),
   [`0049`](../decisoes/0049-status-usa-so-itens-reservados-e-cor-do-id-por-categoria.md),
   [`0055`](../decisoes/0055-status-entregue-considera-todos-os-itens-com-alerta.md),
-  [`0056`](../decisoes/0056-entregue-exige-item-de-tipo-do-ct.md).
+  [`0056`](../decisoes/0056-entregue-exige-item-de-tipo-do-ct.md),
+  [`0067`](../decisoes/0067-visao-analitica-reservados-e-barra-de-conclusao.md).
 - Detalhe exaustivo de cobertura de teste: [`docs/testes/visao-analitica.md`](../testes/visao-analitica.md).

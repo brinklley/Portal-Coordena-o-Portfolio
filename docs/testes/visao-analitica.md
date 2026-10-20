@@ -1,7 +1,7 @@
 # Testes: Visão analítica do roadmap do time
 
-Cobre `tests/test_visao_analitica.py` (15 testes). Ver `docs/regras-de-negocio.md` §10; decisões
-`0027`, `0028`, `0029`, `0036`, `0039`.
+Cobre `tests/test_visao_analitica.py` (18 testes). Ver `docs/regras-de-negocio.md` §10; decisões
+`0027`, `0028`, `0029`, `0036`, `0039`, `0067`.
 
 ## Regra: Projetada é a soma do QTD de cada épico mostrado na tabela
 
@@ -17,11 +17,12 @@ somado é o que está visível).
 - **Teste**: `test_projetada_e_soma_do_qtd_dos_epicos_da_tabela`
 - **Relacionado**: decisão `0027`.
 
-## Regra: Capacidade é a soma dos itens reservados (com a tag) de cada épico
+## Regra: Reservados é a soma dos itens reservados (com a tag) de cada épico
 
-**Garante que**: "Capacidade" soma só os itens marcados com a tag configurável de roadmap
-(`CFG.anTag`, padrão `ROADMAP`) — mesma tag usada no Report F4P (Vazão/User Story) — e essa tag é
-configurável por organização.
+**Garante que**: "Reservados" (rótulo do cabeçalho — renomeado de "Capacidade" na decisão `0067`) soma
+só os itens marcados com a tag configurável de roadmap (`CFG.anTag`, padrão `ROADMAP`) — mesma tag
+usada no Report F4P (Vazão/User Story) — e essa tag é configurável por organização. O campo interno
+continua `d.cap`/`row.reservados` — só o rótulo exibido mudou.
 
 - **Dado**: 3 itens, 2 com a tag ROADMAP.
 - **Então (sucesso)**: `d.cap === 2`; a soma de `row.reservados.length` bate com `d.cap`; trocar
@@ -32,6 +33,30 @@ configurável por organização.
 - **Testes**: `test_capacidade_e_soma_dos_reservados_dos_epicos_da_tabela`,
   `test_capacidade_usa_a_tag_configuravel`
 - **Relacionado**: decisão `0027`.
+
+## Regra: a barra de conclusão mostra o percentual já entregue de Reservados e de Projetada (decisão 0067)
+
+**Garante que**: logo abaixo do cabeçalho, uma barra por número (Reservados e Projetada) mostra o
+percentual dos itens daquela soma que já estão na categoria Vazão (entregues) — usando exatamente os
+mesmos conjuntos (`capItems`/`projItems`) que o modal de transparência já expõe, nunca uma contagem à
+parte.
+
+- **Dado**: 4 itens — 1 reservado e entregue, 1 reservado e aberto, 1 não reservado e entregue, 1 não
+  reservado e aberto.
+- **Então (sucesso)**: `d.cap === 2`, `d.capDone === 1` (50% de Reservados entregue); `d.proj === 4`,
+  `d.projDone === 2` (50% de Projetada entregue) — os dois percentuais calculados sobre conjuntos
+  diferentes (Projetada inclui itens fora da Reserva).
+- **Cenário de falha coberto**: a barra usaria um cálculo à parte (ex.: sobre todos os itens do time,
+  não só os da soma exibida), divergindo do número que o próprio cabeçalho mostra — a mesma classe de
+  bug que a decisão `0027` já havia eliminado para os números em si.
+- **Teste**: `test_barra_de_conclusao_calcula_percentual_de_reservados_e_projetada_entregues`
+- **Sem nenhum item na soma, mostra "--" em vez de "0%"**: evita sugerir que existe trabalho pendente
+  quando não há nenhum item a entregar.
+  - **Teste**: `test_barra_de_conclusao_mostra_tracinho_quando_a_soma_e_zero`
+- **O rótulo "Capacidade" vira "Reservados"** (só o texto exibido — `d.cap`/`data-an-items="cap"`
+  continuam com o mesmo nome interno).
+  - **Teste**: `test_cabecalho_mostra_reservados_nao_capacidade`
+- **Relacionado**: decisão `0067-visao-analitica-reservados-e-barra-de-conclusao.md`.
 
 ## Regra: a linha do épico mostra a quantidade reservada (sem o badge "X US")
 
@@ -49,8 +74,8 @@ US" (redundante com a coluna QTD) foi removido.
 
 ## Regra: os números clicáveis do cabeçalho abrem a lista exata dos itens somados
 
-**Garante que**: clicar em "Capacidade" ou "Projetada" no cabeçalho abre um modal com a lista exata
-dos itens que entraram naquela soma (mesma transparência do Report F4P) — Capacidade mostra só os
+**Garante que**: clicar em "Reservados" ou "Projetada" no cabeçalho abre um modal com a lista exata
+dos itens que entraram naquela soma (mesma transparência do Report F4P) — Reservados mostra só os
 com a tag; Projetada mostra todos, com a situação seguindo `catOf` (mesma categorização do resto do
 portal) e, para itens em Vazão, a data de saída.
 

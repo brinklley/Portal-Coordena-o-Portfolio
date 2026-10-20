@@ -242,7 +242,7 @@ async def gerar(args):
     arq.write_text(saida, encoding="utf-8")
     va = [x[3] for x in secoes if x[1] == "va"]
     print(f"Origem dos dados: {origem}\nGerado: {arq} ({arq.stat().st_size / 1024:.0f} KB) · seções: " + ", ".join(f"{ROTULO[x[1]]}{' ' + x[2] if x[2] else ''}" for x in secoes)
-          + " · " + " / ".join(f"{x[2]} Capacidade {x[3]['capacidade']} Projetada {x[3]['projetada']}" for x in secoes if x[1] == "va"))
+          + " · " + " / ".join(f"{x[2]} Reservados {x[3]['capacidade']} Projetada {x[3]['projetada']}" for x in secoes if x[1] == "va"))
     return arq
 
 

@@ -405,6 +405,13 @@ tr[data-cat="disc"] .fnb{background:var(--c-disc);color:#fff} tr[data-cat="wip"]
 .an-title h2{margin:0;font-family:var(--display);font-size:24px;font-weight:600;letter-spacing:-.01em}
 .an-title h3{margin:2px 0 0;font-family:var(--display);font-size:19px;font-weight:400}
 .an-title h3 mark{background:#FDE047;padding:0 3px}
+.an-progress{display:flex;gap:28px;margin-top:10px;flex-wrap:wrap}
+.an-prog-col{flex:1 1 220px;max-width:300px}
+.an-prog-label{font-size:12px;color:var(--ink-2);margin-bottom:4px}
+.an-prog-label b{color:var(--ink);font-size:13px;font-variant-numeric:tabular-nums}
+.an-prog-n{font-variant-numeric:tabular-nums}
+.an-prog-bar{height:8px;background:#E5E7EB;border-radius:4px;overflow:hidden}
+.an-prog-bar span{display:block;height:100%;background:#22C55E;border-radius:4px;transition:width .2s}
 .an-kpis{display:flex;gap:22px;margin-top:10px;flex-wrap:wrap}
 .an-kpi{display:flex;align-items:baseline;gap:8px}
 .an-kpi b{font-size:20px;font-variant-numeric:tabular-nums}
