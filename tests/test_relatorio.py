@@ -40,7 +40,7 @@ def test_relatorio_reproduz_exatamente_a_visao_analitica_do_portal(browser, gera
       const d = anData(); return {cap:d.cap, proj:d.proj, ids: anSorted(d.rows).map(r => r.e.id), cts: anSorted(d.rows).map(r => r.m.ct)}; }""")
     assert esperado["cap"] > 0 and len(esperado["ids"]) > 3
     rel = page.context.new_page(); rel.goto("file://" + gerado["arq"])
-    assert rel.inner_text("#va-mobile .an-title h3").replace("\n", " ") == f"Entregas previstas: Capacidade {esperado['cap']} US / Projetada {esperado['proj']} US"
+    assert rel.inner_text("#va-mobile .an-title h3").replace("\n", " ") == f"Entregas previstas: Reservados {esperado['cap']} US / Projetada {esperado['proj']} US"
     assert rel.eval_on_selector_all("#va-mobile .an-table tbody tr .ep .idb", "els => els.map(e => e.textContent)") == esperado["ids"]
     assert rel.eval_on_selector_all("#va-mobile .an-table .ct-ok, #va-mobile .an-table .ct-bad", "els => els.map(e => e.textContent)") == [f"CycleTime: {c if c is not None else '--'} Dias" for c in esperado["cts"]]
     page.context.close()

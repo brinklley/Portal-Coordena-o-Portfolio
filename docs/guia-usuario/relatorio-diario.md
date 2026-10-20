@@ -22,7 +22,7 @@ Ela:
 2. Carrega os dados do Azure DevOps pelo mesmo caminho da tela — uma credencial por organização, sem
    token chegando ao navegador (decisão `0063`).
 3. Para o roadmap vigente (interno, por padrão), identifica os **times comprometidos** — times que têm
-   pelo menos um item com Capacidade reservada (a tag `CFG.anTag`, a mesma da Visão Analítica, §10)
+   pelo menos um item com capacidade reservada (a tag `CFG.anTag`, a mesma da Visão Analítica, §10)
    nesse roadmap.
 4. Para cada time comprometido: captura a Visão Analítica e o Actionable daquele time. Captura também
    o Report F4P uma única vez (ele já mostra os 4 times).
@@ -45,7 +45,7 @@ Ele continua aparecendo no Report F4P, que sempre mostra os 4 times.
 ### "Pedi a geração para um time específico e deu erro 'não está comprometido no roadmap'"
 
 Mesma régua acima: mesmo pedindo um time explicitamente, ele só entra na Visão Analítica/Actionable do
-relatório se tiver Capacidade reservada naquele roadmap. A mensagem de erro lista exatamente quais
+relatório se tiver capacidade reservada naquele roadmap. A mensagem de erro lista exatamente quais
 times estão comprometidos no momento, para conferir.
 
 ### "O relatório não foi gerado hoje"
@@ -97,7 +97,7 @@ Azure DevOps.
   completa do gerador, autenticação por ponte (PAT nunca chega ao navegador, decisão
   [`0007`](../decisoes/0007-token-nunca-salvo.md)), e o histórico de ajustes feitos depois do primeiro
   teste em produção.
-- `docs/regras-de-negocio.md` §10 (Visão analítica — a mesma régua de "Reserva"/"Capacidade" decide
+- `docs/regras-de-negocio.md` §10 (Visão analítica — a mesma régua de "Reserva"/"Reservados" decide
   quem é "time comprometido" aqui).
 - Detalhe exaustivo de cobertura de teste: [`docs/testes/relatorio.md`](../testes/relatorio.md).
 - Comando para gerar manualmente (ex.: para testar): ver seção "Comandos" do `CLAUDE.md` na raiz do

@@ -36,7 +36,7 @@ function cfgForm(err){
       <label>Parado na mesma coluna a partir de (dias)<input type="number" min="1" id="cfgStuck" value="${d.stuckDays}"></label>
     </div>
     <h4>Visão analítica</h4>
-    <p class="help">Usada no painel analítico (abre pela aba à esquerda quando há um Time e um Roadmap no filtro). <b>Capacidade</b> conta os itens com a tag abaixo; <b>Projetada</b> e <b>QTD</b> contam todos. As contagens usam os mesmos tipos de item marcados em “Tipos considerados no CT do épico”.</p>
+    <p class="help">Usada no painel analítico (abre pela aba à esquerda quando há um Time e um Roadmap no filtro). <b>Reservados</b> conta os itens com a tag abaixo; <b>Projetada</b> e <b>QTD</b> contam todos. As contagens usam os mesmos tipos de item marcados em “Tipos considerados no CT do épico”.</p>
     <div class="grid3">
       <label title="Também usada pelo quadrante Vazão do Report F4P (Reserva)">Tag que marca a capacidade do roadmap<input type="text" id="cfgAnTag" value="${esc(d.anTag || "")}" style="width:200px"></label>
       <label>Coluna da iniciativa com Capex/Opex<input type="text" id="cfgAnCol" value="${esc(d.anClassCol || "")}" style="width:240px"></label>

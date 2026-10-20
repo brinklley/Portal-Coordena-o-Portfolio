@@ -4,10 +4,10 @@ Cobre `tests/test_relatorio.py` (14 testes). Decisão `0063`; código em `script
 
 ## Regra: o relatório é idêntico ao que o portal mostra
 
-**Garante que**: o relatório nunca diverge da tela porque a regra não é reimplementada — o HTML gerado traz a mesma Capacidade/Projetada, os mesmos épicos na mesma ordem e o mesmo CycleTime que `anData()`/`anSorted()` no portal.
+**Garante que**: o relatório nunca diverge da tela porque a regra não é reimplementada — o HTML gerado traz os mesmos Reservados/Projetada, os mesmos épicos na mesma ordem e o mesmo CycleTime que `anData()`/`anSorted()` no portal.
 
 - **Dado**: fixture `relatorio.xlsx`, time MOBILE, roadmap interno vigente, mesmo fuso (Brasília).
-- **Então (sucesso)**: o título "Entregas previstas: Capacidade X US / Projetada Y US", a lista de IDs de épico e os CycleTimes do arquivo gerado são iguais aos calculados no portal.
+- **Então (sucesso)**: o título "Entregas previstas: Reservados X US / Projetada Y US" (decisão `0067`), a lista de IDs de épico e os CycleTimes do arquivo gerado são iguais aos calculados no portal.
 - **Cenário de falha coberto**: alguém reimplementar uma regra no gerador (ou filtrar diferente) e o e-mail mostrar números que não batem com a tela.
 - **Teste**: `test_relatorio_reproduz_exatamente_a_visao_analitica_do_portal`
 
@@ -27,7 +27,7 @@ Cobre `tests/test_relatorio.py` (14 testes). Decisão `0063`; código em `script
 
 ## Regra: entradas inválidas abortam sem gerar arquivo parcial
 
-**Garante que**: time sem Capacidade no roadmap, ou roadmap inexistente nos dados, encerram com erro claro e sem arquivo na saída.
+**Garante que**: time sem Reservados no roadmap, ou roadmap inexistente nos dados, encerram com erro claro e sem arquivo na saída.
 
 - **Testes**: `test_time_sem_capacidade_no_roadmap_aborta_com_mensagem_clara`, `test_roadmap_inexistente_nos_dados_aborta`
 

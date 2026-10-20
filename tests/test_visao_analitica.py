@@ -64,6 +64,67 @@ def test_capacidade_usa_a_tag_configuravel(page):
     page.evaluate("()=>{ CFG.anTag = 'ROADMAP'; }")
     assert d["cap"] == 1
 
+# Decisão 0067: rótulo do cabeçalho renomeado de "Capacidade" para "Reservados" (campo interno d.cap
+# continua o mesmo), e nova barra de conclusão logo abaixo mostrando o % de Reservados e de Projetada
+# já entregue (catOf === "vazao"), calculado sobre os mesmos conjuntos capItems/projItems do modal de
+# transparência — nunca uma contagem à parte.
+
+def test_barra_de_conclusao_calcula_percentual_de_reservados_e_projetada_entregues(page):
+    carregar(page, "f4p.xlsx")
+    sem = page.evaluate("semestre(TODAY)")
+    _setup_epico(page, team="AN_PROGBAR", sem=sem, itens=[
+        {"stName": "Vazao", "deploy": "2026-01-05", "tags": ["ROADMAP"]},   # reservado, entregue
+        {"stName": "Backlog", "tags": ["ROADMAP"]},                         # reservado, aberto
+        {"stName": "Vazao", "deploy": "2026-01-06", "tags": []},            # não reservado, entregue
+        {"stName": "WIP", "tags": []},                                      # não reservado, aberto
+    ])
+    d = page.evaluate("anData()")
+    assert d["cap"] == 2 and d["capDone"] == 1     # 1 dos 2 reservados já entregue (50%)
+    assert d["proj"] == 4 and d["projDone"] == 2    # 2 dos 4 itens projetados já entregues (50%)
+    page.click("#anTab")
+    cap_txt = page.inner_text('[data-an-prog="cap"]')
+    proj_txt = page.inner_text('[data-an-prog="proj"]')
+    assert "50%" in cap_txt and "(1/2)" in cap_txt
+    assert "50%" in proj_txt and "(2/4)" in proj_txt
+
+def test_cabecalho_mostra_reservados_nao_capacidade(page):
+    """O rótulo exibido mudou de "Capacidade" para "Reservados" — o campo interno d.cap e o atributo
+    data-an-items="cap" continuam os mesmos (só o texto visível ao usuário mudou)."""
+    carregar(page, "f4p.xlsx")
+    sem = page.evaluate("semestre(TODAY)")
+    _setup_epico(page, team="AN_LABEL", sem=sem, itens=[{"stName": "Backlog", "tags": ["ROADMAP"]}])
+    page.click("#anTab")
+    txt = page.inner_text("#anTitle")
+    assert "Reservados" in txt
+    assert "Capacidade" not in txt
+    assert page.is_visible('button[data-an-items="cap"]')
+
+def test_barra_de_conclusao_mostra_tracinho_quando_a_soma_e_zero(page):
+    """Épico cujo único item é de um tipo fora de CFG.ctTypes (ex.: Spike) tem QTD 0 e Reservados 0
+    (mesmo cenário de dados de test_entregue_nao_conta_item_de_tipo_fora_do_ct_epico_normal) — a barra
+    não deve mostrar "0%" (sugeriria trabalho pendente que não existe), e sim "--"."""
+    carregar(page, "f4p.xlsx")
+    sem = page.evaluate("semestre(TODAY)")
+    page.evaluate("""(args)=>{
+      const {team, sem} = args;
+      S.model.teamFlow[team] = ["Backlog", "WIP", "Vazao"];
+      CFG.flow[norm(team)] = {cat:{wip:"wip", vazao:"vazao"}, ct:[]};
+      S.model.ops.set(team+"_op0", {id:team+"_op0", title:"Item fora do CT", team, type:"Spike", stName:"Vazao", deploy:new Date(2026,0,5), ready:new Date(2026,0,1), tags:[]});
+      const iniId = `INI_${team}`, relId = `REL_${team}`, epiId = `EPI_${team}`;
+      S.model.inis.set(iniId, {id:iniId, valid:true, title:"Iniciativa "+team, exec:sem, owner:null, rels:[relId]});
+      S.model.rels.set(relId, {id:relId, valid:true, title:"Release "+team, parent:iniId, epis:[epiId]});
+      S.model.epis.set(epiId, {id:epiId, valid:true, title:"Épico "+team, parent:relId, target:null, interno:null, st:0, ops:[team+"_op0"], type:"Epic"});
+      S.f.team = team; S.f.exec = sem;
+      render();
+    }""", {"team": "AN_PROGBAR_ZERO", "sem": sem})
+    d = page.evaluate("anData()")
+    assert d["cap"] == 0 and d["proj"] == 0
+    page.click("#anTab")
+    cap_txt = page.inner_text('[data-an-prog="cap"]')
+    proj_txt = page.inner_text('[data-an-prog="proj"]')
+    assert "--" in cap_txt and "0%" not in cap_txt
+    assert "--" in proj_txt and "0%" not in proj_txt
+
 def test_linha_do_epico_mostra_quantidade_reservada(page):
     carregar(page, "f4p.xlsx")
     sem = page.evaluate("semestre(TODAY)")

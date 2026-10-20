@@ -88,8 +88,12 @@ function anData(){
   });
   const projItems = rows.flatMap(r => r.itens);
   const capItems = rows.flatMap(r => r.reservados);
+  /* barra de conclusão do cabeçalho (decisão `0067`): % dos itens de cada soma (Reservados/Projetada)
+     já entregue — mesmo critério de "entregue" usado em todo o resto do portal (catOf === "vazao"). */
+  const capDone = capItems.filter(o => catOf(o) === "vazao").length;
+  const projDone = projItems.filter(o => catOf(o) === "vazao").length;
   const dl = anDeadline(S.f.int || S.f.exec, L.max);
-  return {team, projItems, capItems, cap: capItems.length, proj: projItems.length, L, rows, dl};
+  return {team, projItems, capItems, cap: capItems.length, proj: projItems.length, capDone, projDone, L, rows, dl};
 }
 function anSorted(rows){
   const k = AN.sort, d = AN.dir;
@@ -106,8 +110,15 @@ function renderAnalytics(){
   if (!AN.open) return;
   const d = anData(), rm = [S.f.int && `roadmap interno ${semLong(S.f.int)}`, S.f.exec && `roadmap executivo ${semLong(S.f.exec)}`].filter(Boolean).join(" · ");
   const over = d.proj > d.cap;
+  const pct = (done, total) => total ? Math.round(done / total * 100) : null;
+  const capPct = pct(d.capDone, d.cap), projPct = pct(d.projDone, d.proj);
+  const progBar = (key, label, done, total, p) => `<div class="an-prog-col" data-an-prog="${key}">
+      <div class="an-prog-label">${label} entregue: <b>${p === null ? "--" : p + "%"}</b> <span class="an-prog-n">(${done}/${total})</span></div>
+      <div class="an-prog-bar" title="${esc(`${done} de ${total} itens ${label.toLowerCase()} já entregues (categoria Vazão)`)}"><span style="width:${p || 0}%"></span></div>
+    </div>`;
   $("anTitle").innerHTML = `<h2>Roadmap ${esc(d.team)} ${esc(semLong(S.f.int || S.f.exec))}</h2>
-    <h3>Entregas previstas: Capacidade <button type="button" class="f4p-real" data-an-items="cap" title="Ver os itens que compõem a Capacidade">${d.cap}</button> US / Projetada ${over ? `<mark><button type="button" class="f4p-real" data-an-items="proj" title="Ver os itens que compõem a Projetada">${d.proj}</button></mark>` : `<button type="button" class="f4p-real" data-an-items="proj" title="Ver os itens que compõem a Projetada">${d.proj}</button>`} US</h3>
+    <h3>Entregas previstas: Reservados <button type="button" class="f4p-real" data-an-items="cap" title="Ver os itens que compõem os Reservados">${d.cap}</button> US / Projetada ${over ? `<mark><button type="button" class="f4p-real" data-an-items="proj" title="Ver os itens que compõem a Projetada">${d.proj}</button></mark>` : `<button type="button" class="f4p-real" data-an-items="proj" title="Ver os itens que compõem a Projetada">${d.proj}</button>`} US</h3>
+    <div class="an-progress">${progBar("cap", "Reservados", d.capDone, d.cap, capPct)}${progBar("proj", "Projetada", d.projDone, d.proj, projPct)}</div>
     <div class="an-kpis">
       <div class="an-kpi"><b>${d.L.max ? d.L.max + " DIAS" : "--"}</b><span>CycleTime máximo${d.L.planned ? "" : " (regra geral; o time não tem CT planejado)"}</span></div>
       ${d.dl ? (() => { const left = days(TODAY, d.dl.date);
@@ -131,7 +142,7 @@ function renderAnalytics(){
           return `<span class="dl ${left < 0 ? "late" : left <= 14 ? "near" : ""}" title="Itens do épico que ainda não entraram na coluna de entrada do CT">${r.pending.length} ${r.pending.length === 1 ? "item fora" : "itens fora"} do fluxo · entrar até ${fmtDM(d.dl.date)}</span>`; })() : ""}</td>
       <td class="c">${esc(semShort(r.ref))}<br>${esc(r.cls || "---")}</td></tr>`; }).join("");
   $("anBody").innerHTML = `<table class="an-table" id="anTable"><thead><tr>${th("qtd","QTD")}${th("ep","Evolução")}${th("status","Status")}${th("ct","Flow")}${th("ref","Ref.")}</tr></thead><tbody>${rows}</tbody></table>
-    <div class="an-note">Épicos com itens do time ${esc(d.team)} dentro dos filtros atuais (${esc(rm)}). QTD, Capacidade e Projetada contam itens dos tipos ${esc(ctTypesLabel())}; Capacidade só os com a tag ${esc(CFG.anTag || "ROADMAP")}. Projetada é sempre a soma do QTD de cada épico da tabela; Capacidade é sempre a soma do "reservado" de cada épico. Os números do cabeçalho (Capacidade e Projetada) e os de cada linha (QTD e "reservado") são clicáveis e abrem a lista dos itens exatos que entram em cada soma (com a situação: Backlog, Discovery, WIP ou Vazão, com a data quando entregue). Status mostra a fase e a coluna do fluxo só dos itens reservados (com a tag ${esc(CFG.anTag || "ROADMAP")}) — não de todo o vínculo do time com o épico; o agrupador de categorias logo abaixo continua somando todos os itens, com ou sem a tag. Flow segue a configuração do fluxo do time; CycleTime em vermelho passa do CT máximo. Dead line = fim do semestre${CFG.anFreeze ? ` menos ${CFG.anFreeze} dias` : ""} menos o CT máximo; “itens fora do fluxo” ainda não chegaram na coluna de entrada do CT. Ref.: roadmap interno do épico (ou o executivo da iniciativa, se vazio) e ${esc(CFG.anClassCol || "classificação")} da iniciativa.</div>`;
+    <div class="an-note">Épicos com itens do time ${esc(d.team)} dentro dos filtros atuais (${esc(rm)}). QTD, Reservados e Projetada contam itens dos tipos ${esc(ctTypesLabel())}; Reservados só os com a tag ${esc(CFG.anTag || "ROADMAP")}. Projetada é sempre a soma do QTD de cada épico da tabela; Reservados é sempre a soma do "reservado" de cada épico. Os números do cabeçalho (Reservados e Projetada) e os de cada linha (QTD e "reservado") são clicáveis e abrem a lista dos itens exatos que entram em cada soma (com a situação: Backlog, Discovery, WIP ou Vazão, com a data quando entregue). A barra abaixo do cabeçalho mostra o percentual de Reservados e de Projetada já entregue (categoria Vazão). Status mostra a fase e a coluna do fluxo só dos itens reservados (com a tag ${esc(CFG.anTag || "ROADMAP")}) — não de todo o vínculo do time com o épico; o agrupador de categorias logo abaixo continua somando todos os itens, com ou sem a tag. Flow segue a configuração do fluxo do time; CycleTime em vermelho passa do CT máximo. Dead line = fim do semestre${CFG.anFreeze ? ` menos ${CFG.anFreeze} dias` : ""} menos o CT máximo; “itens fora do fluxo” ainda não chegaram na coluna de entrada do CT. Ref.: roadmap interno do épico (ou o executivo da iniciativa, se vazio) e ${esc(CFG.anClassCol || "classificação")} da iniciativa.</div>`;
   // decisão 0054: "ID ou descrição" só destaca a linha aqui (não filtra) — rola até a primeira linha
   // destacada pra ajudar a localizar visualmente, sem precisar procurar na tabela inteira.
   if (S.f.q){ const hl = $("anBody").querySelector("tr.hl"); if (hl) hl.scrollIntoView({block:"center"}); }
@@ -149,7 +160,7 @@ $("anPanel").addEventListener("click", e => {
   const btn = e.target.closest("[data-an-items]");
   if (btn){
     const d = anData(), which = btn.dataset.anItems, items = which === "cap" ? d.capItems : d.projItems;
-    f4pItemsModal(`Roadmap ${d.team} · ${which === "cap" ? "Capacidade" : "Projetada"} · ${semLong(S.f.int || S.f.exec)}`, items);
+    f4pItemsModal(`Roadmap ${d.team} · ${which === "cap" ? "Reservados" : "Projetada"} · ${semLong(S.f.int || S.f.exec)}`, items);
     return;
   }
   const btnEpi = e.target.closest("[data-an-epi-items]");
