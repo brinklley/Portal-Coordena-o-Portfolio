@@ -1,6 +1,12 @@
 /* ---------------- whiteboard: zoom e arrastar ---------------- */
 const vp = $("viewport"), sizer = $("sizer");
 let Z = 1;
+/* margem de espaço em branco pra navegar (decisão `0069`): fração do viewport reservada como margem
+   PANNABLE em volta do conteúdo, nos 4 lados — ver PAN_MARGIN abaixo. panMX/panMY (recalculados a cada
+   updateSizer()) são onde o conteúdo começa dentro do sizer — qualquer código que precise "rolar até o
+   início do conteúdo" usa esses dois, nunca 0 (que agora cai na margem em branco). */
+const PAN_MARGIN = 0.5;
+let panMX = 0, panMY = 0;
 /* usa offsetWidth/offsetHeight (não clientWidth/clientHeight) de propósito: client* encolhe quando a
    barra de rolagem aparece, e board.style.minWidth/minHeight é justamente o que decide, via sizer,
    se o viewport (overflow:auto) PRECISA de barra — ler client* aqui fecha um ciclo (barra aparece →
@@ -13,8 +19,19 @@ function updateSizer(){
   board.style.minHeight = (vp.offsetHeight / Z) + "px";
   board.style.transform = `scale(${Z})`;
   const ex = boardExtent();
-  sizer.style.width = (Math.max(board.offsetWidth, ex.r + 160) * Z) + "px";
-  sizer.style.height = (Math.max(board.offsetHeight, ex.b + 200) * Z) + "px";
+  /* decisão `0069`: pedido do usuário — a área pannable do quadro (fora do conteúdo) era pequena
+     demais, a câmera "batia nas bordas" ao mover o minimapa. Antes só existia uma margem pequena
+     (160/200px de CONTEÚDO, não de tela — depois de multiplicada pelo zoom, encolhia a quase nada
+     com zoom out) e só do lado direito/inferior; a esquerda/acima não tinha margem nenhuma (board
+     ficava colado em left:0;top:0 do sizer). Agora a margem é sempre meia largura/altura do viewport,
+     em PIXELS DE TELA (não encolhe/cresce com o zoom — por isso soma `mx`/`my` direto, sem multiplicar
+     por `Z`: `left`/`top` do board não são afetados pelo `transform:scale()` dele mesmo, só o tamanho
+     renderizado é), igual nos 4 lados. */
+  panMX = vp.offsetWidth * PAN_MARGIN; panMY = vp.offsetHeight * PAN_MARGIN;
+  board.style.left = panMX + "px";
+  board.style.top = panMY + "px";
+  sizer.style.width = (Math.max(board.offsetWidth, ex.r) * Z + panMX * 2) + "px";
+  sizer.style.height = (Math.max(board.offsetHeight, ex.b) * Z + panMY * 2) + "px";
   sizer.style.backgroundSize = `${22 * Z}px ${22 * Z}px`;
   $("zLabel").textContent = Math.round(Z * 100) + "%";
 }

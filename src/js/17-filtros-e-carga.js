@@ -32,6 +32,11 @@ function loadTables(tables, label, imp){
   recomputeHealth();
   $("srcLabel").textContent = label;
   fillFilters(); closeDrawer(); render();
+  /* decisão `0069`: #board agora começa deslocado (margem pannable) dentro do #sizer, não mais em
+     (0,0) — sem isso, uma carga nova (ou recarregada) do Azure DevOps abriria com a câmera parada na
+     margem em branco, em vez de no início do conteúdo. updateSizer() roda de novo aqui (idempotente)
+     só pra garantir que panMX/panMY já refletem o tamanho atual antes de posicionar a câmera. */
+  updateSizer(); vp.scrollLeft = panMX; vp.scrollTop = panMY;
   toast(`Carregado: ${S.model.inis.size} iniciativas, ${S.model.epis.size} épicos, ${S.model.ops.size} itens de times.`, 3200);
   return true;
 }

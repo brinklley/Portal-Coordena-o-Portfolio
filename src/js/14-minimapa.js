@@ -13,12 +13,17 @@ function drawMinimap(){
   const g = cv.getContext("2d"); g.setTransform(dpr,0,0,dpr,0,0);
   g.fillStyle = "#EEF1F3"; g.fillRect(0,0,cw,ch);
   g.strokeStyle = "#AEB8C1"; g.lineWidth = 1;
-  board.querySelectorAll(".island").forEach(el => { const p = pos(el); g.fillStyle = "#FFFFFF"; g.fillRect(p.l*s, p.t*s, (p.r-p.l)*s, (p.b-p.t)*s); g.strokeRect(p.l*s+.5, p.t*s+.5, (p.r-p.l)*s, (p.b-p.t)*s); });
+  /* decisão `0069`: pos(el) mede a posição relativa ao próprio #board, que agora fica deslocado
+     (margem pannable, panMX/panMY) dentro do #sizer — soma o deslocamento (convertido pra unidade
+     "equivalente sem zoom", a mesma que pos() usa) pra desenhar os cards alinhados com o retângulo do
+     viewport abaixo (que já usa vp.scrollLeft/Top, medidos a partir da borda do próprio sizer). */
+  const mxU = panMX / Z, myU = panMY / Z;
+  board.querySelectorAll(".island").forEach(el => { const p = pos(el); g.fillStyle = "#FFFFFF"; g.fillRect((p.l+mxU)*s, (p.t+myU)*s, (p.r-p.l)*s, (p.b-p.t)*s); g.strokeRect((p.l+mxU)*s+.5, (p.t+myU)*s+.5, (p.r-p.l)*s, (p.b-p.t)*s); });
   const col = {ini:"#34489A", rel:"#16786A", epi:"#9A6512", op:"#5A6570"};
   board.querySelectorAll(".card").forEach(el => {
     const p = pos(el); g.globalAlpha = el.classList.contains("dim") ? .25 : 1;
     g.fillStyle = col[el.dataset.key.split(":")[0]] || "#5A6570";
-    g.fillRect(p.l*s, p.t*s, Math.max(1.5,(p.r-p.l)*s), Math.max(1.5,(p.b-p.t)*s));
+    g.fillRect((p.l+mxU)*s, (p.t+myU)*s, Math.max(1.5,(p.r-p.l)*s), Math.max(1.5,(p.b-p.t)*s));
   });
   g.globalAlpha = 1;
   const vx = vp.scrollLeft / Z * s, vy = vp.scrollTop / Z * s, vw = vp.clientWidth / Z * s, vh = vp.clientHeight / Z * s;

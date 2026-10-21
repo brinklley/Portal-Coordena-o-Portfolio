@@ -24,7 +24,7 @@ board.addEventListener("click", e => {
   }
   if (lvl === "ini"){
     if (S.path.ini === id){ S.path = {}; S.expand = false; S.focus = null; S.pathQueryId = null; closeDrawer(); render(); return; }
-    S.path = {ini:id}; S.pathQueryId = null; S.focus = null; scrollNext("rel"); vp.scrollTop = 0;
+    S.path = {ini:id}; S.pathQueryId = null; S.focus = null; scrollNext("rel"); vp.scrollTop = panMY;
   } else if (lvl === "rel"){
     if (S.path.rel === id){ delete S.path.rel; delete S.path.epi; render(); return; }
     S.path.rel = id; delete S.path.epi; scrollNext("epi");
