@@ -131,3 +131,65 @@ def test_arrastar_o_quadro_nao_fecha_o_painel(page):
     page.mouse.click(1300, 700)
     page.wait_for_timeout(200)
     assert page.evaluate("ACT.open") is False
+
+# Decisão 0068: pedido do usuário — com um painel lateral aberto, a área visível do whiteboard (que
+# fica por trás do painel, sempre em largura cheia) sobrava pequena demais pra navegar. O padrão caiu
+# de 1180px fixos pra 760px, e o usuário pode arrastar a alça (.an-resize) pra ajustar entre 360px e
+# 1180px — a escolha é a mesma pros 3 painéis (compartilham a variável CSS --an-w) e fica salva entre
+# sessões (localStorage).
+
+def test_painel_lateral_tem_largura_padrao_menor_que_a_antiga(page):
+    carregar(page, "f4p.xlsx")
+    sem = page.evaluate("semestre(TODAY)")
+    _habilitar_painel(page, team="QRESIZE1", sem=sem)
+    page.click("#anTab")
+    w = page.evaluate("document.getElementById('anPanel').getBoundingClientRect().width")
+    assert w == 760   # era min(1180px, 96vw) antes da decisão 0068
+
+def test_arrastar_a_alca_redimensiona_o_painel_dentro_dos_limites(page):
+    carregar(page, "f4p.xlsx")
+    sem = page.evaluate("semestre(TODAY)")
+    _habilitar_painel(page, team="QRESIZE2", sem=sem)
+    page.click("#anTab")
+    page.wait_for_timeout(300)   # espera a transição de abertura do painel (.22s) antes de medir a alça
+    box = page.locator("#anPanel .an-resize").bounding_box()
+    # arrasta pra direita (alarga)
+    page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+    page.mouse.down()
+    page.mouse.move(box["x"] + 200, box["y"] + box["height"] / 2, steps=5)
+    page.mouse.up()
+    page.wait_for_timeout(100)
+    w_alargado = page.evaluate("document.getElementById('anPanel').getBoundingClientRect().width")
+    assert w_alargado > 760
+    # arrasta bem além do limite mínimo — deve ficar preso em 360px, nunca menos
+    box2 = page.locator("#anPanel .an-resize").bounding_box()
+    page.mouse.move(box2["x"] + box2["width"] / 2, box2["y"] + box2["height"] / 2)
+    page.mouse.down()
+    page.mouse.move(box2["x"] - 2000, box2["y"] + box2["height"] / 2, steps=5)
+    page.mouse.up()
+    page.wait_for_timeout(100)
+    w_min = page.evaluate("document.getElementById('anPanel').getBoundingClientRect().width")
+    assert w_min == 360
+
+def test_largura_do_painel_persiste_e_vale_para_os_3_paineis(page):
+    """A largura escolhida é uma preferência compartilhada (variável CSS --an-w) — redimensionar a
+    Visão Analítica também muda o Report F4P e o Actionable, e continua valendo depois de fechar e
+    reabrir outro painel."""
+    carregar(page, "f4p.xlsx")
+    sem = page.evaluate("semestre(TODAY)")
+    _habilitar_painel(page, team="QRESIZE3", sem=sem)
+    page.click("#anTab")
+    page.wait_for_timeout(300)   # espera a transição de abertura do painel (.22s) antes de medir a alça
+    box = page.locator("#anPanel .an-resize").bounding_box()
+    page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+    page.mouse.down()
+    page.mouse.move(box["x"] + 150, box["y"] + box["height"] / 2, steps=5)
+    page.mouse.up()
+    page.wait_for_timeout(100)
+    w_an = page.evaluate("document.getElementById('anPanel').getBoundingClientRect().width")
+    assert w_an > 760
+    page.evaluate("closeAnalytics()")
+    page.click("#f4pTab")
+    w_f4p = page.evaluate("document.getElementById('f4pPanel').getBoundingClientRect().width")
+    assert w_f4p == w_an
+    assert page.evaluate("+localStorage.getItem('mapaPortfolioAnW')") == w_an

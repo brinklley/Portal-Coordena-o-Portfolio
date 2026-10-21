@@ -18,6 +18,7 @@
   --panel:#F7F8F9;
   --font:"Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,Roboto,"Helvetica Neue",Arial,sans-serif;
   --display:"Segoe UI Variable Display","Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;
+  --an-w:760px;
 }
 *{box-sizing:border-box}
 html,body{margin:0;height:100%}
@@ -397,9 +398,16 @@ tr[data-cat="disc"] .fnb{background:var(--c-disc);color:#fff} tr[data-cat="wip"]
 .side-tab.ready{animation:antab 1.6s ease-out 2}
 @keyframes antab{0%,100%{box-shadow:4px 6px 16px -10px rgba(0,0,0,.5)}40%{box-shadow:0 0 0 6px rgba(52,72,154,.35)}}
 .side-tab[aria-expanded="true"]{display:none}
-.an-panel{position:fixed;left:0;z-index:46;width:min(1180px,96vw);background:#fff;border-right:1px solid var(--line);box-shadow:14px 0 36px -18px rgba(0,0,0,.45);
+/* Largura ajustável (decisão `0068`): padrão bem mais estreito que o antigo fixo de 1180px, liberando
+   área do whiteboard por trás do painel para quem precisa navegar o quadro com o painel aberto; o
+   usuário arrasta a alça (.an-resize) para ajustar entre ANW_MIN e ANW_MAX (15-visao-analitica.js),
+   e a escolha fica salva (localStorage) entre sessões. */
+.an-panel{position:fixed;left:0;z-index:46;width:min(var(--an-w),96vw);min-width:0;background:#fff;border-right:1px solid var(--line);box-shadow:14px 0 36px -18px rgba(0,0,0,.45);
   transform:translateX(-102%);transition:transform .22s ease;display:flex;flex-direction:column}
 .an-panel.open{transform:none}
+.an-panel.resizing{transition:none;user-select:none}
+.an-resize{position:absolute;top:0;right:-6px;width:12px;height:100%;cursor:col-resize;z-index:2;touch-action:none}
+.an-resize:hover,.an-resize.active{background:rgba(52,72,154,.18)}
 .an-head{display:flex;align-items:flex-start;gap:14px;padding:16px 22px 10px;border-bottom:1px solid var(--line)}
 .an-title{flex:1;min-width:0}
 .an-title h2{margin:0;font-family:var(--display);font-size:24px;font-weight:600;letter-spacing:-.01em}
