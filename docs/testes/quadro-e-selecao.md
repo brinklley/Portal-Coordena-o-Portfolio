@@ -1,10 +1,12 @@
 # Testes: Board de Iniciativas — recolher/manter visíveis
 
-Cobre `tests/test_quadro_iniciativas.py` (9 testes). Trata do comportamento da lista de iniciativas
+Cobre `tests/test_quadro_iniciativas.py` (12 testes). Trata do comportamento da lista de iniciativas
 ao selecionar um card: por padrão recolhe para mostrar só a selecionada; com "Manter todas as
-iniciativas visíveis" ligado, mostra todas, com foco (destaque) na selecionada; e de clicar no
-whiteboard para fechar o painel lateral aberto. Ver `docs/telas.md` e decisões
-`0021-manter-iniciativas-visiveis.md` e `0065-clicar-no-whiteboard-fecha-painel-lateral.md`.
+iniciativas visíveis" ligado, mostra todas, com foco (destaque) na selecionada; de clicar no
+whiteboard para fechar o painel lateral aberto; e da largura ajustável do painel lateral. Ver
+`docs/telas.md` e decisões `0021-manter-iniciativas-visiveis.md`,
+`0065-clicar-no-whiteboard-fecha-painel-lateral.md` e
+`0068-painel-lateral-largura-ajustavel.md`.
 
 ## Regra: selecionar uma iniciativa recolhe as demais por padrão
 
@@ -107,3 +109,27 @@ só fecha num clique de verdade, sem deslocamento do mouse entre o pressionar e 
   `test_clicar_num_card_fecha_o_painel_mas_mantem_o_comportamento_normal_do_clique`,
   `test_arrastar_o_quadro_nao_fecha_o_painel`
 - **Relacionado**: decisão `0065-clicar-no-whiteboard-fecha-painel-lateral.md`.
+
+## Regra: a largura do painel lateral é ajustável, com padrão menor que o antigo (decisão 0068)
+
+**Garante que**: o painel (Visão Analítica/Report F4P/Actionable, compartilham `.an-panel`) tem largura
+padrão de 760px (antes, fixo em `min(1180px, 96vw)`) e uma alça na borda direita (`.an-resize`)
+permite arrastar entre 360px e 1180px — como o painel é `position:fixed` sobre o whiteboard (que
+sempre renderiza em largura cheia, nunca encolhe), reduzir a largura do painel aumenta diretamente a
+área do quadro visível ao lado dele.
+
+- **Dado**: um dos painéis aberto, viewport de teste (1500px).
+- **Então (sucesso)**: a largura do painel é 760px por padrão; arrastar a alça pra direita aumenta a
+  largura; arrastar bem além do limite mínimo trava em 360px (nunca menos).
+- **Cenário de falha coberto** (melhoria pedida pelo usuário, print anotado): com um painel aberto, a
+  área visível do quadro ficava pequena demais para navegar sem bater nas bordas — o usuário precisava
+  manter um painel aberto (para consultar números) e ao mesmo tempo mexer no quadro, mas não tinha
+  espaço para as duas coisas.
+- **Testes**: `test_painel_lateral_tem_largura_padrao_menor_que_a_antiga`,
+  `test_arrastar_a_alca_redimensiona_o_painel_dentro_dos_limites`
+- **A largura é uma preferência compartilhada pelos 3 painéis, e persiste entre sessões**: mudar a
+  largura com a Visão Analítica aberta também muda o Report F4P e o Actionable (todos usam a mesma
+  variável CSS `--an-w`); o valor escolhido é salvo em `localStorage` e aplicado na próxima abertura do
+  Portal.
+  - **Teste**: `test_largura_do_painel_persiste_e_vale_para_os_3_paineis`
+- **Relacionado**: decisão `0068-painel-lateral-largura-ajustavel.md`.

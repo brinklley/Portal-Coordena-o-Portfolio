@@ -19,6 +19,10 @@ guia são, em geral, complementos que você abre a partir daqui.
   num card ou numa área vazia — fecha o painel, sem precisar ir até o botão "«" no canto dele. Um
   card clicado continua respondendo normalmente (abre o nível abaixo, seleciona). Arrastar o quadro
   (pan) não fecha o painel — só um clique de verdade, sem arrastar.
+- **Largura do painel ajustável**: arraste a borda direita do painel (o cursor muda para ↔) para
+  diminuir ou aumentar o espaço do quadro visível ao lado dele — útil para manter um painel aberto e
+  ainda ter espaço confortável para navegar. A escolha vale para os 3 painéis (mudar a largura num
+  deles muda nos outros também) e fica lembrada da próxima vez que você abrir o Portal.
 - Cada nível, e cada time (no modo cadeia completa), é uma **ilha** com borda própria. Times são
   distribuídos em fileiras equilibradas (os maiores primeiro); uma coluna do fluxo com mais de 6 itens
   quebra automaticamente em subcolunas, para não ficar uma lista vertical enorme.
@@ -144,7 +148,8 @@ Veja `docs/guia-usuario/configuracoes.md` para como ajustar esses limites.
   [`0021`](../decisoes/0021-manter-iniciativas-visiveis.md) (manter iniciativas visíveis),
   [`0040`](../decisoes/0040-offsets-de-ilhas-descartados-por-contexto.md) (ilhas soltas — posição
   descartada por contexto), [`0065`](../decisoes/0065-clicar-no-whiteboard-fecha-painel-lateral.md)
-  (clicar no whiteboard fecha o painel lateral aberto).
+  (clicar no whiteboard fecha o painel lateral aberto),
+  [`0068`](../decisoes/0068-painel-lateral-largura-ajustavel.md) (largura do painel ajustável).
 - Detalhe exaustivo de cobertura de teste:
   [`docs/testes/hierarquia-e-modelo.md`](../testes/hierarquia-e-modelo.md),
   [`docs/testes/quadro-e-selecao.md`](../testes/quadro-e-selecao.md),

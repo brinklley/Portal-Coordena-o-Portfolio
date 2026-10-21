@@ -201,3 +201,34 @@ function closeDrawer(){ S.detailKey = null; $("drawer").classList.remove("open")
 $("dClose").onclick = closeDrawer;
 document.addEventListener("keydown", e => { if (e.key === "Escape") closeDrawer(); });
 
+/* ---------- largura ajustável dos painéis laterais (Visão analítica/F4P/Actionable) ---------- */
+/* decisão `0068`: pedido do usuário — com um painel aberto, a área visível do quadro (que fica por
+   trás do painel, nunca encolhe: .an-panel é position:fixed sobre o whiteboard, que continua em
+   largura cheia) sobrava pequena demais pra navegar. O padrão caiu de 1180px fixos pra 760px (CSS,
+   --an-w), e o usuário ainda pode arrastar a alça (.an-resize, borda direita do painel) pra ajustar
+   entre ANW_MIN e ANW_MAX — a escolha fica salva entre sessões (localStorage, preferência de
+   interface, não dado de negócio — não faz parte de CFG/exportação de configuração). */
+const ANW_MIN = 360, ANW_MAX = 1180, ANW_KEY = "mapaPortfolioAnW";
+function anwApply(w){ document.documentElement.style.setProperty("--an-w", w + "px"); }
+(() => { try { const w = +localStorage.getItem(ANW_KEY); if (w >= ANW_MIN && w <= ANW_MAX) anwApply(w); } catch(e){} })();
+document.querySelectorAll(".an-panel").forEach(panel => {
+  const h = document.createElement("div");
+  h.className = "an-resize"; h.setAttribute("aria-hidden", "true");
+  panel.appendChild(h);
+  let sx = 0, sw = 0, dragging = false;
+  h.addEventListener("pointerdown", e => {
+    dragging = true; sx = e.clientX; sw = panel.getBoundingClientRect().width;
+    h.setPointerCapture(e.pointerId); panel.classList.add("resizing");
+  });
+  h.addEventListener("pointermove", e => {
+    if (!dragging) return;
+    anwApply(Math.min(ANW_MAX, Math.max(ANW_MIN, Math.round(sw + (e.clientX - sx)))));
+  });
+  const endDrag = () => {
+    if (!dragging) return;
+    dragging = false; panel.classList.remove("resizing");
+    try { localStorage.setItem(ANW_KEY, Math.round(panel.getBoundingClientRect().width)); } catch(e){}
+  };
+  h.addEventListener("pointerup", endDrag); h.addEventListener("pointercancel", endDrag);
+});
+
