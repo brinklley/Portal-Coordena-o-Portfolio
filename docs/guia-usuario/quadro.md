@@ -34,6 +34,9 @@ guia são, em geral, complementos que você abre a partir daqui.
 
 - **Zoom/arrastar** o quadro inteiro, **minimapa** (canto da tela) para se orientar em cadeias
   grandes, e um **navegador de times** ("Ir para") para saltar direto a um time.
+- **Espaço para navegar**: a área que dá pra arrastar/rolar sempre tem uma margem em branco generosa
+  (meia tela, nos 4 lados) além do conteúdo carregado — pra sempre ter espaço de sobra pra mover a
+  câmera, sem "bater na borda" do quadro, mesmo com zoom bem reduzido.
 - **Ancorar/soltar ilhas**: por padrão as ilhas ficam ancoradas (um roteador em grade redesenha os
   barbantes contornando as ilhas automaticamente). Soltando uma ilha, você pode arrastá-la livremente
   para organizar a tela como preferir.
@@ -149,7 +152,9 @@ Veja `docs/guia-usuario/configuracoes.md` para como ajustar esses limites.
   [`0040`](../decisoes/0040-offsets-de-ilhas-descartados-por-contexto.md) (ilhas soltas — posição
   descartada por contexto), [`0065`](../decisoes/0065-clicar-no-whiteboard-fecha-painel-lateral.md)
   (clicar no whiteboard fecha o painel lateral aberto),
-  [`0068`](../decisoes/0068-painel-lateral-largura-ajustavel.md) (largura do painel ajustável).
+  [`0068`](../decisoes/0068-painel-lateral-largura-ajustavel.md) (largura do painel ajustável),
+  [`0069`](../decisoes/0069-margem-pannable-em-volta-do-conteudo.md) (margem pannable em volta do
+  conteúdo).
 - Detalhe exaustivo de cobertura de teste:
   [`docs/testes/hierarquia-e-modelo.md`](../testes/hierarquia-e-modelo.md),
   [`docs/testes/quadro-e-selecao.md`](../testes/quadro-e-selecao.md),
