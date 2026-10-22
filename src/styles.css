@@ -266,6 +266,9 @@ body.with-drawer .minimap,body.with-drawer .mm-open{right:436px}
 .card.tagged .c-extra{border-top-color:rgba(0,0,0,.2)}
 .tgs{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
 .tchp{white-space:nowrap;display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.02em;padding:1px 7px;border-radius:999px;border:1px solid rgba(0,0,0,.15)}
+/* decisão `0070`: selo agregado de tag no card do épico — clicável, abre a lista exata dos itens */
+.tchp.epi-tag{cursor:pointer}
+.tchp.epi-tag:hover,.tchp.epi-tag:focus-visible{outline:2px solid rgba(0,0,0,.35);outline-offset:1px}
 .al.info{border-left-color:#3B82C4;background:#EAF3FB} .al.info .lv{color:#1F5F99}
 .al.outlier{border-left-color:var(--outlier);background:#F3EAF8} .al.outlier .lv{color:var(--outlier)}
 .ctab input.bad{border-color:var(--alert);background:#FDF0EE}

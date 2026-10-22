@@ -9,7 +9,26 @@ vp.addEventListener("click", () => {
   else if (F4P.open) closeF4P();
   else if (ACT.open) closeActionable();
 });
+/* selo de tag no card do épico (decisão `0070`): é um AGREGADO ("N itens abertos dos times vinculados
+   com esta tag"), não a tag do próprio épico — clicar nele abre a lista exata dos itens que entram
+   nessa contagem (mesma transparência do Report F4P/Visão Analítica), em vez de só confiar no texto do
+   title. Checado antes da lógica de clique no card (abaixo) porque o selo fica dentro do card. */
+function epiTagClick(e){
+  const chip = e.target.closest("[data-epi-tag-id]"); if (!chip) return false;
+  const epi = S.model.epis.get(chip.dataset.epiTagEpi); if (!epi) return true;
+  const tagId = chip.dataset.epiTagId, tg = (CFG.tags || []).find(x => x.id === tagId);
+  const m = epiMetrics(epi, S.f.team);
+  const items = m.recs.filter(o => catOf(o) !== "vazao" && (o.tagHits || []).some(x => x.id === tagId));
+  f4pItemsModal(`Épico #${esc(epi.id)} · ${tg ? esc(tg.name) : esc(tagId)} nos times`, items);
+  return true;
+}
+board.addEventListener("keydown", e => {
+  if (e.key !== "Enter" && e.key !== " ") return;
+  if (!e.target.closest("[data-epi-tag-id]")) return;
+  e.preventDefault(); epiTagClick(e);
+});
 board.addEventListener("click", e => {
+  if (epiTagClick(e)) return;
   const c = e.target.closest(".card"); if (!c) return;
   const key = c.dataset.key; const [lvl, ...rest] = key.split(":"); const id = rest.join(":");
   // card revelado por "+N ocultos" (decisão 0050): está fora do filtro ativo (não em V), então só

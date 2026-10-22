@@ -108,6 +108,14 @@ avisa que falta desdobramento, em vez de mostrar "aberto" como se o trabalho já
 andamento. O mesmo vale para uma release com o selo "sem épico". Se a opção "Mostrar itens sem
 desdobramento" estiver desligada, esses casos somem do quadro em vez de aparecer com o selo.
 
+### "O card do épico mostra um selo de tag (ex. 'PAUSADO 1'), mas conferi o épico no Azure DevOps e ele não tem essa tag"
+
+O selo no card do épico **não é a tag do próprio épico** — é a soma de quantos itens dos times
+vinculados a ele, ainda abertos, têm aquela tag. Épicos normalmente não carregam esse tipo de tag;
+quem carrega é o item operacional (User Story, Task etc.) dentro de algum time. Clique no selo para
+ver a lista exata dos itens que entram na contagem — cada um leva direto até o item certo, inclusive
+em qual time ele está, para conferir a tag no lugar certo do Azure DevOps.
+
 ### "O painel de detalhes mostra um alerta amarelo (atenção) em vez de vermelho (atraso) para um item que já está demorando bastante"
 
 Os limites de CycleTime (quando vira "atenção", "atraso" ou "outlier") são configuráveis **por time**
@@ -154,9 +162,11 @@ Veja `docs/guia-usuario/configuracoes.md` para como ajustar esses limites.
   (clicar no whiteboard fecha o painel lateral aberto),
   [`0068`](../decisoes/0068-painel-lateral-largura-ajustavel.md) (largura do painel ajustável),
   [`0069`](../decisoes/0069-margem-pannable-em-volta-do-conteudo.md) (margem pannable em volta do
-  conteúdo).
+  conteúdo), [`0070`](../decisoes/0070-selo-de-tag-do-epico-clicavel.md) (selo de tag do épico
+  clicável).
 - Detalhe exaustivo de cobertura de teste:
   [`docs/testes/hierarquia-e-modelo.md`](../testes/hierarquia-e-modelo.md),
+  [`docs/testes/ct-alertas-tags.md`](../testes/ct-alertas-tags.md),
   [`docs/testes/quadro-e-selecao.md`](../testes/quadro-e-selecao.md),
   [`docs/testes/ilhas-e-cadeia-completa.md`](../testes/ilhas-e-cadeia-completa.md),
   [`docs/testes/ct-alertas-tags.md`](../testes/ct-alertas-tags.md).

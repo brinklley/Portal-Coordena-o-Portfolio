@@ -28,6 +28,61 @@ def test_tag_blocked_reconhecida(page):
     carregar(page, "times.xlsx")
     assert page.evaluate("[...S.model.ops.values()].filter(o=>o.tagHits.some(t=>t.id==='blocked')).length") > 0
 
+# Decisão 0070: pedido do usuário — o selo de tag no card do épico ("PAUSADO 1") é um AGREGADO dos
+# itens dos times vinculados a ele (não a tag do próprio épico), mas isso não ficava claro — o usuário
+# checou o épico no Azure DevOps (sem tag nenhuma) e achou que o Portal estava errado. O título do selo
+# já dizia "nos times", mas passou despercebido; agora o selo é clicável e abre a lista exata dos itens
+# que entram naquela contagem (mesma transparência do Report F4P/Visão Analítica).
+
+def _setup_epico_com_tag(page, *, team, sem=None):
+    """Épico com 3 itens de time: 1 reservado+aberto com a tag PAUSADO (deve contar), 1 aberto sem
+    tag (não deve contar) e 1 já entregue (Vazão) com a mesma tag PAUSADO (não deve contar — o selo só
+    soma itens ainda abertos)."""
+    page.evaluate("""(args)=>{
+      const {team} = args;
+      S.model.teamFlow[team] = ["Backlog", "WIP", "Vazao"];
+      CFG.flow[norm(team)] = {cat:{wip:"wip", vazao:"vazao"}, ct:[]};
+      const mk = (id, stName, tags, deploy) => S.model.ops.set(id, {id, title:"Item "+id, team, type:"User Story", stName,
+        deploy: deploy ? new Date(2026,0,5) : null, ready: new Date(2026,0,1), tags: tags || []});
+      mk(team+"_aberto_pausado", "Backlog", ["PAUSADO"], false);
+      mk(team+"_aberto_sem_tag", "WIP", [], false);
+      mk(team+"_entregue_pausado", "Vazao", ["PAUSADO"], true);
+      const iniId = "INI_"+team, relId = "REL_"+team, epiId = "EPI_"+team;
+      S.model.inis.set(iniId, {lvl:"ini", id:iniId, valid:true, title:"Iniciativa "+team, exec:null, owner:null, st:0, rels:[relId]});
+      S.model.rels.set(relId, {lvl:"rel", id:relId, valid:true, title:"Release "+team, parent:iniId, st:0, epis:[epiId]});
+      S.model.epis.set(epiId, {lvl:"epi", id:epiId, valid:true, title:"Épico "+team, parent:relId, target:null, interno:null, st:0,
+        ops:[team+"_aberto_pausado", team+"_aberto_sem_tag", team+"_entregue_pausado"], type:"Epic"});
+      S.f.team = ""; S.path = {ini:iniId, rel:relId}; S.expand = false;
+      recomputeHealth(); render();
+    }""", {"team": team})
+
+def test_selo_de_tag_do_epico_conta_so_itens_abertos_dos_times(page):
+    carregar(page, "f4p.xlsx")
+    _setup_epico_com_tag(page, team="ETAG1")
+    d = page.evaluate("epiMetrics(S.model.epis.get('EPI_ETAG1'), '').tagCount")
+    assert d.get("paused") == 1   # só o item aberto com a tag; o entregue não entra
+
+def test_clique_no_selo_da_tag_abre_a_lista_exata_dos_itens(page):
+    """Mesma transparência do Report F4P/Visão Analítica: o modal mostra exatamente os itens que
+    entram na contagem do selo — nem o item sem a tag, nem o item já entregue com a mesma tag."""
+    carregar(page, "f4p.xlsx")
+    _setup_epico_com_tag(page, team="ETAG2")
+    page.click('[data-epi-tag-epi="EPI_ETAG2"][data-epi-tag-id="paused"]')
+    assert page.is_visible("#f4pItemsBg")
+    assert page.locator("#f4pItemsBody tbody tr").count() == 1
+    assert "ETAG2_aberto_pausado" in page.inner_text("#f4pItemsBody")
+    assert "ETAG2_entregue_pausado" not in page.inner_text("#f4pItemsBody")
+    assert "ETAG2_aberto_sem_tag" not in page.inner_text("#f4pItemsBody")
+
+def test_clique_no_selo_da_tag_nao_seleciona_o_epico(page):
+    """O selo fica dentro do card do épico — clicar nele deve abrir só o modal, sem também disparar o
+    comportamento normal de clique no card (selecionar/navegar o épico)."""
+    carregar(page, "f4p.xlsx")
+    _setup_epico_com_tag(page, team="ETAG3")
+    assert page.evaluate("S.path.epi") != "EPI_ETAG3"
+    page.click('[data-epi-tag-epi="EPI_ETAG3"][data-epi-tag-id="paused"]')
+    assert page.evaluate("S.path.epi") != "EPI_ETAG3"
+
 def test_ct_do_epico_so_com_tipos_configurados(page):
     carregar(page, "times.xlsx")
     m = page.evaluate("(()=>{const e=[...S.model.epis.values()].find(e=>e.ops.length>3); const m=epiMetrics(e,''); return {n:m.n, ctN:m.ctN}})()")
