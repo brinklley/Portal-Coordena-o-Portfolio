@@ -194,6 +194,8 @@ Cada alerta traz: diagnóstico com a meta como referência (ex.: "Já consumiu 9
 - O card do item ganha a cor de fundo da primeira tag encontrada (ordem da configuração) e o texto se ajusta para contraste.
 - Alertas de tag só para itens **abertos** (fora da Vazão).
 - Tags são editáveis e é possível cadastrar novas.
+- **A tag é sempre o estado atual do item** (`System.Tags`, buscado ao vivo do Azure DevOps a cada carga) — nunca um estado histórico; o único uso do histórico (`WorkItemRevisions`) é calcular há quantos dias um item **já bloqueado agora** está nessa condição.
+- **Selo de tag no card do épico** (ex. `PAUSADO 1`): é um **agregado**, não a tag do próprio épico — soma quantos itens dos times vinculados ao épico, ainda abertos, têm aquela tag. É clicável: abre a lista exata dos itens que entram na soma (decisão `0070`).
 
 ## 10. Visão analítica
 

@@ -1,7 +1,8 @@
 # Testes: CycleTime, alertas e tags
 
-Cobre `tests/test_ct_alertas_tags.py` (4 testes). Ver `docs/regras-de-negocio.md` §6 (CycleTime),
-§8 (Alertas) e §9 (Tags cadastradas).
+Cobre `tests/test_ct_alertas_tags.py` (7 testes). Ver `docs/regras-de-negocio.md` §6 (CycleTime),
+§8 (Alertas) e §9 (Tags cadastradas) e decisão
+[`0070`](../decisoes/0070-selo-de-tag-do-epico-clicavel.md).
 
 ## Regra: CT do item é a diferença entre Ready e Pronto para Deploy
 
@@ -45,6 +46,29 @@ mecanismo de `tagHits` para a tag configurável de expedição).
   ligeiramente diferente (maiúsculas, espaço), deixaria de ser reconhecida.
 - **Teste**: `test_tag_blocked_reconhecida`
 - **Relacionado**: regras-de-negocio.md §9.
+
+## Regra: o selo de tag no card do épico é um agregado dos itens dos times, clicável (decisão 0070)
+
+**Garante que**: o selo de tag no card do épico (ex. `PAUSADO 1`) soma quantos itens dos times
+vinculados ao épico, **ainda abertos** (fora da Vazão), têm aquela tag — não é a tag do próprio épico
+— e é clicável, abrindo a lista exata dos itens que entram na soma (mesma transparência do Report
+F4P/Visão Analítica).
+
+- **Dado**: um épico com 3 itens — 1 aberto com a tag PAUSADO, 1 aberto sem tag, 1 já entregue
+  (Vazão) com a mesma tag PAUSADO.
+- **Então (sucesso)**: `epiMetrics(epi, '').tagCount.paused === 1` (só o item aberto); clicar no selo
+  abre o modal com exatamente 1 linha, o item aberto — nem o sem tag, nem o já entregue.
+- **Cenário de falha coberto** (relatado pelo usuário): o usuário conferiu a tag do **épico** no Azure
+  DevOps (vazia — épicos não carregam esse tipo de tag) achando que era a mesma coisa que o selo
+  mostrava, e concluiu (incorretamente) que o Portal estava com dado desatualizado. O selo não deixava
+  claro, de forma acionável, que era um agregado dos itens dos times, nem qual item específico
+  carregava a tag.
+- **Testes**: `test_selo_de_tag_do_epico_conta_so_itens_abertos_dos_times`,
+  `test_clique_no_selo_da_tag_abre_a_lista_exata_dos_itens`
+- **Clicar no selo não também seleciona/navega o épico** (o selo fica dentro do card clicável do
+  épico).
+  - **Teste**: `test_clique_no_selo_da_tag_nao_seleciona_o_epico`
+- **Relacionado**: decisão `0070-selo-de-tag-do-epico-clicavel.md`.
 
 ## Regra: CT do épico só considera os tipos de item configurados para CT
 

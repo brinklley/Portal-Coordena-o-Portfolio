@@ -255,7 +255,7 @@ function card(it, forceDim){
       <div class="c-title">${esc(it.title)}</div>
       <div class="c-meta"><span>Target <b>${fmt(it.target)}</b></span><span title="${esc("CT" + ctRange(m) + ", " + ctTip(m))}">CT <b>${m.ct ?? "--"}</b>${m.ct != null ? " d" : ""}</span><span>Ag. Deploy <b>${fmt(m.ag)}</b></span>
       ${distGroup(m)}
-      ${Object.keys(m.tagCount).length ? `<span class="tgs" style="margin:2px 0 0;width:100%">${(CFG.tags || []).filter(x => m.tagCount[x.id]).map(x => `<span class="tchp" style="background:${x.color};color:${inkOn(x.color)}" title="${m.tagCount[x.id]} ${m.tagCount[x.id] === 1 ? "item aberto" : "itens abertos"} com ${esc(x.name)} nos times">${esc(x.name)} ${m.tagCount[x.id]}</span>`).join("")}</span>` : ""}
+      ${Object.keys(m.tagCount).length ? `<span class="tgs" style="margin:2px 0 0;width:100%">${(CFG.tags || []).filter(x => m.tagCount[x.id]).map(x => `<span class="tchp epi-tag" role="button" tabindex="0" data-epi-tag-epi="${esc(it.id)}" data-epi-tag-id="${esc(x.id)}" style="background:${x.color};color:${inkOn(x.color)}" title="${m.tagCount[x.id]} ${m.tagCount[x.id] === 1 ? "item aberto" : "itens abertos"} com ${esc(x.name)} nos times — não é a tag do próprio épico. Clique para ver os itens exatos.">${esc(x.name)} ${m.tagCount[x.id]}</span>`).join("")}</span>` : ""}
       ${it.diverge ? `<span class="tag div" title="Roadmap interno diferente do executivo da iniciativa">Int ${esc(shortSem(it.interno))} ≠ Exec ${esc(shortSem(it.exec))}</span>` : ""}</div>${extraHtml(it)}
       <div class="kids" style="align-items:center">${distBar(m)}<span class="ph ${m.phase}" title="Fase pelos itens vinculados nos times">${PHASE_LABEL[m.phase]}</span></div></button>`;
   }
