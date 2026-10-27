@@ -205,7 +205,7 @@ function actLateDeliveries(st, ad){
    bug configurados (CFG.act.bugTypes, padrão bug/internal bug/external bug, excluídos por inteiro da
    amostra) — quanto % é User Story (mesmo critério do quadrante User Story do Report F4P, §12.8:
    `CFG.f4p.usTypes`), quanto % é Technical Story (mesmo critério do quadrante Technical Story do Report
-   F4P, §12.5: tipo fixo "technical story") e quanto % é "demais" (o resto da amostra, sem bugs). Um mês
+   F4P, §12.5: `CFG.f4p.tsTypes`) e quanto % é "demais" (o resto da amostra, sem bugs). Um mês
    sem nenhum item na amostra — sem entregas no mês, ou todas bug — mostra uma barra cinza cheia com
    "0,00%"; isso cobre, de propósito, os meses ainda não decorridos de um semestre em curso: o gráfico
    sempre mostra os 6 meses do semestre (não só os já decorridos), para o usuário ver de antemão o que
@@ -237,10 +237,10 @@ function actDistItems(team, month){
 }
 function actDistBuckets(team, month){
   const items = actDistItems(team, month);
-  const usTypes = f4pUsTypes();
+  const usTypes = f4pUsTypes(), tsTypes = f4pTsTypes();
   const us = items.filter(o => usTypes.has(norm(o.type)));
-  const ts = items.filter(o => norm(o.type) === "technical story");
-  const demais = items.filter(o => !usTypes.has(norm(o.type)) && norm(o.type) !== "technical story");
+  const ts = items.filter(o => tsTypes.has(norm(o.type)));
+  const demais = items.filter(o => !usTypes.has(norm(o.type)) && !tsTypes.has(norm(o.type)));
   return {items, us, ts, demais};
 }
 function actDistData(team, st){

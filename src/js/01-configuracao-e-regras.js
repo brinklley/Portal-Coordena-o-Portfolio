@@ -9,7 +9,8 @@ const cfgDefaults = () => ({teams:{}, warnDays:30, alertDays:60, outlierDays:90,
   ctTypes:["user story","technical story","technical solution"], tags:TAG_DEFAULTS(),
   typeColors:{ini:{}, rel:{}, epi:{}, op:{}}, fields:{ini:[], rel:[], epi:[], op:[]}, ctCols:null, flow:{},
   anTag:"ROADMAP", anClassCol:"Classificação_Despesas_Comitê", anFreeze:10,
-  f4p:{months:6, types:["user story","technical story"], expediteTag:"urgent", epiTypes:["epic"], usTypes:["user story"], effTypes:[], teams:{}},
+  f4p:{months:6, types:["user story","technical story"], expediteTag:"urgent", epiTypes:["epic"], usTypes:["user story"],
+    tsTypes:["technical story"], effTypes:[], teams:{}},
   act:{bugTypes:["bug","internal bug","external bug"], cfdIncludeBugs:true},
   azure:{orgs:[], sources:[], maps:{}, mapMeta:{}, fields:{epic:"ID_EPICO_UNICRED", roadmap:"AnoSemestreRoadmap"}, excludeRemoved:true}});
 /* aceita configurações antigas (ctMax + warnPct) e converte para limites por time */
@@ -26,6 +27,7 @@ function normCfg(j){
     expediteTag: typeof jf.expediteTag === "string" && jf.expediteTag ? jf.expediteTag : f4pD.expediteTag,
     epiTypes: Array.isArray(jf.epiTypes) && jf.epiTypes.length ? jf.epiTypes : f4pD.epiTypes,
     usTypes: Array.isArray(jf.usTypes) && jf.usTypes.length ? jf.usTypes : f4pD.usTypes,
+    tsTypes: Array.isArray(jf.tsTypes) && jf.tsTypes.length ? jf.tsTypes : f4pD.tsTypes,
     // vazio é uma configuração válida aqui (significa "todos os tipos", padrão do quadrante Eficiência
     // de fluxo) — diferente dos demais campos de tipo acima, que caem no padrão quando vazios.
     effTypes: Array.isArray(jf.effTypes) ? jf.effTypes : f4pD.effTypes,

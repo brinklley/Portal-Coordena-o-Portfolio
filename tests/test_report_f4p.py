@@ -421,6 +421,43 @@ def test_ts_meta_zero_e_valida(page):
     page.click("#cfgSave"); page.wait_for_timeout(200)
     assert page.evaluate("CFG.f4p.teams.core") == {"tsMeta": 0}
 
+# Decisão 0071: até aqui, Technical Story era o único dos três recortes por tipo (Vazão/Technical
+# Story/User Story) com o tipo travado em "technical story" — diferente de User Story e Vazão, que já
+# usavam uma lista configurável própria (`usTypes`/`types`). O usuário habilitou o artefato "Activity"
+# em `CFG.f4p.types` (Vazão) esperando que contasse na vazão, mas a Conferência divergente sinalizava —
+# corretamente, já que nenhum dos outros dois quadrantes cobria "Activity". `CFG.f4p.tsTypes` (padrão
+# ["technical story"]) resolve isso no mesmo padrão de `usTypes`: o usuário decide explicitamente que
+# "Activity" conta como Technical Story, incluindo-o também nessa lista.
+
+def test_ts_usa_tipos_configuraveis_proprios_independentes_do_vazao(page):
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.teamFlow.F4P_TS5 = ["Backlog", "Vazao"];
+      CFG.flow.f4p_ts5 = {cat:{vazao:"vazao"}, ct:[]};
+      CFG.f4p.tsTypes = ["activity"];
+      const hoje = new Date();
+      S.model.ops.set("a1", {team:"F4P_TS5", type:"Activity", stName:"Vazao", deploy:hoje});
+      S.model.ops.set("a2", {team:"F4P_TS5", type:"Technical Story", stName:"Vazao", deploy:hoje});   // não é mais o tipo configurado
+      S.f.exec = semestre(TODAY);
+      const n = f4pTsRealizado("F4P_TS5", f4pSemesterState());
+      CFG.f4p.tsTypes = ["technical story"];
+      return n;
+    }""")
+    assert r == 1
+
+def test_configuracao_ts_types_tem_padrao_technical_story(page):
+    r = page.evaluate("()=>{ const c = normCfg({}); return c.f4p.tsTypes; }")
+    assert r == ["technical story"]
+
+def test_configuracao_ts_types_persiste_e_entra_na_exportacao(page):
+    carregar(page, "times.xlsx")
+    page.evaluate("()=>{ CFG.f4p.tsTypes = ['technical story', 'activity']; }")
+    page.click("#btnCfg")
+    with page.expect_download() as d:
+        page.click("#cfgExport")
+    txt = open(d.value.path(), encoding="utf-8").read()
+    assert '"tsTypes"' in txt and '"activity"' in txt
+
 # ---------------- Situação dos itens (Urgente e Technical Story) ----------------
 # Decisão 0019: a lista de itens (clique no Realizado) mostra a mesma categoria de coluna do resto do
 # portal (Backlog/Discovery/WIP/Vazão, mapeada por time em Configurações — catOf/CAT_LABEL), não um
@@ -1671,6 +1708,29 @@ def test_reconciliacao_sinaliza_divergencia_quando_configuracao_de_tipos_diverge
       return rec;
     }""")
     assert r == {"team": "DIVERGE", "vazao": 2, "ts": 0, "planejado": 0, "naoPlanejado": 1, "soma": 1, "ok": False}
+
+def test_reconciliacao_nao_sinaliza_quando_tipo_extra_entra_em_ts_types(page):
+    """Cenário real reportado pelo usuário: habilitou "Activity" em CFG.f4p.types (Vazão) e a
+    conferência divergia, porque Technical Story não cobria o tipo novo. Incluir "Activity" também em
+    CFG.f4p.tsTypes (decisão 0071) resolve sem precisar de uma terceira categoria "outros": o item passa
+    a contar como Technical Story para fins da conferência, igual a qualquer outro tipo incluído ali."""
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.teamFlow.ATIVIDADE = ["Backlog", "Vazao"];
+      CFG.flow.atividade = {cat:{vazao:"vazao"}, ct:[]};
+      CFG.f4p.types = ["user story", "technical story", "activity"];
+      CFG.f4p.tsTypes = ["technical story", "activity"];
+      S.model.teams.push("ATIVIDADE");
+      S.f.team = "ATIVIDADE"; S.f.exec = semestre(TODAY);
+      const hoje = new Date();
+      S.model.ops.set("act1", {team:"ATIVIDADE", type:"Activity", stName:"Vazao", deploy:hoje, tags:[]});
+      S.model.ops.set("us1", {team:"ATIVIDADE", type:"User Story", stName:"Vazao", deploy:hoje, tags:[]});
+      render();
+      const rec = f4pReconciliacao().find(x => x.team === "ATIVIDADE");
+      CFG.f4p.types = ["user story", "technical story"]; CFG.f4p.tsTypes = ["technical story"];
+      return rec;
+    }""")
+    assert r == {"team": "ATIVIDADE", "vazao": 2, "ts": 1, "planejado": 0, "naoPlanejado": 1, "soma": 2, "ok": True}
 
 def test_reconciliacao_banner_aparece_so_quando_ha_divergencia(page):
     carregar(page, "f4p.xlsx")

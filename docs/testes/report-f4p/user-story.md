@@ -1,7 +1,7 @@
 # Testes: Report F4P — Quadrante 7 (User Story: reservado vs. planejado outro semestre vs. não planejado) + conferência cruzada
 
 Ver `docs/testes/report-f4p/README.md` para as regras compartilhadas. Regras de negócio: §12.8.
-Decisões `0030`, `0043`.
+Decisões `0030`, `0043`, `0071`.
 
 Mesmo critério de "entregue" (categoria de fluxo Vazão) do Technical Story/Vazão, mas com **tipos
 próprios** (`CFG.f4p.usTypes`, padrão `["user story"]`, independentes de `CFG.f4p.types` do CT).
@@ -87,7 +87,7 @@ usado pela conferência cruzada (decisão `0043`).
 
 ---
 
-## Conferência cruzada: Vazão × Technical Story × User Story (decisão `0030`)
+## Conferência cruzada: Vazão × Technical Story × User Story (decisões `0030`, `0071`)
 
 **Garante que**: para qualquer time, Vazão Realizado é sempre igual à soma de Technical Story
 Realizado + User Story Planejado + User Story Não planejado — mesmo universo de itens entregues no
@@ -120,6 +120,22 @@ esconder a diferença.
 - **Cenário de falha coberto**: uma configuração de tipos inconsistente entre os quadrantes passaria
   despercebida — os três números pareceriam corretos individualmente, mas não bateriam entre si, e
   ninguém perceberia sem essa checagem explícita.
+
+### Regra: incluir o tipo extra em Technical Story (ou User Story) resolve a divergência, sem um bucket "Outros" automático
+
+**Garante que**: a decisão `0030` continua sinalizando qualquer tipo de `CFG.f4p.types` não coberto por
+`tsTypes` nem por `usTypes` — mas agora, desde a decisão `0071`, o usuário tem como resolver: incluir o
+tipo extra (ex. "Activity") também em `CFG.f4p.tsTypes` (ou em `usTypes`) faz ele contar normalmente na
+soma, sem mais aviso. Foi uma escolha deliberada **não** criar uma terceira categoria "Outros" que
+absorvesse automaticamente qualquer tipo não coberto — isso faria a soma bater sempre, por construção,
+e a conferência nunca mais pegaria uma configuração realmente inconsistente.
+
+- **Dado**: `CFG.f4p.types` e `CFG.f4p.tsTypes` incluem `"activity"` (além dos tipos padrão); 1 Activity
+  entregue (agora conta como Technical Story) + 1 User Story sem tag entregue.
+- **Então (sucesso)**: `{team, vazao:2, ts:1, planejado:0, naoPlanejado:1, soma:2, ok:True}` — sem
+  divergência, mesmo com o tipo extra.
+- **Teste**: `test_reconciliacao_nao_sinaliza_quando_tipo_extra_entra_em_ts_types`
+- **Relacionado**: decisão `0071-f4p-technical-story-tipo-configuravel.md`.
 
 ### Regra: o banner de divergência só aparece quando há divergência real
 
