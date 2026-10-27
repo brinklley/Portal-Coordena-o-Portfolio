@@ -70,20 +70,24 @@ Urgente, que conta item aberto normalmente.
 
 ### "A soma de Vazão não bate com Technical Story + User Story. O que isso significa?"
 
-É um alerta de propósito, não um bug: um aviso aparece no topo do painel quando a soma **Technical
-Story Realizado + User Story Planejado (Reservado + Planejado outro semestre) + User Story Não
-planejado** não bate com o **Vazão Realizado** do mesmo time. Como os três quadrantes usam listas de
-tipo configuráveis separadamente (`CFG.f4p.types` para Vazão/CycleTime, `CFG.f4p.tsTypes` para
-Technical Story, `CFG.f4p.usTypes` para User Story), uma mudança de configuração num dos três sem
-ajustar os outros produz essa divergência — o aviso mostra os números exatos de cada lado para
-investigar a configuração de tipos.
+A soma completa é **Technical Story Realizado + User Story Planejado (Reservado + Planejado outro
+semestre) + User Story Não planejado + Demais**, e ela deveria sempre bater com o **Vazão Realizado** do
+mesmo time. "Demais" são os itens do Vazão Realizado cujo tipo não está nem na lista de tipos de
+Technical Story nem na de User Story — o Portal soma isso **automaticamente**, sem você precisar
+configurar nada a mais.
 
 **Caso comum**: você marcou um tipo novo (ex. "Activity") na lista de tipos da Vazão, em
-Configurações › Report F4P, esperando que ele contasse no Vazão Realizado — e o aviso apareceu. Isso
-acontece porque nem a lista de Technical Story nem a de User Story sabem que "Activity" existe, então a
-soma dos dois fica menor que a Vazão. A correção é simples: inclua "Activity" também na lista de
-tipos de Technical Story (ou de User Story, se fizer mais sentido pro seu time) — a conferência passa a
-bater, porque agora os três quadrantes concordam sobre a que esse tipo equivale.
+Configurações › Report F4P, esperando que ele contasse no Vazão Realizado. Isso já funciona sozinho: o
+item entra em "Demais", a soma bate, e um aviso **informativo** (azul, não um erro) aparece no topo do
+painel mostrando quantos itens "Demais" existem por time — clique no número para ver exatamente quais
+são. Se "Activity" conceitualmente deveria contar como Technical Story (ou User Story) para o seu time
+— por exemplo, para entrar também na meta do quadrante Technical Story — inclua-o na lista de tipos
+correspondente em Configurações; aí ele sai de "Demais" e passa a contar lá.
+
+Já um aviso **vermelho** ("Conferência divergente") é sempre um erro de configuração de verdade: a soma
+ficou **maior** que o Vazão Realizado, o que só acontece quando a lista de tipos de Technical Story ou de
+User Story inclui um tipo que a lista da Vazão não cobre, ou quando o mesmo tipo está nas duas listas ao
+mesmo tempo (contado em dobro). Confira as três listas de tipos em Configurações › Report F4P.
 
 ### "Não entendo a diferença entre 'Reserva' e 'Reserva entregue' no quadrante Vazão"
 

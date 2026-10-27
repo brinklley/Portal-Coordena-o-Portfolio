@@ -1666,11 +1666,12 @@ def test_configuracao_us_types_persiste_e_entra_na_exportacao(page):
     txt = open(d.value.path(), encoding="utf-8").read()
     assert '"usTypes"' in txt and '"feature"' in txt
 
-# ---------------- Conferência cruzada Vazão × Technical Story × User Story (decisão 0030) ----------------
+# ---------------- Conferência cruzada Vazão × Technical Story × User Story (decisões 0030, 0072) ----------------
 # O usuário pediu uma validação explícita: Vazão Realizado deve ser sempre igual à soma de Technical
-# Story Realizado + User Story Planejado + User Story Não planejado (mesmo universo de itens entregues
-# no período, recortado por tipo). Exemplo exato dado pelo usuário: MOBILE com 38 no Vazão Realizado,
-# distribuídos em 27 Technical Story + 4 User Story planejado + 7 User Story não planejado (38 = 27+4+7).
+# Story Realizado + User Story Planejado + User Story Não planejado + Demais (mesmo universo de itens
+# entregues no período, recortado por tipo). Exemplo exato dado pelo usuário: MOBILE com 38 no Vazão
+# Realizado, distribuídos em 27 Technical Story + 4 User Story planejado + 7 User Story não planejado
+# (38 = 27+4+7, sem nenhum item "Demais").
 
 def test_reconciliacao_bate_com_o_exemplo_exato_do_usuario(page):
     carregar(page, "f4p.xlsx")
@@ -1686,12 +1687,14 @@ def test_reconciliacao_bate_com_o_exemplo_exato_do_usuario(page):
       render();
       return f4pReconciliacao().find(x => x.team === "MOBILE_RECON");
     }""")
-    assert r == {"team": "MOBILE_RECON", "vazao": 38, "ts": 27, "planejado": 4, "naoPlanejado": 7, "soma": 38, "ok": True}
+    assert r == {"team": "MOBILE_RECON", "vazao": 38, "ts": 27, "planejado": 4, "naoPlanejado": 7, "demais": 0, "soma": 38, "ok": True}
 
-def test_reconciliacao_sinaliza_divergencia_quando_configuracao_de_tipos_diverge(page):
-    """Se CFG.f4p.types (Vazão) contar um tipo que os outros dois quadrantes não cobrem (ex.: um
-    terceiro tipo além de Technical Story e dos tipos de User Story), a soma diverge — e é exatamente
-    esse erro de configuração que a conferência deve sinalizar."""
+def test_reconciliacao_tipo_extra_na_vazao_conta_como_demais_sem_divergir(page):
+    """Decisão 0072: cenário real reportado pelo usuário. Habilitou "Internal Bug" em CFG.f4p.types
+    (Vazão) esperando que contasse no Vazão Realizado — antes da 0072, isso só fazia a soma divergir
+    (ok:False), sem explicar a diferença. Agora o item entra automaticamente em "Demais" (não precisa de
+    configuração extra em tsTypes/usTypes) e a soma bate, com o próprio "Demais" mostrando a quantidade
+    exata que compõe a diferença."""
     carregar(page, "f4p.xlsx")
     r = page.evaluate("""()=>{
       S.model.teamFlow.DIVERGE = ["Backlog", "Vazao"];
@@ -1707,13 +1710,34 @@ def test_reconciliacao_sinaliza_divergencia_quando_configuracao_de_tipos_diverge
       CFG.f4p.types = ["user story", "technical story"];
       return rec;
     }""")
-    assert r == {"team": "DIVERGE", "vazao": 2, "ts": 0, "planejado": 0, "naoPlanejado": 1, "soma": 1, "ok": False}
+    assert r == {"team": "DIVERGE", "vazao": 2, "ts": 0, "planejado": 0, "naoPlanejado": 1, "demais": 1, "soma": 2, "ok": True}
+
+def test_reconciliacao_sinaliza_divergencia_quando_ts_ou_us_contam_item_fora_da_vazao(page):
+    """"Demais" só absorve itens que a própria Vazão já conta (não existe "demais negativo") — então a
+    conferência ainda sinaliza um erro real (ok:False) quando Technical Story ou User Story contam um
+    item de um tipo que `CFG.f4p.types` (Vazão) não cobre: a soma passa a ultrapassar o Vazão Realizado,
+    e não há como "Demais" corrigir isso automaticamente."""
+    carregar(page, "f4p.xlsx")
+    r = page.evaluate("""()=>{
+      S.model.teamFlow.DIVERGETS = ["Backlog", "Vazao"];
+      CFG.flow.divergets = {cat:{vazao:"vazao"}, ct:[]};
+      CFG.f4p.tsTypes = ["technical story", "technical solution"];   // "technical solution" não está em CFG.f4p.types
+      S.model.teams.push("DIVERGETS");
+      S.f.team = "DIVERGETS"; S.f.exec = semestre(TODAY);
+      const hoje = new Date();
+      S.model.ops.set("tsol1", {team:"DIVERGETS", type:"Technical Solution", stName:"Vazao", deploy:hoje, tags:[]});
+      S.model.ops.set("us1", {team:"DIVERGETS", type:"User Story", stName:"Vazao", deploy:hoje, tags:[]});
+      render();
+      const rec = f4pReconciliacao().find(x => x.team === "DIVERGETS");
+      CFG.f4p.tsTypes = ["technical story"];
+      return rec;
+    }""")
+    assert r == {"team": "DIVERGETS", "vazao": 1, "ts": 1, "planejado": 0, "naoPlanejado": 1, "demais": 0, "soma": 2, "ok": False}
 
 def test_reconciliacao_nao_sinaliza_quando_tipo_extra_entra_em_ts_types(page):
-    """Cenário real reportado pelo usuário: habilitou "Activity" em CFG.f4p.types (Vazão) e a
-    conferência divergia, porque Technical Story não cobria o tipo novo. Incluir "Activity" também em
-    CFG.f4p.tsTypes (decisão 0071) resolve sem precisar de uma terceira categoria "outros": o item passa
-    a contar como Technical Story para fins da conferência, igual a qualquer outro tipo incluído ali."""
+    """Incluir o tipo extra também em CFG.f4p.tsTypes (decisão 0071) continua funcionando como antes: o
+    item passa a contar como Technical Story em vez de cair em "Demais" — útil quando o tipo extra
+    conceitualmente equivale a Technical Story para o time."""
     carregar(page, "f4p.xlsx")
     r = page.evaluate("""()=>{
       S.model.teamFlow.ATIVIDADE = ["Backlog", "Vazao"];
@@ -1730,26 +1754,68 @@ def test_reconciliacao_nao_sinaliza_quando_tipo_extra_entra_em_ts_types(page):
       CFG.f4p.types = ["user story", "technical story"]; CFG.f4p.tsTypes = ["technical story"];
       return rec;
     }""")
-    assert r == {"team": "ATIVIDADE", "vazao": 2, "ts": 1, "planejado": 0, "naoPlanejado": 1, "soma": 2, "ok": True}
+    assert r == {"team": "ATIVIDADE", "vazao": 2, "ts": 1, "planejado": 0, "naoPlanejado": 1, "demais": 0, "soma": 2, "ok": True}
 
-def test_reconciliacao_banner_aparece_so_quando_ha_divergencia(page):
+def test_reconciliacao_clique_no_demais_abre_a_lista_exata_dos_itens(page):
+    """Mesma transparência do resto do Report F4P: "Demais" é clicável e abre só os itens que compõem
+    essa contagem — nem os de Technical Story, nem os de User Story."""
+    carregar(page, "f4p.xlsx")
+    page.evaluate("""()=>{
+      S.model.teamFlow.DEMAISCLK = ["Backlog", "Vazao"];
+      CFG.flow.demaisclk = {cat:{vazao:"vazao"}, ct:[]};
+      CFG.f4p.types = ["user story", "technical story", "internal bug"];
+      S.model.teams.push("DEMAISCLK");
+      S.f.team = "DEMAISCLK"; S.f.exec = semestre(TODAY);
+      const hoje = new Date();
+      S.model.ops.set("ib1", {id:"ib1", team:"DEMAISCLK", type:"Internal Bug", stName:"Vazao", deploy:hoje, tags:[]});
+      S.model.ops.set("us1", {id:"us1", team:"DEMAISCLK", type:"User Story", stName:"Vazao", deploy:hoje, tags:[]});
+      render();
+    }""")
+    page.click("#f4pTab")
+    page.click('button[data-f4p-recon-demais-team="DEMAISCLK"]')
+    assert page.is_visible("#f4pItemsBg")
+    assert page.locator("#f4pItemsBody tbody tr").count() == 1
+    assert "ib1" in page.inner_text("#f4pItemsBody")
+    assert "us1" not in page.inner_text("#f4pItemsBody")
+    page.evaluate("()=>{ CFG.f4p.types = ['user story', 'technical story']; }")
+
+def test_reconciliacao_banner_vermelho_so_aparece_quando_ha_divergencia_real(page):
     carregar(page, "f4p.xlsx")
     page.evaluate("""()=>{
       S.model.teamFlow.DIVERGE2 = ["Backlog", "Vazao"];
       CFG.flow.diverge2 = {cat:{vazao:"vazao"}, ct:[]};
-      CFG.f4p.types = ["user story", "technical story", "internal bug"];
+      CFG.f4p.tsTypes = ["technical story", "technical solution"];
       S.model.teams.push("DIVERGE2");
       S.f.team = "DIVERGE2"; S.f.exec = semestre(TODAY);
       const hoje = new Date();
-      S.model.ops.set("ib1", {team:"DIVERGE2", type:"Internal Bug", stName:"Vazao", deploy:hoje, tags:[]});
+      S.model.ops.set("tsol1", {team:"DIVERGE2", type:"Technical Solution", stName:"Vazao", deploy:hoje, tags:[]});
       render();
     }""")
     page.click("#f4pTab")
     assert page.locator(".f4p-recon").count() == 1
     assert "DIVERGE2" in page.inner_text(".f4p-recon")
     assert "Vazão Realizado" in page.inner_text(".f4p-recon")
-    page.evaluate("()=>{ CFG.f4p.types = ['user story', 'technical story']; render(); }")
+    page.evaluate("()=>{ CFG.f4p.tsTypes = ['technical story']; render(); }")
     assert page.locator(".f4p-recon").count() == 0
+
+def test_reconciliacao_banner_info_aparece_so_quando_ha_itens_demais(page):
+    carregar(page, "f4p.xlsx")
+    page.evaluate("""()=>{
+      S.model.teamFlow.DEMAISBANNER = ["Backlog", "Vazao"];
+      CFG.flow.demaisbanner = {cat:{vazao:"vazao"}, ct:[]};
+      CFG.f4p.types = ["user story", "technical story", "internal bug"];
+      S.model.teams.push("DEMAISBANNER");
+      S.f.team = "DEMAISBANNER"; S.f.exec = semestre(TODAY);
+      const hoje = new Date();
+      S.model.ops.set("ib1", {team:"DEMAISBANNER", type:"Internal Bug", stName:"Vazao", deploy:hoje, tags:[]});
+      render();
+    }""")
+    page.click("#f4pTab")
+    assert page.locator(".f4p-recon").count() == 0   # sem divergência real: nada em vermelho
+    assert page.locator(".f4p-recon-info").count() == 1
+    assert "DEMAISBANNER" in page.inner_text(".f4p-recon-info")
+    page.evaluate("()=>{ CFG.f4p.types = ['user story', 'technical story']; render(); }")
+    assert page.locator(".f4p-recon-info").count() == 0
 
 # ---------------- Quadrante 8 · Eficiência de fluxo (min vs atual vs max) ----------------
 # Decisão 0031. Eficiência do Fluxo = Touch Time ÷ (Touch Time + Waiting Time) × 100, pela classificação
