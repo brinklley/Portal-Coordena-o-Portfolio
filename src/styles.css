@@ -516,6 +516,9 @@ tr[data-cat="disc"] .fnb{background:var(--c-disc);color:#fff} tr[data-cat="wip"]
 .f4p-recon{margin:0 0 14px;padding:10px 14px;border:1px solid var(--alert);border-radius:8px;background:#FDECEA;color:#7A1F17;font-size:12.5px;line-height:1.5}
 .f4p-recon b{color:var(--alert)}
 .f4p-recon ul{margin:6px 0 0;padding-left:18px}
+.f4p-recon-info{margin:0 0 14px;padding:10px 14px;border:1px solid var(--ok);border-radius:8px;background:#EAF1F6;color:#1F3A4D;font-size:12.5px;line-height:1.5}
+.f4p-recon-info b{color:var(--ok)}
+.f4p-recon-info ul{margin:6px 0 0;padding-left:18px}
 /* Actionable (painel de métricas acionáveis por time) */
 .act-card-body{padding:10px 12px 4px}
 .act-chart{width:100%;height:auto;display:block}

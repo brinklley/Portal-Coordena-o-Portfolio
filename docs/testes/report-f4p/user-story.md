@@ -1,7 +1,7 @@
 # Testes: Report F4P — Quadrante 7 (User Story: reservado vs. planejado outro semestre vs. não planejado) + conferência cruzada
 
 Ver `docs/testes/report-f4p/README.md` para as regras compartilhadas. Regras de negócio: §12.8.
-Decisões `0030`, `0043`, `0071`.
+Decisões `0030`, `0043`, `0071`, `0072`.
 
 Mesmo critério de "entregue" (categoria de fluxo Vazão) do Technical Story/Vazão, mas com **tipos
 próprios** (`CFG.f4p.usTypes`, padrão `["user story"]`, independentes de `CFG.f4p.types` do CT).
@@ -87,62 +87,91 @@ usado pela conferência cruzada (decisão `0043`).
 
 ---
 
-## Conferência cruzada: Vazão × Technical Story × User Story (decisões `0030`, `0071`)
+## Conferência cruzada: Vazão × Technical Story × User Story (decisões `0030`, `0071`, `0072`)
 
 **Garante que**: para qualquer time, Vazão Realizado é sempre igual à soma de Technical Story
-Realizado + User Story Planejado + User Story Não planejado — mesmo universo de itens entregues no
-período, só recortado por tipo em cada quadrante. Essa é uma validação explícita pedida pelo usuário
-para dar confiança de que os três quadrantes, calculados de forma independente, não divergem. Aqui
-"User Story Planejado" é o **total** (`f4pUsPlanejadoItems`, agregado interno usado só pelo cálculo,
-não exibido diretamente na UI desde a decisão `0043`) — a soma de Reservado + Planejado (outro
-semestre) não muda esse total, então a conferência continua batendo sem alteração de cálculo.
+Realizado + User Story Planejado + User Story Não planejado + Demais — mesmo universo de itens
+entregues no período, só recortado por tipo em cada quadrante (mais o restante, "Demais", que nenhum
+dos dois cobre). Essa é uma validação explícita pedida pelo usuário para dar confiança de que os
+quadrantes, calculados de forma independente, não divergem. Aqui "User Story Planejado" é o **total**
+(`f4pUsPlanejadoItems`, agregado interno usado só pelo cálculo, não exibido diretamente na UI desde a
+decisão `0043`) — a soma de Reservado + Planejado (outro semestre) não muda esse total, então a
+conferência continua batendo sem alteração de cálculo.
 
 - **Exemplo exato dado pelo usuário**: MOBILE com 38 no Vazão Realizado = 27 Technical Story + 4
-  User Story planejado + 7 User Story não planejado (27+4+7=38).
+  User Story planejado + 7 User Story não planejado + 0 Demais (27+4+7+0=38).
 - **Dado**: 27 itens Technical Story, 4 User Story com tag ROADMAP, 7 User Story sem tag, todos
   entregues no período.
 - **Então (sucesso)**: `f4pReconciliacao()` para o time retorna
-  `{team, vazao:38, ts:27, planejado:4, naoPlanejado:7, soma:38, ok:True}`.
+  `{team, vazao:38, ts:27, planejado:4, naoPlanejado:7, demais:0, soma:38, ok:True}`.
 - **Teste**: `test_reconciliacao_bate_com_o_exemplo_exato_do_usuario`
 
-### Regra: divergência de configuração de tipos é sinalizada, não escondida
+### Regra: tipo extra na Vazão conta automaticamente como "Demais", sem exigir configuração adicional
 
-**Garante que**: se `CFG.f4p.types` (Vazão) conta um tipo que os outros dois quadrantes não cobrem
-(ex.: um terceiro tipo além de Technical Story e dos tipos de User Story), a soma diverge — e é
-exatamente esse erro de configuração que a conferência deve sinalizar (`ok: False`), em vez de
-esconder a diferença.
+**Garante que**: `f4pDemaisItems(team, st)` soma, dentro do Vazão Realizado (`f4pVazaoRealizadoItems`,
+já filtrado por `CFG.f4p.types`), os itens cujo tipo **não** está em `CFG.f4p.tsTypes` nem em
+`CFG.f4p.usTypes`. Isso faz a soma da conferência bater **por construção** quando `CFG.f4p.types` tem um
+tipo a mais que os outros dois quadrantes não cobrem — sem exigir que o usuário replique a configuração
+numa segunda lista. Decisão `0072`, correção de curso da `0071`: o usuário reportou, com um exemplo real
+em produção, que ainda precisava configurar o tipo extra duas vezes (na Vazão e em `tsTypes`/`usTypes`)
+para a conferência parar de "divergir" — e que, mesmo quando divergia, não dava pra ver quantos itens
+formavam a diferença.
 
-- **Dado**: `CFG.f4p.types` inclui `"internal bug"` além dos tipos padrão; 1 Internal Bug entregue
-  (conta só no Vazão) + 1 User Story sem tag entregue.
-- **Então (sucesso)**: `{team, vazao:2, ts:0, planejado:0, naoPlanejado:1, soma:1, ok:False}` — a
-  soma (1) não bate com o Vazão (2), a divergência real do Internal Bug.
-- **Teste**: `test_reconciliacao_sinaliza_divergencia_quando_configuracao_de_tipos_diverge`
-- **Cenário de falha coberto**: uma configuração de tipos inconsistente entre os quadrantes passaria
-  despercebida — os três números pareceriam corretos individualmente, mas não bateriam entre si, e
-  ninguém perceberia sem essa checagem explícita.
+- **Dado**: `CFG.f4p.types` inclui `"internal bug"` além dos tipos padrão (`CFG.f4p.tsTypes`/
+  `usTypes` continuam no padrão); 1 Internal Bug entregue + 1 User Story sem tag entregue.
+- **Então (sucesso)**: `{team, vazao:2, ts:0, planejado:0, naoPlanejado:1, demais:1, soma:2, ok:True}`
+  — a soma bate (2=2) porque o Internal Bug entra em "Demais", não precisa de configuração extra.
+- **Teste**: `test_reconciliacao_tipo_extra_na_vazao_conta_como_demais_sem_divergir`
+- **Cenário de falha coberto**: antes da `0072`, esse mesmo cenário resultava em `ok:False` sem
+  explicar a diferença — o usuário via o aviso de divergência mas não tinha como saber que "1 item"
+  era a causa, nem contava-lo em lugar nenhum.
 
-### Regra: incluir o tipo extra em Technical Story (ou User Story) resolve a divergência, sem um bucket "Outros" automático
+### Regra: divergência real (soma maior que o Vazão Realizado) continua sinalizada
 
-**Garante que**: a decisão `0030` continua sinalizando qualquer tipo de `CFG.f4p.types` não coberto por
-`tsTypes` nem por `usTypes` — mas agora, desde a decisão `0071`, o usuário tem como resolver: incluir o
-tipo extra (ex. "Activity") também em `CFG.f4p.tsTypes` (ou em `usTypes`) faz ele contar normalmente na
-soma, sem mais aviso. Foi uma escolha deliberada **não** criar uma terceira categoria "Outros" que
-absorvesse automaticamente qualquer tipo não coberto — isso faria a soma bater sempre, por construção,
-e a conferência nunca mais pegaria uma configuração realmente inconsistente.
+**Garante que**: "Demais" só absorve itens que o próprio Vazão Realizado já contava — não existe
+"demais negativo". A conferência ainda sinaliza `ok:False` quando `CFG.f4p.tsTypes` ou
+`CFG.f4p.usTypes` contam um item cujo tipo `CFG.f4p.types` (Vazão) não cobre, ou quando o mesmo tipo
+está nas duas listas (`tsTypes` e `usTypes`) ao mesmo tempo — nesses casos a soma ultrapassa o Vazão
+Realizado, e isso continua sendo um erro de configuração de verdade (decisão `0030`, "divergência é
+sinalizada, não escondida" — segue valendo para este caso).
+
+- **Dado**: `CFG.f4p.tsTypes` inclui `"technical solution"`, mas `CFG.f4p.types` (Vazão) não; 1
+  Technical Solution entregue (conta em Technical Story, não no Vazão) + 1 User Story sem tag
+  entregue.
+- **Então (sucesso)**: `{team, vazao:1, ts:1, planejado:0, naoPlanejado:1, demais:0, soma:2, ok:False}`
+  — a soma (2) ultrapassa o Vazão (1).
+- **Teste**: `test_reconciliacao_sinaliza_divergencia_quando_ts_ou_us_contam_item_fora_da_vazao`
+
+### Regra: incluir o tipo extra em Technical Story (ou User Story) continua funcionando como antes
+
+**Garante que**: a decisão `0071` (Technical Story com lista de tipos própria) continua valendo —
+incluir o tipo extra também em `CFG.f4p.tsTypes` (ou `usTypes`) faz o item contar especificamente
+como Technical Story (ou User Story), em vez de cair em "Demais". Útil quando o tipo extra deve entrar
+também na meta do quadrante Technical Story, por exemplo — "Demais" é só o resultado automático de
+**não** fazer essa atribuição explícita.
 
 - **Dado**: `CFG.f4p.types` e `CFG.f4p.tsTypes` incluem `"activity"` (além dos tipos padrão); 1 Activity
-  entregue (agora conta como Technical Story) + 1 User Story sem tag entregue.
-- **Então (sucesso)**: `{team, vazao:2, ts:1, planejado:0, naoPlanejado:1, soma:2, ok:True}` — sem
-  divergência, mesmo com o tipo extra.
+  entregue (agora conta como Technical Story, não como Demais) + 1 User Story sem tag entregue.
+- **Então (sucesso)**: `{team, vazao:2, ts:1, planejado:0, naoPlanejado:1, demais:0, soma:2, ok:True}`.
 - **Teste**: `test_reconciliacao_nao_sinaliza_quando_tipo_extra_entra_em_ts_types`
 - **Relacionado**: decisão `0071-f4p-technical-story-tipo-configuravel.md`.
 
-### Regra: o banner de divergência só aparece quando há divergência real
+### Regra: clique no "Demais" abre a lista exata dos itens
 
-**Garante que**: `.f4p-recon` (o aviso visual) só é renderizado para times com `ok: False`; some
-assim que a configuração volta a bater.
+**Garante que**: mesma transparência do resto do Report F4P — o número de "Demais" é clicável e abre
+só os itens que compõem essa contagem (nem os de Technical Story, nem os de User Story).
 
-- **Dado**: um time com divergência de tipo (aparece o banner citando o time e "Vazão Realizado");
-  depois `CFG.f4p.types` volta ao padrão e re-renderiza.
-- **Então (sucesso)**: banner presente no primeiro caso; ausente depois da correção.
-- **Teste**: `test_reconciliacao_banner_aparece_so_quando_ha_divergencia`
+- **Teste**: `test_reconciliacao_clique_no_demais_abre_a_lista_exata_dos_itens`
+
+### Regra: o banner vermelho (divergência real) e o banner azul (itens "Demais") aparecem de forma independente
+
+**Garante que**: `.f4p-recon` (vermelho) só é renderizado para times com `ok:False` (erro real, ver
+regra acima); `.f4p-recon-info` (azul, informativo) só é renderizado para times com `ok:True` e
+`demais > 0`. Nenhum dos dois aparece quando a configuração está sem tipos extras.
+
+- **Teste do banner vermelho**: `test_reconciliacao_banner_vermelho_so_aparece_quando_ha_divergencia_real`
+  — divergência real (tipo em `tsTypes` fora de `CFG.f4p.types`) mostra o banner; corrigir a
+  configuração faz o banner sumir.
+- **Teste do banner azul**: `test_reconciliacao_banner_info_aparece_so_quando_ha_itens_demais` — tipo
+  extra na Vazão sem configuração adicional mostra só o banner azul (nunca o vermelho, já que a soma
+  bate); removê-lo da configuração faz o banner sumir.
