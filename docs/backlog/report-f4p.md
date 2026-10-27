@@ -36,11 +36,11 @@ Por time: `[Meta] | [Realizado] [Tendência]`
 
 ## Quadrante 4 · TECHNICAL STORY (META VS REALIZADO) — implementado
 
-Mesmo comportamento do Quadrante 3 (Urgente), com diferenças de negócio. Decisões: `docs/decisoes/0018-report-f4p-quadrante-technical-story.md` e `docs/decisoes/0020-report-f4p-technical-story-so-itens-entregues.md`. Regra completa: `docs/regras-de-negocio.md` §12.5.
+Mesmo comportamento do Quadrante 3 (Urgente), com diferenças de negócio. Decisões: `docs/decisoes/0018-report-f4p-quadrante-technical-story.md`, `docs/decisoes/0020-report-f4p-technical-story-so-itens-entregues.md` e `docs/decisoes/0071-f4p-technical-story-tipo-configuravel.md` (tipo deixa de ser fixo). Regra completa: `docs/regras-de-negocio.md` §12.5.
 
 Por time: `[Meta] | [Realizado]`
 
-- **O que conta**: itens do **tipo Technical Story** — tipo fixo (não configurável, ao contrário dos tipos de CycleTime/Variabilidade), em vez de uma tag.
+- **O que conta**: itens dos tipos configurados para este quadrante (`CFG.f4p.tsTypes`, configuração própria — padrão **Technical Story**), em vez de uma tag — até a decisão `0071`, era um tipo fixo, não configurável.
 - **Meta**: teto de itens Technical Story no semestre, configurável por time; **padrão 6** quando o time não cadastra a própria (diferente do Urgente, que fica sem meta).
 - **Realizado**: usa a mesma janela do Urgente (`f4pExactSemesterWindow`, decisões `0017`/`0018`), mas **diferente do Urgente** só conta itens já **entregues** — categoria de fluxo Vazão (`catOf`, decisão `0019`) — com `o.deploy` dentro do período; itens em Backlog, Discovery ou WIP não contam, mesmo abertos há muito tempo (decisão `0020`).
 - Indicador de cor do Realizado: acima da meta → vermelho; na meta ou abaixo → verde. Sempre colorido (a meta nunca fica "sem valor").

@@ -50,9 +50,11 @@ function cfgForm(err){
       <label>Tag da Classe de Serviço Expedite (quadrante Urgente)<select id="cfgF4pExpedite" style="width:200px">${(d.tags || []).map(tg => `<option value="${esc(tg.id)}" ${tg.id === (d.f4p.expediteTag || "urgent") ? "selected" : ""}>${esc(tg.name)}</option>`).join("") || `<option value="">Nenhuma tag cadastrada</option>`}</select></label>
     </div>
     <div class="typelist">${typesFound().map(([ty, n]) => `<label><input type="checkbox" data-f4ptype="${esc(norm(ty))}" ${(d.f4p.types || []).includes(norm(ty)) ? "checked" : ""}> ${esc(ty)} <span class="muted">${n}</span></label>`).join("") || `<span class="muted">Carregue os dados do Azure DevOps para ver os tipos.</span>`}</div>
-    <p class="help">Os tipos acima valem para CycleTime, Variabilidade e Vazão. O quadrante Urgente conta itens da tag Expedite acima de <b>qualquer</b> tipo; Technical Story conta só itens desse tipo, fixo.</p>
+    <p class="help">Os tipos acima valem para CycleTime, Variabilidade e Vazão. O quadrante Urgente conta itens da tag Expedite acima de <b>qualquer</b> tipo; Technical Story usa a lista própria abaixo.</p>
     <p class="help">Tipos de <b>épico</b> (não de item de time) considerados pelo quadrante <b>Roadmap – Épicos</b>; padrão Epic.</p>
     <div class="typelist">${typesByLevel("epi").map(([ty, n]) => `<label><input type="checkbox" data-f4pepitype="${esc(norm(ty))}" ${(d.f4p.epiTypes || []).includes(norm(ty)) ? "checked" : ""}> ${esc(ty)} <span class="muted">${n}</span></label>`).join("") || `<span class="muted">Carregue os dados do Azure DevOps para ver os tipos de épico.</span>`}</div>
+    <p class="help">Tipos considerados pelo quadrante <b>Technical Story</b>; padrão Technical Story — configuração própria, independente da lista de tipos de Vazão acima. Se você marcar na lista de Vazão (acima) um tipo que não aparecer aqui nem na lista de User Story (abaixo), a <b>Conferência divergente</b> do Report F4P vai sinalizar — inclua o tipo aqui (ou em User Story) para ele contar na conferência.</p>
+    <div class="typelist">${typesFound().map(([ty, n]) => `<label><input type="checkbox" data-f4ptstype="${esc(norm(ty))}" ${(d.f4p.tsTypes || []).includes(norm(ty)) ? "checked" : ""}> ${esc(ty)} <span class="muted">${n}</span></label>`).join("") || `<span class="muted">Carregue os dados do Azure DevOps para ver os tipos.</span>`}</div>
     <p class="help">Tipos considerados pelo quadrante <b>User Story (planejado vs não planejado)</b>; padrão User Story — configuração própria, independente da lista de tipos acima.</p>
     <div class="typelist">${typesFound().map(([ty, n]) => `<label><input type="checkbox" data-f4pustype="${esc(norm(ty))}" ${(d.f4p.usTypes || []).includes(norm(ty)) ? "checked" : ""}> ${esc(ty)} <span class="muted">${n}</span></label>`).join("") || `<span class="muted">Carregue os dados do Azure DevOps para ver os tipos.</span>`}</div>
     <p class="help">Tipos considerados pelo quadrante <b>Eficiência de fluxo</b>; sem nenhum marcado, contam <b>todos os tipos</b> (padrão) — diferente das listas acima, aqui vazio não cai num padrão fixo.</p>
@@ -130,6 +132,8 @@ function readForm(){
     .concat((d.f4p.epiTypes || []).filter(x => !$("cfgBody").querySelector(`input[data-f4pepitype="${cssEsc(x)}"]`)));
   d.f4p.usTypes = [...$("cfgBody").querySelectorAll("input[data-f4pustype]")].filter(i => i.checked).map(i => i.dataset.f4pustype)
     .concat((d.f4p.usTypes || []).filter(x => !$("cfgBody").querySelector(`input[data-f4pustype="${cssEsc(x)}"]`)));
+  d.f4p.tsTypes = [...$("cfgBody").querySelectorAll("input[data-f4ptstype]")].filter(i => i.checked).map(i => i.dataset.f4ptstype)
+    .concat((d.f4p.tsTypes || []).filter(x => !$("cfgBody").querySelector(`input[data-f4ptstype="${cssEsc(x)}"]`)));
   d.f4p.effTypes = [...$("cfgBody").querySelectorAll("input[data-f4pefftype]")].filter(i => i.checked).map(i => i.dataset.f4pefftype)
     .concat((d.f4p.effTypes || []).filter(x => !$("cfgBody").querySelector(`input[data-f4pefftype="${cssEsc(x)}"]`)));
   d.act.bugTypes = [...$("cfgBody").querySelectorAll("input[data-actbugtype]")].filter(i => i.checked).map(i => i.dataset.actbugtype)

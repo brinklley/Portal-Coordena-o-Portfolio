@@ -73,10 +73,17 @@ Urgente, que conta item aberto normalmente.
 É um alerta de propósito, não um bug: um aviso aparece no topo do painel quando a soma **Technical
 Story Realizado + User Story Planejado (Reservado + Planejado outro semestre) + User Story Não
 planejado** não bate com o **Vazão Realizado** do mesmo time. Como os três quadrantes usam listas de
-tipo configuráveis separadamente (`CFG.f4p.types` para Vazão/CycleTime, um tipo fixo para Technical
-Story, `CFG.f4p.usTypes` para User Story), uma mudança de configuração num dos três sem ajustar os
-outros produz essa divergência — o aviso mostra os números exatos de cada lado para investigar a
-configuração de tipos.
+tipo configuráveis separadamente (`CFG.f4p.types` para Vazão/CycleTime, `CFG.f4p.tsTypes` para
+Technical Story, `CFG.f4p.usTypes` para User Story), uma mudança de configuração num dos três sem
+ajustar os outros produz essa divergência — o aviso mostra os números exatos de cada lado para
+investigar a configuração de tipos.
+
+**Caso comum**: você marcou um tipo novo (ex. "Activity") na lista de tipos da Vazão, em
+Configurações › Report F4P, esperando que ele contasse no Vazão Realizado — e o aviso apareceu. Isso
+acontece porque nem a lista de Technical Story nem a de User Story sabem que "Activity" existe, então a
+soma dos dois fica menor que a Vazão. A correção é simples: inclua "Activity" também na lista de
+tipos de Technical Story (ou de User Story, se fizer mais sentido pro seu time) — a conferência passa a
+bater, porque agora os três quadrantes concordam sobre a que esse tipo equivale.
 
 ### "Não entendo a diferença entre 'Reserva' e 'Reserva entregue' no quadrante Vazão"
 

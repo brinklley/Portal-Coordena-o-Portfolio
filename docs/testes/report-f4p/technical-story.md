@@ -1,11 +1,28 @@
 # Testes: Report F4P — Quadrante 4 (Technical Story: meta vs. realizado)
 
 Ver `docs/testes/report-f4p/README.md` para as regras compartilhadas. Regras de negócio: §12.5.
-Decisões `0018`–`0020`.
+Decisões `0018`–`0020`, `0071`.
 
-Mesmo padrão de meta/cor/clique do Urgente (`urgente.md`), mas conta itens pelo **tipo** "Technical
-Story" (não por tag), e a meta padrão é **6** quando o time não cadastra a própria (o Urgente fica
-"sem meta" nesse caso — diferença proposital entre os dois quadrantes).
+Mesmo padrão de meta/cor/clique do Urgente (`urgente.md`), mas conta itens pelo **tipo** (padrão
+"Technical Story", não por tag), e a meta padrão é **6** quando o time não cadastra a própria (o
+Urgente fica "sem meta" nesse caso — diferença proposital entre os dois quadrantes).
+
+## Regra: tipos configuráveis (próprios, independentes de Vazão e User Story)
+
+**Garante que**: `f4pTsOps`/`f4pTsRealizado` usam `CFG.f4p.tsTypes` (padrão `["technical story"]`), não
+um tipo fixo — mudar `CFG.f4p.types` (Vazão) ou `CFG.f4p.usTypes` (User Story) não afeta este quadrante,
+e vice-versa.
+
+- **Teste**: `test_ts_usa_tipos_configuraveis_proprios_independentes_do_vazao` (troca `tsTypes` para
+  `["activity"]` e confirma que "Technical Story" comum deixa de contar).
+- **Testes de configuração**: `test_configuracao_ts_types_tem_padrao_technical_story`,
+  `test_configuracao_ts_types_persiste_e_entra_na_exportacao`.
+- **Cenário de falha coberto** (pedido real do usuário, decisão `0071`): antes desta decisão, o tipo
+  era fixo (`norm(o.type) === "technical story"`), então um tipo extra habilitado em `CFG.f4p.types`
+  para contar na Vazão (ex. "Activity") não tinha como ser reconhecido também como Technical Story —
+  a Conferência divergente (ver `user-story.md`) sinalizava incorretamente para o usuário como se fosse
+  um bug, quando era só a falta de uma configuração própria para este quadrante.
+- **Relacionado**: decisão `0071-f4p-technical-story-tipo-configuravel.md`.
 
 ## Regra: conta só itens do tipo Technical Story já entregues (categoria Vazão)
 
