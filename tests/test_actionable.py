@@ -1118,7 +1118,7 @@ def test_cfd_aparece_no_painel_com_legenda_e_grafico(page):
     page.wait_for_timeout(200)
     txt = page.inner_text("#actBody")
     assert "CFD (Cumulative Flow Diagram)" in txt
-    assert "Nenhum" in txt and "Discovery" in txt and "WIP" in txt and "Vazão" in txt
+    assert "Backlog" in txt and "Discovery" in txt and "WIP" in txt and "Vazão" in txt
     assert page.locator(".act-cfd-band").count() == 4
 
 def test_cfd_tooltip_mostra_os_valores_da_semana_ao_passar_o_mouse(page):
@@ -1137,7 +1137,7 @@ def test_cfd_tooltip_mostra_os_valores_da_semana_ao_passar_o_mouse(page):
     page.click("#actTab")
     page.wait_for_timeout(200)
     tip = page.evaluate("document.querySelector('.act-cfd-hit').querySelector('title').textContent")
-    assert "Nenhum: 1" in tip and "Discovery: 1" in tip and "WIP: 0" in tip and "Vazão: 0" in tip
+    assert "Backlog: 1" in tip and "Discovery: 1" in tip and "WIP: 0" in tip and "Vazão: 0" in tip
 
 def test_configuracao_cfd_include_bugs_tem_padrao_true(page):
     r = page.evaluate("()=>{ const c = normCfg({}); return c.act.cfdIncludeBugs; }")
