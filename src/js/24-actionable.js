@@ -312,7 +312,10 @@ function actDistCard(team, data){
    diminui (dentro do escopo do semestre — ver `actCfdOps`). Configurável se conta itens do tipo bug
    (`CFG.act.cfdIncludeBugs`, padrão `true` — quando desligado, exclui os tipos de `CFG.act.bugTypes`, a
    mesma lista do quadrante Distribuição Vazão por mês). Decisões `0045`, `0046` (Vazão passou a iniciar
-   em 0 no início do semestre, excluindo itens já entregues antes dele). */
+   em 0 no início do semestre, excluindo itens já entregues antes dele), `0074` (legenda/tooltip/texto de
+   ajuda exibem "Backlog" em vez de "Nenhum" — só o rótulo de exibição deste gráfico; a categoria
+   continua "Nenhum"/"none" no modelo e em todo o resto do portal, inclusive nos nomes internos deste
+   mesmo arquivo, como `bandNenhum`/`act-cfd-l-nenhum`, deixados como estão). */
 function actCfdWeeksBlock(from, to){
   const weeks = [];
   let cursor = from;
@@ -447,7 +450,7 @@ function actCfdSvg(data, st){
   const hit = drawn.map((d, i) => {
     const x0 = n === 1 ? mL : i === 0 ? mL : (xOf(i - 1) + xOf(i)) / 2;
     const x1 = n === 1 ? mL + pw : i === n - 1 ? mL + pw : i === cutoff ? xOf(i) : (xOf(i) + xOf(i + 1)) / 2;
-    const tip = `${fmtL(d.from)} a ${fmtL(d.to)} · Nenhum: ${d.bandNenhum} · Discovery: ${d.bandDisc} · WIP: ${d.bandWip} · Vazão: ${d.bandVazao}`;
+    const tip = `${fmtL(d.from)} a ${fmtL(d.to)} · Backlog: ${d.bandNenhum} · Discovery: ${d.bandDisc} · WIP: ${d.bandWip} · Vazão: ${d.bandVazao}`;
     return `<rect class="act-cfd-hit" x="${x0.toFixed(1)}" y="${mT}" width="${(x1 - x0).toFixed(1)}" height="${ph}"><title>${esc(tip)}</title></rect>`;
   }).join("");
   return `<svg class="act-chart act-cfd" viewBox="0 0 ${W} ${H}" role="img" aria-label="Diagrama de fluxo cumulativo">
@@ -462,7 +465,7 @@ function actCfdSvg(data, st){
 function actCfdCard(data, st){
   return `<div class="act-cfd-wrap">
     <div class="act-cfd-legend">
-      <span class="act-leg act-cfd-l-nenhum">Nenhum</span>
+      <span class="act-leg act-cfd-l-nenhum">Backlog</span>
       <span class="act-leg act-cfd-l-disc">Discovery</span>
       <span class="act-leg act-cfd-l-wip">WIP</span>
       <span class="act-leg act-cfd-l-vazao">Vazão</span>
@@ -502,7 +505,7 @@ function renderActionable(){
     `Para cada mês do semestre ${esc(semLong(f4pSemester()))}, dos itens entregues (Vazão) do time — exceto os tipos de bug (${esc((CFG.act.bugTypes || []).join(", ") || "nenhum tipo marcado")}) — % User Story (${esc((CFG.f4p.usTypes || []).join(", ") || "nenhum tipo marcado")}), % Technical Story (${esc((CFG.f4p.tsTypes || []).join(", ") || "nenhum tipo marcado")}) e % demais tipos entregues. Um mês sem nenhum item na amostra (inclui os meses ainda não decorridos, no semestre em curso) mostra uma barra cinza com 0%.${distTemMesTardio ? ` Mês marcado com ⚠: fora do semestre selecionado — aparece porque um item de um épico comprometido com este roadmap foi entregue depois do período; o cálculo desse mês continua olhando todas as entregas do time naquele mês civil, sem filtrar por épico, igual aos demais.` : ""} Clique numa fatia para ver os itens dela.`);
   const cfdData = actCfdData(team, st);
   const cfdCard = actCard("CFD (Cumulative Flow Diagram)", actCfdCard(cfdData, st),
-    `Para cada semana do semestre ${esc(semLong(f4pSemester()))} (blocos de 7 dias a partir do 1º dia do semestre), quantos itens do time já chegaram a cada categoria de fluxo — Nenhum (criados), Discovery, WIP e Vazão — usando as datas reais de entrada em cada coluna do quadro. Não entram itens já entregues (Vazão) antes do início do semestre selecionado, para a Vazão refletir o que aconteceu dentro do período, não o histórico acumulado de negócio já resolvido antes dele. Vazão fica na base (cresce pra cima); Nenhum no topo é sempre o total de itens (do escopo do semestre) já criados até aquela semana (nunca diminui).${st.kind === "current" ? " Num semestre em curso, o gráfico só desenha até a semana atual (marcada por uma linha vertical \"hoje\") — o restante do período fica em branco, em vez de projetar uma continuação achatada." : ""} Se um item de um épico comprometido com este roadmap for entregue depois do fim do semestre, o eixo X estende com as semanas seguintes reais até cobrir essa entrega, com uma linha vertical "fim do semestre" marcando a fronteira. ${CFG.act.cfdIncludeBugs === false ? "Itens do tipo bug não entram na amostra (desligado em Configurações)." : "Itens do tipo bug entram na amostra (padrão)."} Passe o mouse sobre o gráfico para ver os valores de cada semana.`);
+    `Para cada semana do semestre ${esc(semLong(f4pSemester()))} (blocos de 7 dias a partir do 1º dia do semestre), quantos itens do time já chegaram a cada categoria de fluxo — Backlog (criados), Discovery, WIP e Vazão — usando as datas reais de entrada em cada coluna do quadro. Não entram itens já entregues (Vazão) antes do início do semestre selecionado, para a Vazão refletir o que aconteceu dentro do período, não o histórico acumulado de negócio já resolvido antes dele. Vazão fica na base (cresce pra cima); Backlog no topo é sempre o total de itens (do escopo do semestre) já criados até aquela semana (nunca diminui).${st.kind === "current" ? " Num semestre em curso, o gráfico só desenha até a semana atual (marcada por uma linha vertical \"hoje\") — o restante do período fica em branco, em vez de projetar uma continuação achatada." : ""} Se um item de um épico comprometido com este roadmap for entregue depois do fim do semestre, o eixo X estende com as semanas seguintes reais até cobrir essa entrega, com uma linha vertical "fim do semestre" marcando a fronteira. ${CFG.act.cfdIncludeBugs === false ? "Itens do tipo bug não entram na amostra (desligado em Configurações)." : "Itens do tipo bug entram na amostra (padrão)."} Passe o mouse sobre o gráfico para ver os valores de cada semana.`);
   $("actBody").innerHTML = `<div class="act-quad-grid">${ctCard}${buCard}${distCard}${cfdCard}</div>
     <div class="an-note">Os 4 quadrantes do Actionable têm regra definida.</div>`;
 }

@@ -25,7 +25,7 @@ escolhido ainda não começou.
    conceito de Capacidade da Visão Analítica) e uma linha crescente com o Entregue acumulado mês a
    mês. "Faltam" é o que ainda não chegou em Vazão.
 4. **CFD** (Cumulative Flow Diagram): área empilhada mostrando, semana a semana, quantos itens do
-   time já passaram por cada categoria de fluxo (Nenhum, Discovery, WIP, Vazão) — reconstruído a
+   time já passaram por cada categoria de fluxo (Backlog, Discovery, WIP, Vazão) — reconstruído a
    partir do histórico real de quando cada item entrou em cada coluna, não do estado de hoje.
 
 ## Perguntas frequentes ("não está batendo com o que eu esperava")

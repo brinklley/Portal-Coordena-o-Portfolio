@@ -369,7 +369,10 @@ altura entre os cards da 1ª linha (CycleTime/Burnup).
 Reconstrução histórica (não um instantâneo do estado atual): eixo X = semanas do semestre selecionado
 em blocos fixos de 7 dias; eixo Y = contagem acumulada em cada categoria de fluxo (Nenhum/Discovery/
 WIP/Vazão), usando as datas de entrada por coluna já guardadas no modelo (`o.fd`, decisão `0006`).
-Empilhamento estilo ActionableAgile: Vazão na base, Nenhum no topo (nunca diminui).
+Empilhamento estilo ActionableAgile: Vazão na base, Nenhum no topo (nunca diminui). Decisão `0074`: a
+legenda, o tooltip e o texto de ajuda deste gráfico mostram "Backlog" em vez de "Nenhum" — só o rótulo de
+exibição; a categoria (`catOf`, os campos internos `nenhum`/`bandNenhum`) continua "Nenhum" como em todo
+o resto do portal.
 
 ### Regra: as semanas cobrem o semestre inteiro em blocos fixos de 7 dias
 
