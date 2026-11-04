@@ -562,16 +562,25 @@ function f4pEpiCatClass(e){
    de fundo do ID (decisão `0049`): por padrão, a categoria de fluxo do item (`catOf`) — antes o fundo era
    sempre verde (cor de Vazão/entregue) mesmo pra itens em Backlog/Discovery/WIP, dando a entender que tudo
    já tinha sido entregue. Épicos (Roadmap – Épicos) não têm uma categoria de fluxo — o call site passa um
-   catFn próprio baseado na coluna do quadro de Épicos. */
-function f4pItemsModal(title, items, situacaoFn, catFn){
+   catFn próprio baseado na coluna do quadro de Épicos. warnFn (decisão `0073`, opcional): quando passado,
+   abre uma coluna extra com um selo de alerta (⚠, com tooltip no `title`) para itens cujo warnFn(o) devolva
+   um texto — usado pelo Burnup Reserva · entregue para explicar, item a item, por que a contagem não bate
+   com a de outra ferramenta/quadrante que usa um critério mais restrito. warnFn(o) devolvendo algo "falsy"
+   não mostra selo nenhum naquela linha; sem warnFn (os demais call sites), a coluna nem aparece. */
+function f4pItemsModal(title, items, situacaoFn, catFn, warnFn){
   situacaoFn = situacaoFn || f4pItemSituacao;
   catFn = catFn || (o => catOf(o));
-  const rows = items.length ? items.map(o => `<tr><td><button type="button" class="idb ${esc(catFn(o))}" data-f4p-go="${esc(o.id)}">${esc(o.id)}</button></td>
+  const showWarn = typeof warnFn === "function";
+  const rows = items.length ? items.map(o => {
+    const w = showWarn ? warnFn(o) : null;
+    const warnTd = showWarn ? `<td class="c">${w ? `<span class="f4p-items-warn" title="${esc(w)}">⚠</span>` : ""}</td>` : "";
+    return `<tr><td><button type="button" class="idb ${esc(catFn(o))}" data-f4p-go="${esc(o.id)}">${esc(o.id)}</button></td>
       <td>${esc(o.title || "(sem título)")}</td>
-      <td class="c">${esc(situacaoFn(o))}</td></tr>`).join("")
-    : `<tr><td colspan="3" class="muted">Nenhum item nesta contagem.</td></tr>`;
+      <td class="c">${esc(situacaoFn(o))}</td>${warnTd}</tr>`;
+  }).join("")
+    : `<tr><td colspan="${showWarn ? 4 : 3}" class="muted">Nenhum item nesta contagem.</td></tr>`;
   $("f4pItemsTitle").textContent = title;
-  $("f4pItemsBody").innerHTML = `<table class="ctab f4p-items-tbl"><thead><tr><th>ID</th><th>Título</th><th>Situação</th></tr></thead><tbody>${rows}</tbody></table>`;
+  $("f4pItemsBody").innerHTML = `<table class="ctab f4p-items-tbl"><thead><tr><th>ID</th><th>Título</th><th>Situação</th>${showWarn ? "<th></th>" : ""}</tr></thead><tbody>${rows}</tbody></table>`;
   $("f4pItemsBg").hidden = false;
 }
 function closeF4PItems(){ $("f4pItemsBg").hidden = true; }

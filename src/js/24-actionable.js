@@ -185,6 +185,24 @@ function actBurnupSummary(data){
     <button type="button" class="f4p-real ${data.faltam > 0 ? "f4p-warn" : "f4p-good"}" data-act-items="faltam">${data.faltam}</button> falta${data.faltam === 1 ? "" : "m"}
   </div>`;
 }
+/* Decisão `0073`: o usuário comparou o "Entregue" do Burnup Reserva com o "Reservado" do quadrante User
+   Story do Report F4P (§12.8) pro mesmo time/semestre e viu números diferentes (6 × 4) — investigou e
+   achou os dois itens da diferença, de propósito (não um bug): "Entregue" usa os tipos de `CFG.ctTypes`
+   (Technical Story/Technical Solution inclusos) e conta qualquer entrega da Reserva, mesmo fora do
+   período exato do semestre (§13.3); o "Reservado" do User Story usa só `CFG.f4p.usTypes` e exige entrega
+   dentro do período exato. Em vez de unificar os dois critérios (quebraria a regra de cada quadrante,
+   documentada e testada à parte), o pedido foi tornar a diferença visível no próprio modal: cada item do
+   "Entregue" ganha um selo de alerta (⚠, amarelo) com o motivo exato no tooltip, só quando ele não
+   contaria no "Reservado" do User Story — o usuário não precisa mais investigar manualmente. */
+function actBurnupEntregueWarn(o, st){
+  const motivos = [];
+  const {from, to} = f4pExactSemesterWindow(st);
+  if (o.deploy && (o.deploy < from || o.deploy > to)) motivos.push("entregue fora do período exato do semestre selecionado");
+  const usTypes = f4pUsTypes();
+  if (!o.type || !usTypes.has(norm(o.type))) motivos.push(`tipo "${o.type || "sem tipo"}" não é um dos tipos de User Story`);
+  if (!motivos.length) return null;
+  return `Não entra no "Reservado" do quadrante User Story do Report F4P (§12.8): ${motivos.join("; ")}.`;
+}
 
 /* Itens "tardios" (decisões `0060`/`0061`): entregues (categoria Vazão) depois do fim do semestre
    selecionado, mas cujo épico está comprometido com o roadmap deste time+semestre (mesmo conjunto de
@@ -481,7 +499,7 @@ function renderActionable(){
   const distData = actDistData(team, st);
   const distTemMesTardio = distData.some(d => d.late);
   const distCard = actCard("Distribuição Vazão por mês", actDistCard(team, distData),
-    `Para cada mês do semestre ${esc(semLong(f4pSemester()))}, dos itens entregues (Vazão) do time — exceto os tipos de bug (${esc((CFG.act.bugTypes || []).join(", ") || "nenhum tipo marcado")}) — % User Story (${esc((CFG.f4p.usTypes || []).join(", ") || "nenhum tipo marcado")}), % Technical Story (tipo fixo) e % demais tipos entregues. Um mês sem nenhum item na amostra (inclui os meses ainda não decorridos, no semestre em curso) mostra uma barra cinza com 0%.${distTemMesTardio ? ` Mês marcado com ⚠: fora do semestre selecionado — aparece porque um item de um épico comprometido com este roadmap foi entregue depois do período; o cálculo desse mês continua olhando todas as entregas do time naquele mês civil, sem filtrar por épico, igual aos demais.` : ""} Clique numa fatia para ver os itens dela.`);
+    `Para cada mês do semestre ${esc(semLong(f4pSemester()))}, dos itens entregues (Vazão) do time — exceto os tipos de bug (${esc((CFG.act.bugTypes || []).join(", ") || "nenhum tipo marcado")}) — % User Story (${esc((CFG.f4p.usTypes || []).join(", ") || "nenhum tipo marcado")}), % Technical Story (${esc((CFG.f4p.tsTypes || []).join(", ") || "nenhum tipo marcado")}) e % demais tipos entregues. Um mês sem nenhum item na amostra (inclui os meses ainda não decorridos, no semestre em curso) mostra uma barra cinza com 0%.${distTemMesTardio ? ` Mês marcado com ⚠: fora do semestre selecionado — aparece porque um item de um épico comprometido com este roadmap foi entregue depois do período; o cálculo desse mês continua olhando todas as entregas do time naquele mês civil, sem filtrar por épico, igual aos demais.` : ""} Clique numa fatia para ver os itens dela.`);
   const cfdData = actCfdData(team, st);
   const cfdCard = actCard("CFD (Cumulative Flow Diagram)", actCfdCard(cfdData, st),
     `Para cada semana do semestre ${esc(semLong(f4pSemester()))} (blocos de 7 dias a partir do 1º dia do semestre), quantos itens do time já chegaram a cada categoria de fluxo — Nenhum (criados), Discovery, WIP e Vazão — usando as datas reais de entrada em cada coluna do quadro. Não entram itens já entregues (Vazão) antes do início do semestre selecionado, para a Vazão refletir o que aconteceu dentro do período, não o histórico acumulado de negócio já resolvido antes dele. Vazão fica na base (cresce pra cima); Nenhum no topo é sempre o total de itens (do escopo do semestre) já criados até aquela semana (nunca diminui).${st.kind === "current" ? " Num semestre em curso, o gráfico só desenha até a semana atual (marcada por uma linha vertical \"hoje\") — o restante do período fica em branco, em vez de projetar uma continuação achatada." : ""} Se um item de um épico comprometido com este roadmap for entregue depois do fim do semestre, o eixo X estende com as semanas seguintes reais até cobrir essa entrega, com uma linha vertical "fim do semestre" marcando a fronteira. ${CFG.act.cfdIncludeBugs === false ? "Itens do tipo bug não entram na amostra (desligado em Configurações)." : "Itens do tipo bug entram na amostra (padrão)."} Passe o mouse sobre o gráfico para ver os valores de cada semana.`);
@@ -500,11 +518,13 @@ $("actBody").addEventListener("click", e => {
   if (dot){ closeActionable(); gotoId(dot.dataset.actGo); return; }
   const btn = e.target.closest("[data-act-items]");
   if (btn){
-    const buData = actBurnupData();
+    const st = f4pSemesterState();
+    const buData = actBurnupData(st);
     const which = btn.dataset.actItems;
     const items = which === "reserva" ? buData.capItems : which === "entregue" ? buData.entregues : buData.faltamItems;
     const label = which === "reserva" ? "reservado" : which === "entregue" ? "entregue" : "faltam";
-    f4pItemsModal(`Burnup Reserva · ${S.f.team} · ${label} · ${semLong(f4pSemester())}`, items);
+    const warnFn = which === "entregue" ? (o => actBurnupEntregueWarn(o, st)) : null;
+    f4pItemsModal(`Burnup Reserva · ${S.f.team} · ${label} · ${semLong(f4pSemester())}`, items, undefined, undefined, warnFn);
     return;
   }
   const distBtn = e.target.closest("[data-act-dist-set]");
