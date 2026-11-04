@@ -225,6 +225,31 @@ clicáveis, abrindo a lista dos itens exatos de cada grupo (mesmo modal `f4pItem
   `test_burnup_clique_em_faltam_abre_lista_dos_itens_ainda_nao_entregues`
 - **Relacionado**: decisão `0042-burnup-clique-em-faltam.md`.
 
+## Regra: itens do "Entregue" que não contariam no "Reservado" do User Story do Report F4P ganham um selo de alerta (decisão `0073`)
+
+**Garante que**: o usuário comparou "Entregue" do Burnup Reserva (tipos de `CFG.ctTypes`, qualquer data
+de entrega) com "Reservado" do quadrante User Story do Report F4P (só `CFG.f4p.usTypes`, só dentro do
+período exato do semestre) e viu números diferentes — não é um bug, os dois critérios são deliberadamente
+diferentes. Cada item do modal "Entregue" que não entraria no "Reservado" do User Story ganha um selo ⚠
+(`.f4p-items-warn`) com o motivo exato no `title`: tipo fora de `usTypes`, entrega fora do período exato,
+ou os dois juntos. Itens que contariam igual nos dois (mesmo tipo, mesma janela) não ganham selo nenhum.
+
+- **Dado**: Reserva do time com 3 itens entregues — 1 User Story dentro do período exato do semestre
+  (não diverge), 1 Technical Story dentro do período (diverge só por tipo), 1 User Story entregue antes
+  do início do semestre (diverge só por janela).
+- **Então (sucesso)**: no modal "Entregue", só os dois últimos têm `.f4p-items-warn`; o `title` de cada
+  um cita o motivo certo (tipo, ou período, respectivamente).
+- **Teste**: `test_burnup_entregue_sinaliza_item_que_nao_conta_no_reservado_do_user_story`
+- **Teste do motivo combinado**: `test_burnup_entregue_sinaliza_os_dois_motivos_juntos_no_tooltip` — um
+  item Technical Story entregue fora do período junta os dois motivos no mesmo tooltip.
+- **Teste de ausência**: `test_burnup_reservado_e_faltam_nao_tem_coluna_de_alerta` — o selo é exclusivo
+  do modal "Entregue"; "Reservado" e "Faltam" continuam sem a coluna extra (mesmo call site do
+  `f4pItemsModal`, sem `warnFn`).
+- **Cenário de falha coberto**: o usuário precisou investigar manualmente, item por item, pra achar os 2
+  itens responsáveis pela diferença de 6 para 4 — o selo entrega essa informação de cara, sem precisar
+  cruzar os dois painéis.
+- **Relacionado**: decisão `0073-burnup-entregue-selo-divergencia-com-user-story.md`.
+
 ## Regra: uma entrega fora do período do semestre selecionado conta como Entregue, não como Faltam
 
 **Garante que** (decisão `0058`, correção — revê a regra anterior, decisão `0041`): Entregue e Faltam

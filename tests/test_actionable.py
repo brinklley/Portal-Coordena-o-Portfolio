@@ -272,6 +272,98 @@ def test_burnup_clique_em_faltam_abre_lista_dos_itens_ainda_nao_entregues(page):
     body = page.inner_text("#f4pItemsBody")
     assert "g2" in body and "g3" in body and "g1" not in body
 
+# Decisão 0073: pedido do usuário depois de comparar o "Entregue" do Burnup Reserva com o "Reservado" do
+# quadrante User Story do Report F4P pro mesmo time/semestre e ver números diferentes (6 × 4) — investigou
+# e achou os dois itens da diferença (1 Technical Story, 1 entregue fora do período) sem ser um bug: os
+# dois quadrantes usam tipos e janela deliberadamente diferentes. O modal "Entregue" passa a sinalizar,
+# item a item, qual não contaria no "Reservado" do User Story, com o motivo no tooltip.
+
+def test_burnup_entregue_sinaliza_item_que_nao_conta_no_reservado_do_user_story(page):
+    carregar(page, "f4p.xlsx")
+    sem = page.evaluate("semestre(TODAY)")
+    page.evaluate("""(sem)=>{
+      S.model.teamFlow.BUWARN = ["Backlog", "Vazao"];
+      CFG.flow.buwarn = {cat:{vazao:"vazao"}, ct:[]};
+      const curStart = f4pSemStart(sem);
+      const dentro = new Date(curStart.getFullYear(), curStart.getMonth()+1, 15);
+      const antes = new Date(curStart.getTime() - 10*864e5);
+      S.model.ops.set("w1", {id:"w1", title:"W1", team:"BUWARN", type:"User Story", stName:"Vazao", deploy:dentro, ready:dentro, tags:["ROADMAP"]});
+      S.model.ops.set("w2", {id:"w2", title:"W2", team:"BUWARN", type:"Technical Story", stName:"Vazao", deploy:dentro, ready:dentro, tags:["ROADMAP"]});
+      S.model.ops.set("w3", {id:"w3", title:"W3", team:"BUWARN", type:"User Story", stName:"Vazao", deploy:antes, ready:antes, tags:["ROADMAP"]});
+      S.model.inis.set("INI_W", {id:"INI_W", valid:true, title:"Ini", exec:sem, owner:null, rels:["REL_W"]});
+      S.model.rels.set("REL_W", {id:"REL_W", valid:true, title:"Rel", parent:"INI_W", epis:["EPI_W"]});
+      S.model.epis.set("EPI_W", {id:"EPI_W", valid:true, title:"Epi", parent:"REL_W", target:null, interno:null, st:0, ops:["w1","w2","w3"], type:"Epic"});
+      S.model.teams.push("BUWARN");
+      S.f.team = "BUWARN"; S.f.exec = sem;
+      render();
+    }""", sem)
+    page.click("#actTab")
+    page.wait_for_timeout(200)
+    page.click('[data-act-items="entregue"]')
+    assert page.is_visible("#f4pItemsBg")
+    assert page.locator("#f4pItemsBody tbody tr").count() == 3
+    assert page.locator('#f4pItemsBody tr:has(button[data-f4p-go="w1"]) .f4p-items-warn').count() == 0
+    w2_warn = page.locator('#f4pItemsBody tr:has(button[data-f4p-go="w2"]) .f4p-items-warn')
+    assert w2_warn.count() == 1
+    w2_title = w2_warn.get_attribute("title")
+    assert "não é um dos tipos de User Story" in w2_title and "período exato do semestre" not in w2_title
+    w3_warn = page.locator('#f4pItemsBody tr:has(button[data-f4p-go="w3"]) .f4p-items-warn')
+    assert w3_warn.count() == 1
+    w3_title = w3_warn.get_attribute("title")
+    assert "período exato do semestre" in w3_title and "não é um dos tipos" not in w3_title
+
+def test_burnup_entregue_sinaliza_os_dois_motivos_juntos_no_tooltip(page):
+    """Um item Technical Story entregue fora do período exato do semestre junta os dois motivos no mesmo
+    tooltip, em vez de mostrar só um deles."""
+    carregar(page, "f4p.xlsx")
+    sem = page.evaluate("semestre(TODAY)")
+    page.evaluate("""(sem)=>{
+      S.model.teamFlow.BUWARN2 = ["Backlog", "Vazao"];
+      CFG.flow.buwarn2 = {cat:{vazao:"vazao"}, ct:[]};
+      const antes = new Date(f4pSemStart(sem).getTime() - 10*864e5);
+      S.model.ops.set("x1", {id:"x1", title:"X1", team:"BUWARN2", type:"Technical Story", stName:"Vazao", deploy:antes, ready:antes, tags:["ROADMAP"]});
+      S.model.inis.set("INI_X", {id:"INI_X", valid:true, title:"Ini", exec:sem, owner:null, rels:["REL_X"]});
+      S.model.rels.set("REL_X", {id:"REL_X", valid:true, title:"Rel", parent:"INI_X", epis:["EPI_X"]});
+      S.model.epis.set("EPI_X", {id:"EPI_X", valid:true, title:"Epi", parent:"REL_X", target:null, interno:null, st:0, ops:["x1"], type:"Epic"});
+      S.model.teams.push("BUWARN2");
+      S.f.team = "BUWARN2"; S.f.exec = sem;
+      render();
+    }""", sem)
+    page.click("#actTab")
+    page.wait_for_timeout(200)
+    page.click('[data-act-items="entregue"]')
+    warn = page.locator("#f4pItemsBody .f4p-items-warn")
+    assert warn.count() == 1
+    title = warn.get_attribute("title")
+    assert "não é um dos tipos de User Story" in title and "período exato do semestre" in title
+
+def test_burnup_reservado_e_faltam_nao_tem_coluna_de_alerta(page):
+    """O selo é exclusivo do modal "Entregue" — "Reservado" e "Faltam" usam o mesmo `f4pItemsModal`, mas
+    sem `warnFn`, então nem a coluna extra aparece."""
+    carregar(page, "f4p.xlsx")
+    sem = page.evaluate("semestre(TODAY)")
+    page.evaluate("""(sem)=>{
+      S.model.teamFlow.BUWARN3 = ["Backlog", "Vazao"];
+      CFG.flow.buwarn3 = {cat:{vazao:"vazao"}, ct:[]};
+      S.model.ops.set("y1", {id:"y1", title:"Y1", team:"BUWARN3", type:"Technical Story", stName:"Backlog", deploy:null, ready:null, tags:["ROADMAP"]});
+      S.model.inis.set("INI_Y", {id:"INI_Y", valid:true, title:"Ini", exec:sem, owner:null, rels:["REL_Y"]});
+      S.model.rels.set("REL_Y", {id:"REL_Y", valid:true, title:"Rel", parent:"INI_Y", epis:["EPI_Y"]});
+      S.model.epis.set("EPI_Y", {id:"EPI_Y", valid:true, title:"Epi", parent:"REL_Y", target:null, interno:null, st:0, ops:["y1"], type:"Epic"});
+      S.model.teams.push("BUWARN3");
+      S.f.team = "BUWARN3"; S.f.exec = sem;
+      render();
+    }""", sem)
+    page.click("#actTab")
+    page.wait_for_timeout(200)
+    page.click('[data-act-items="reserva"]')
+    assert page.is_visible("#f4pItemsBg")
+    assert page.locator("#f4pItemsBody thead th").count() == 3
+    assert page.locator("#f4pItemsBody .f4p-items-warn").count() == 0
+    page.click("#f4pItemsClose")
+    page.click('[data-act-items="faltam"]')
+    assert page.locator("#f4pItemsBody thead th").count() == 3
+    assert page.locator("#f4pItemsBody .f4p-items-warn").count() == 0
+
 def test_burnup_entrega_fora_do_periodo_do_semestre_ainda_conta_como_entregue(page):
     """Decisão 0058 (correção; revê a regra anterior, decisão 0041): um item da Reserva entregue depois
     que o semestre selecionado (já encerrado) fechou continua contando como "entregue" no resumo. Mesma
